@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🚀 Code2Larp
+# NASA Space Apps Challenge - Code2Larp
 ### *Transforming Real-Time Space Telemetry into Collaborative Mission Control Roleplay*
 
 [![NASA Space Apps Challenge](https://img.shields.io/badge/NASA%20Space%20Apps-2026-0B3D91?style=for-the-badge&logo=nasa&logoColor=white)](https://www.spaceappschallenge.org/)
