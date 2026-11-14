@@ -19,6 +19,17 @@
 - Colours: brand green `#17643a`, controls `#1f8a4c`, water `#2f9fd3`/`#1b5fa8`, storm `#e2533c`, white surfaces.
   Fonts: Inter (UI, wordmark), Bricolage Grotesque (big figures only).
 
+## 0a. Data accuracy rules already applied (keep them)
+
+- Bicol flood map = Sentinel-1 **mosaic**: orbit 134 pass of **2 Nov** where it covers, orbit 61 pass of **28 Oct** elsewhere
+  (`bicol_summary.json → orbits`, per-town `sentinel1`). Say "28 Oct + 2 Nov", never just "2 Nov", for Bicol-wide figures.
+  The 30 m pilot (fields, hit rate, pilot grids) is the 2 Nov pass only.
+- Kristine event window = **21–26 Oct 2024** (CLAUDE.md §1). Bicol rain/soil figures = Bicol-land averages of the
+  interpolated NASA POWER grid (sea cells excluded). Day axis = Philippine time (UTC+8).
+- Closest pass is measured to the EONET track line (≈259 km from Naga, 23 Oct 04:49 PHT); never imply a direct hit.
+- Elevation in the readout/inspector comes from the 3D terrain (AWS Terrain Tiles) with the exaggeration removed;
+  it is approximate and hidden in 2D.
+
 ## 0b. Next tasks, in priority order
 
 1. **Demo video (≤30 s)**: press Story, screen-record the 5 steps at 1534×728, add English subtitles.

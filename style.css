@@ -720,3 +720,9 @@ h2, h3, h4, .pilot-head h2, .plot-card h3, .story h2, .insp-head b { font-family
 }
 .dock { top: calc(50% - 34px); }
 @media (max-width: 760px) { .dock { top: auto; } }
+/* legend fold + town hover card */
+.legend-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; border: 0; background: none; padding: 0; font: 600 11.5px var(--ui); color: var(--muted); cursor: pointer; }
+.legend-toggle [data-lucide] { width: 14px; height: 14px; }
+.town-pop .maplibregl-popup-content { font: 400 12px/1.45 var(--ui); padding: 8px 10px; border-radius: 10px; }
+.town-pop .maplibregl-popup-content small { color: var(--muted); }
+.town-pop .maplibregl-popup-tip { display: none; }

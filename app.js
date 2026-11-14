@@ -423,6 +423,13 @@ function addLayers() {
     hovered = f.id; map.setFeatureState({ source: "munis", id: hovered }, { hover: true });
     map.getCanvas().style.cursor = "crosshair";
   });
+  hoverPopup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 12, className: "town-pop" });
+  map.on("mousemove", "towns-fill", (e) => {
+    const p = e.features[0].properties;
+    if (dayISO(S.t) < "2024-11-02") { hoverPopup.remove(); return; }
+    hoverPopup.setLngLat(e.lngLat).setHTML(`<b>${esc(p.name)}</b>, ${esc(p.province)}<br>${fmt(p.flooded_farmland_ha)} ha flooded farmland (${pct(p.flooded_share)})<br><small>Sentinel-1 ${esc(p.sentinel1)}</small>`).addTo(map);
+  });
+  map.on("mouseleave", "towns-fill", () => hoverPopup.remove());
   map.on("mouseleave", "towns-fill", () => { if (hovered !== null) map.setFeatureState({ source: "munis", id: hovered }, { hover: false }); hovered = null; map.getCanvas().style.cursor = ""; });
 }
 
@@ -452,6 +459,13 @@ function setBasemap(k) {
 }
 
 // ---------------- hover readout + inspector ----------------
+// ground elevation from the 3D terrain (AWS Terrain Tiles), with the visual exaggeration removed
+function elevAt(lng, lat) {
+  if (!map?.getTerrain?.()) return null;
+  const v = map.queryTerrainElevation([lng, lat]);
+  const ex = map.getTerrain()?.exaggeration || 1;
+  return v == null || !isFinite(v) ? null : Math.max(0, v / ex);
+}
 function onHover(e) {
   if (!S.tl) return;
   const { lng, lat } = e.lngLat, t = townAt(lng, lat), f = FIELDS[S.field];
@@ -460,7 +474,8 @@ function onHover(e) {
     const v = sample(cellValues(S.field, Math.floor(S.t)), lng, lat);
     val = ` <span>|</span> ${f.name}: <b>${S.field === "soil" ? fmt(v, 2) : fmt(v, S.field === "lstm" ? 1 : 0)}${f.unit ? " " + f.unit : ""}</b>`;
   }
-  $("readout").innerHTML = `${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E${t ? ` <span>|</span> <b>${esc(t.name)}</b>, ${esc(t.province)}` : ""}${val}${pgReadout(lng, lat)}`;
+  const el = elevAt(lng, lat);
+  $("readout").innerHTML = `${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E${el != null ? ` <span>|</span> ${fmt(el)} m` : ""}${t ? ` <span>|</span> <b>${esc(t.name)}</b>, ${esc(t.province)}` : ""}${val}${pgReadout(lng, lat)}`;
 }
 function inspect(lon, lat) {
   S.inspect = { lon, lat };
@@ -469,7 +484,7 @@ function inspect(lon, lat) {
   pinMarker.setLngLat([lon, lat]).addTo(map);
   if (t) map.setFilter("towns-active", ["all", ["==", ["get", "name"], t.name], ["==", ["get", "province"], t.province]]);
   const rainDay = sample(cellValues("rain", di), lon, lat), rainSum = sample(cellValues("rainsum", di), lon, lat);
-  const evVals = tl.cells.map((_, i) => tl.days.reduce((a, d, k) => (d >= "2024-10-20" && d <= "2024-10-26" ? a + (tl.rain_mm[i][k] || 0) : a), 0));
+  const evVals = tl.cells.map((_, i) => tl.days.reduce((a, d, k) => (d >= "2024-10-21" && d <= "2024-10-26" ? a + (tl.rain_mm[i][k] || 0) : a), 0));
   const rainEvent = sample(evVals, lon, lat), soil = sample(cellValues("soil", di), lon, lat);
   const fl = floodAt(lon, lat);
   const flPill = fl === "flooded" ? `<span class="pill wet">Flooded farmland</span>` : fl === "farmland" ? `<span class="pill dry">Farmland, no flood seen</span>` : fl === "other" ? `<span class="pill na">Not farmland</span>` : `<span class="pill na">Outside radar map</span>`;
@@ -482,9 +497,9 @@ function inspect(lon, lat) {
       : ["Little flooded farmland seen by radar: routine monitoring.", "Radar can miss water under tall crops; confirm with barangay reports."];
   $("insp-title").textContent = t ? `${t.name}, ${t.province}` : "Point outside Bicol towns";
   $("insp-body").innerHTML = `
-    <p class="coord">${lat.toFixed(5)}° N, ${lon.toFixed(5)}° E</p>
+    <p class="coord">${lat.toFixed(5)}° N, ${lon.toFixed(5)}° E${elevAt(lon, lat) != null ? `, about ${fmt(elevAt(lon, lat))} m above sea level` : ""}</p>
     <dl class="kv">
-      <dt>Sentinel-1, 2 Nov (this pixel)</dt><dd>${flPill}</dd>
+      <dt>Radar flood map (this pixel)</dt><dd>${flPill}</dd>
       ${t ? `<div class="sec">Town</div>
       <dt>Flooded farmland</dt><dd>${fmt(t.flooded_farmland_ha)} ha (${pct(share)})</dd>
       <dt>Farmland</dt><dd>${fmt(t.farmland_ha)} ha</dd>
@@ -492,7 +507,7 @@ function inspect(lon, lat) {
       <div class="sec">Weather here, ${short(iso)} (NASA POWER)</div>
       <dt>Rain that day</dt><dd>${fmt(rainDay)} mm</dd>
       <dt>Rain since 10 Oct</dt><dd>${fmt(rainSum)} mm</dd>
-      <dt>Kristine week, 20–26 Oct</dt><dd>${fmt(rainEvent)} mm</dd>
+      <dt>Kristine, 21–26 Oct</dt><dd>${fmt(rainEvent)} mm</dd>
       <dt>Root-zone wetness</dt><dd>${fmt(soil, 2)}${soil >= 0.97 ? " (waterlogged)" : ""}</dd>
       ${sd != null ? `<dt>Distance to storm centre</dt><dd>${fmt(sd)} km</dd>` : ""}
       <div class="sec">LSTM, nearest grid cell</div>
@@ -625,7 +640,7 @@ function renderStats(di) {
 }
 function buildTimeline() {
   const rd = regionDaily(), max = Math.max(...rd.map((d) => d.mean)), passes = new Set(S.tl.passes.filter((p) => p.used).map((p) => p.date));
-  $("bars").innerHTML = S.tl.days.map((d, i) => `<i class="${d >= "2024-10-20" && d <= "2024-10-26" ? "storm" : ""}${passes.has(d) ? " pass" : ""}" style="height:${Math.max(4, (rd[i].mean / max) * 100)}%;--i:${i}" title="${short(d)}: ${fmt(rd[i].mean)} mm over Bicol land (peak ${fmt(rd[i].max)})"></i>`).join("");
+  $("bars").innerHTML = S.tl.days.map((d, i) => `<i class="${d >= "2024-10-21" && d <= "2024-10-26" ? "storm" : ""}${passes.has(d) ? " pass" : ""}" style="height:${Math.max(4, (rd[i].mean / max) * 100)}%;--i:${i}" title="${short(d)}: ${fmt(rd[i].mean)} mm over Bicol land (peak ${fmt(rd[i].max)})"></i>`).join("");
   $("bars").classList.add("intro"); setTimeout(() => $("bars").classList.remove("intro"), 1400);
   $("days").innerHTML = S.tl.days.map((d, i) => (i % 7 === 0 ? `<span style="left:${((i + 0.5) / N()) * 100}%">${short(d)}</span>` : "")).join("");
   $("ticks").innerHTML = S.events.map((e) => `<i style="left:${(e.t / N()) * 100}%;--c:${e.c}" title="${esc(short(dayISO(e.t)) + ": " + e.text)}"></i>`).join("");
@@ -820,7 +835,7 @@ function renderLayers() {
         <span><b>${f.name}</b><small>${f.sub || "Show the map without a heatmap"}</small></span></button>`).join("")}
     </div>
     ${slider("field-op", "Opacity", 0.2, 1, 0.05, S.fieldOpacity, `${Math.round(S.fieldOpacity * 100)}%`)}
-    <p class="h">Flood, Sentinel-1 radar (from 2 Nov)</p>
+    <p class="h">Flood, Sentinel-1 radar (28 Oct + 2 Nov passes)</p>
     ${toggle("hotspots", "Flood hotspots", "Density of flooded farmland; fades as you zoom in")}
     ${toggle("flood", "Flooded farmland, 100 m", "Water on farmland, from zoom 9")}
     ${toggle("towns", "Towns", "Boundaries, shaded by share of farmland flooded")}
@@ -885,7 +900,7 @@ function renderLegend() {
   }
   const after = dayISO(S.t) >= "2024-11-02";
   if (after && z < 12 && (S.layers.flood || S.layers.hotspots || S.layers.towns)) {
-    parts.push(`<div><b>Flood, Sentinel-1 2 Nov</b><div class="sw">${S.layers.hotspots ? `<span><i style="background:linear-gradient(90deg,#ffe882,#ffb000,#ff5a1f,#be0028)"></i>Hotspot density</span>` : ""}${S.layers.flood ? `<span><i style="background:#4ec4de"></i>Flooded farmland</span><span><i style="background:#e9e4c9"></i>Farmland</span>` : ""}${S.layers.towns ? `<span><i style="background:rgba(27,95,168,0.5)"></i>Town share flooded</span>` : ""}</div></div>`);
+    parts.push(`<div><b>Flood, Sentinel-1 (28 Oct + 2 Nov)</b><div class="sw">${S.layers.hotspots ? `<span><i style="background:linear-gradient(90deg,#ffe882,#ffb000,#ff5a1f,#be0028)"></i>Hotspot density</span>` : ""}${S.layers.flood ? `<span><i style="background:#4ec4de"></i>Flooded farmland</span><span><i style="background:#e9e4c9"></i>Farmland</span>` : ""}${S.layers.towns ? `<span><i style="background:rgba(27,95,168,0.5)"></i>Town share flooded</span>` : ""}</div></div>`);
   }
   if (S.pgLayer !== "none" && S.pgrid && S.layers.pilot && z >= 10.5) {
     const st = PG_STYLE[S.pgLayer], a = st.stops[0][0], b = st.stops[st.stops.length - 1][0];
@@ -893,7 +908,9 @@ function renderLegend() {
   }
   if (S.pilot && S.layers.pilot && S.ready && map.getZoom() >= 10.5) parts.unshift(`<div><b>Field Drowning Risk, 30 m</b><div class="sw">${["high", "watch", "low"].map((k) => `<span><i style="background:${RISK_C[k]}"></i>${RISK_W[k]}</span>`).join("")}<span><i style="background:none;box-shadow:inset 0 0 0 2px #4ec4de"></i>Radar flood edge</span><span><i style="background:#7fe0ff"></i>Drainage channel</span></div></div>`);
   if (S.layers.storm && z < 10) parts.push(`<div><b>Kristine (EONET winds, PAGASA classes)</b><div class="sw">${CATS.map((c) => `<span><i style="background:${c.c}"></i>${c.short}</span>`).join("")}</div></div>`);
-  $("legend").innerHTML = parts.join("");
+  $("legend").innerHTML = parts.length ? `<button type="button" class="legend-toggle" aria-expanded="${!S.legendFolded}">Legend<i data-lucide="${S.legendFolded ? "chevron-up" : "chevron-down"}"></i></button>${S.legendFolded ? "" : parts.join("")}` : "";
+  $("legend").querySelector(".legend-toggle")?.addEventListener("click", () => { S.legendFolded = !S.legendFolded; renderLegend(); });
+  icons();
 }
 
 // ---------------- towns ----------------
@@ -901,7 +918,7 @@ function renderTowns() {
   const s = S.summary, towns = S.munis.features.map((f) => f.properties).sort((a, b) => a.rank - b.rank);
   const affected = towns.filter((t) => t.flooded_farmland_ha >= 1).length;
   $("summary").innerHTML = s ? `
-    <div class="big"><b><i id="sum-ha" style="font-style:normal">0</i><small>ha</small></b><span>farmland under water on 2 Nov 2024 (Sentinel-1, 100 m, both orbits)</span></div>
+    <div class="big"><b><i id="sum-ha" style="font-style:normal">0</i><small>ha</small></b><span>farmland under water after Kristine: Sentinel-1 at 100 m, 2 Nov pass where it covers, 28 Oct pass elsewhere</span></div>
     <div><b>${affected} of ${towns.length}</b><span>towns with flooded farmland</span></div>
     <div><b>${pct(s.flooded_farmland_ha / s.farmland_ha)}</b><span>of ${fmt(s.farmland_ha)} ha farmland</span></div>` : "";
   if (s) { $("sum-ha").dataset.v = 0; countTo($("sum-ha"), s.flooded_farmland_ha); }
@@ -1151,7 +1168,7 @@ const STORY = [
     go: () => { setField("rain"); setGibs("none"); setTime(tAt("2024-10-22") + 0.5, true); map.fitBounds([[R.w, R.s], [R.e, R.n]], { padding: chromePadding(), pitch: 30, bearing: 0, duration: 1400 }); } },
   { title: "Clouds blind optical satellites", text: () => "NASA MODIS on 23 Oct sees only cloud over Bicol. Optical images cannot show where the water is during a typhoon.",
     go: () => { setField("none"); setGibs("modis"); setTime(tAt("2024-10-23") + 0.5, true); } },
-  { title: "Radar sees through the cloud", text: () => `Sentinel-1 radar on 2 Nov: ${fmt(S.summary?.flooded_farmland_ha)} ha of Bicol farmland still under water, worst in Bula, Baao and Nabua. Orange marks the flood hotspots.`,
+  { title: "Radar sees through the cloud", text: () => `Sentinel-1 radar (28 Oct and 2 Nov passes): ${fmt(S.summary?.flooded_farmland_ha)} ha of Bicol farmland still under water, worst in Bula, Baao and Nabua. Orange marks the flood hotspots.`,
     go: () => { setGibs("none"); setField("rainsum"); setTime(tAt("2024-11-02") + 0.5, true); map.flyTo({ center: [123.3, 13.5], zoom: 9.4, pitch: 40, bearing: 0, duration: 1800 }); } },
   { title: "Each field gets a drowning risk", text: () => { const p = plotFeat("PL-02")?.properties; return p ? `At 30 m, radar, terrain and rain give each field a score. ${p.plot_id} scores ${p.risk_score}/100 (high). The farmer gets an SMS: open outlets, trench the lowest bund, harvest early.` : ""; },
     go: () => { S.layers.pilot = true; selectPlot("PL-02", true); flyToPilot(); applyLayers(); } },
@@ -1188,7 +1205,7 @@ function bindStory() {
 const APPS = [
   { id: "ai", title: "SakaSAR AI", icon: "message-square-text", ai: true, sub: "Ask about the place and day on the map. Every answer is built from SakaSAR's datasets." },
   { id: "layers", title: "Layers", icon: "layers", sub: "Choose what the 3D map shows: NASA heatmaps, radar flood, storm track, satellite images and terrain." },
-  { id: "towns", title: "Towns", icon: "map-pin", sub: "Bicol towns ranked by farmland the Sentinel-1 radar saw under water on 2 Nov 2024." },
+  { id: "towns", title: "Towns", icon: "map-pin", sub: "Bicol towns ranked by farmland the Sentinel-1 radar saw under water after Kristine (28 Oct and 2 Nov 2024 passes)." },
   { id: "fields", title: "Field risk", icon: "sprout", sub: "30 m Field Drowning Risk for sample fields: score, what to do, the SMS alert and next-season rotations." },
   { id: "forecast", title: "LSTM forecast", icon: "brain-circuit", sub: "How wet the root zone stays in the 7 days after the radar pass, from an LSTM trained on NASA POWER." },
   { id: "events", title: "Events", icon: "list", sub: "What happened, day by day, generated from the data. Click one to jump there on the map." },
@@ -1535,12 +1552,12 @@ function aiAnswer(q, c) {
   }
   if (has("flood", "water", "bad", "damage", "how much")) {
     const t = c.town;
-    if (t) return { who: "bot", src: ["Sentinel-1, 2 Nov"], html: `<p><b>${esc(t.name)}, ${esc(t.province)}</b>: ${fmt(t.flooded_farmland_ha)} ha of ${fmt(t.farmland_ha)} ha farmland under water on 2 Nov (${pct(t.flooded_share)}), rank ${t.rank} of ${S.munis.features.length} towns.</p>` };
-    return { who: "bot", src: ["Sentinel-1, 2 Nov"], html: `<p>${fmt(sm.flooded_farmland_ha)} ha of Bicol farmland was still under water on 2 Nov, ${pct(sm.flooded_farmland_ha / sm.farmland_ha)} of all farmland. Camarines Sur carried most of it.</p>` };
+    if (t) return { who: "bot", src: [`Sentinel-1, ${t.sentinel1}`], html: `<p><b>${esc(t.name)}, ${esc(t.province)}</b>: ${fmt(t.flooded_farmland_ha)} ha of ${fmt(t.farmland_ha)} ha farmland under water (radar ${esc(t.sentinel1)}) (${pct(t.flooded_share)}), rank ${t.rank} of ${S.munis.features.length} towns.</p>` };
+    return { who: "bot", src: ["Sentinel-1, 28 Oct + 2 Nov"], html: `<p>${fmt(sm.flooded_farmland_ha)} ha of Bicol farmland was still under water after Kristine (radar passes of 28 Oct and 2 Nov), ${pct(sm.flooded_farmland_ha / sm.farmland_ha)} of all farmland. Camarines Sur carried most of it.</p>` };
   }
   if (has("first", "priority", "help", "where", "worst", "which town")) {
     const top = sm.top_municipalities.slice(0, 5);
-    return { who: "bot", src: ["Sentinel-1, 2 Nov"], html: `<p>Send teams first to the towns with the most flooded farmland:</p><ul>${top.map((t) => `<li><b>${esc(t.name)}</b>: ${fmt(t.flooded_farmland_ha)} ha</li>`).join("")}</ul>` };
+    return { who: "bot", src: ["Sentinel-1, 28 Oct + 2 Nov"], html: `<p>Send teams first to the towns with the most flooded farmland:</p><ul>${top.map((t) => `<li><b>${esc(t.name)}</b>: ${fmt(t.flooded_farmland_ha)} ha</li>`).join("")}</ul>` };
   }
   if (has("do", "tip", "advice", "should", "help")) {
     const t = c.town, share = t?.flooded_share ?? 0, ci = c.cell, h = ci != null ? tl.lstm_hindcast?.cells?.[ci] : null;
