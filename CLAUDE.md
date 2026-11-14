@@ -117,6 +117,19 @@ Never mount the repo root as static files.
   to the point, distance to the storm, LSTM forecast vs actual for the nearest cell, actions. Hover readout shows coordinates,
   town and the active heatmap value. Towns tab: provinces, ranking, search, CSV export.
 - NASA GIBS image of the day (MODIS, VIIRS, IMERG, SMAP) and basemaps (Esri satellite, CARTO map) are radio choices.
+- Panel tabs: Layers · Towns · **Fields** · Forecast · Events · **Data**.
+  - **Fields** = the 30 m Field Drowning Risk check from `mock-data.json` (risk engine contract): pilot metrics with the
+    independent 31% hit rate, barangay ranking, five sample fields (PL-01…05) with score bar, what drives the score
+    (0.45 radar / 0.35 terrain / 0.20 rain contributions), soil texture, timeline of actions with sources, the SMS
+    (≤160 chars, copy), and three rotations ranked by field fit then by farmer priority (water / nitrogen / cash).
+    Pending inputs (hectares, households, crop, bare-field days) carry a "sample" tag. On the map from zoom 10.5:
+    risk zones, field outlines with score labels, radar flood edge, drainage channel, optional radar-change cells.
+    The 100 m Bicol flood raster hides above zoom 12.2 so it does not cover the 30 m data.
+  - **Data** = sources and limits panel the brief requires: formula, honest hit rate (100% full model labelled circular),
+    datasets used vs future work, ₱0 licensing and processing times, plain limits, team.
+- **Story** button (toolbar): 5-step demo path matching the brief's storyboard: storm rain → MODIS sees only cloud
+  (23 Oct) → Sentinel-1 flood hotspots (2 Nov) → field drowning risk + SMS (PL-02) → ranked rotations.
+- GIBS date changes and our tile loads call `terrain.sourceCache.freeRtt()`; without it 3D shows stale tiles.
 - The map background is sea-coloured so tiles still loading never flash white.
 - Rasters (heatmap, flood) are served as `saka://` tiles from a `maplibregl.addProtocol` handler that crops the
   in-browser canvas. Do NOT go back to image/canvas sources: with 3D terrain MapLibre 4 drapes them only on some

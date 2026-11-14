@@ -44,7 +44,8 @@ const S = {
   tl: null, munis: null, summary: null, overlay: null,
   t: 23, playing: false, speed: 1, last: 0, dayShown: -1,
   field: "rainsum", fieldOpacity: 0.8, basemap: "sat", gibs: "none", view3d: true,
-  layers: { hotspots: true, flood: true, towns: true, storm: true, terrain: true, hillshade: true },
+  layers: { hotspots: true, flood: true, towns: true, storm: true, terrain: true, hillshade: true, pilot: true, sarchange: false },
+  pilot: null, plot: "PL-02", priority: "water", story: 0,
   aiMode: "hind", events: [], townCenters: [], charts: {}, ready: false, inspect: null,
 };
 let map, stormMarker, pinMarker, hoverPopup;
@@ -96,10 +97,11 @@ function nearestCell(lon, lat) {
 
 // ---------------- boot ----------------
 async function init() {
-  const [tl, munis, summary, overlay] = await Promise.all([
+  const [tl, munis, summary, overlay, pilot] = await Promise.all([
     fetchJSON("data/region/bicol_timeline.json"), fetchJSON("data/region/bicol_municipalities.geojson"),
-    fetchJSON("data/region/bicol_summary.json"), fetchJSON("data/region/bicol_flood.json"),
+    fetchJSON("data/region/bicol_summary.json"), fetchJSON("data/region/bicol_flood.json"), fetchJSON("mock-data.json"),
   ]);
+  S.pilot = pilot && pilot.plots ? pilot : null;
   if (!tl || !munis) { toast("Could not load the Bicol data files. Run the API from the project folder."); return; }
   Object.assign(S, { tl, munis, summary, overlay });
   S.t = Math.max(0, tl.days.indexOf("2024-11-02")) + 0.5;
@@ -117,6 +119,9 @@ async function init() {
   renderLayers();
   renderTowns();
   renderAI();
+  renderFields();
+  renderData();
+  bindStory();
   buildTimeline();
   initMap();
   icons();
@@ -319,14 +324,18 @@ function initMap() {
   // when our browser-made tiles arrive, the 3D terrain must re-drape them (it caches each tile's layers)
   let rttQueued = false;
   map.on("sourcedata", (e) => {
-    if ((e.sourceId === "field" || e.sourceId === "flood") && e.tile && !rttQueued) {
+    if ((e.sourceId === "field" || e.sourceId === "flood" || e.sourceId === "base" || String(e.sourceId).startsWith("gibs-")) && e.tile && !rttQueued) {
       rttQueued = true;
       requestAnimationFrame(() => { rttQueued = false; map.terrain?.sourceCache?.freeRtt?.(); map.triggerRepaint(); });
     }
   });
   map.on("mousemove", onHover);
   map.on("mouseout", () => { $("readout").innerHTML = "Move over the map to read values"; hoverPopup?.remove(); });
-  map.on("click", (e) => inspect(e.lngLat.lng, e.lngLat.lat));
+  map.on("click", (e) => {
+    const hit = S.ready && map.getLayer("plots-fill") && S.layers.pilot ? map.queryRenderedFeatures(e.point, { layers: ["plots-fill"] }) : [];
+    if (hit.length) { selectPlot(hit[0].properties.plot_id, true); return; }
+    inspect(e.lngLat.lng, e.lngLat.lat);
+  });
 }
 
 function addLayers() {
@@ -353,7 +362,7 @@ function addLayers() {
   if (S.overlay) {
     map.addSource("flood", { type: "raster", tiles: ["saka://flood/wait/{z}/{x}/{y}"], tileSize: 256, minzoom: 6, maxzoom: 13,
       bounds: [S.overlay.coordinates[0][0], S.overlay.coordinates[2][1], S.overlay.coordinates[1][0], S.overlay.coordinates[0][1]] });
-    map.addLayer({ id: "flood", type: "raster", source: "flood", minzoom: 8.5, paint: { "raster-opacity": ["interpolate", ["linear"], ["zoom"], 8.5, 0, 9.5, 1], "raster-fade-duration": 0, "raster-resampling": "nearest" } });
+    map.addLayer({ id: "flood", type: "raster", source: "flood", minzoom: 8.5, maxzoom: 12.2, paint: { "raster-opacity": ["interpolate", ["linear"], ["zoom"], 8.5, 0, 9.5, 1], "raster-fade-duration": 0, "raster-resampling": "nearest" } });
   }
 
   // storm: segments coloured by category, points, closest approach to Naga
@@ -388,6 +397,8 @@ function addLayers() {
   el.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="2.5"/><path d="M12 4c-4 0-7 2-8 5"/><path d="M12 20c4 0 7-2 8-5"/><path d="M4 12c0 4 2 7 5 8"/><path d="M20 12c0-4-2-7-5-8"/></svg><span class="storm-tag" id="storm-tag"></span>`;
   stormMarker = new maplibregl.Marker({ element: el }).setLngLat([st[0].lon, st[0].lat]).addTo(map);
 
+  addPilotLayers();
+
   let hovered = null;
   map.on("mousemove", "towns-fill", (e) => {
     const f = e.features[0];
@@ -413,6 +424,7 @@ function applyLayers() {
   vis("hillshade", L.hillshade);
   Object.keys(GIBS).forEach((k) => vis(`gibs-${k}`, S.gibs === k));
   map.setTerrain(L.terrain && S.view3d ? { source: "dem", exaggeration: Number($("exag")?.value || 1.8) } : null);
+  applyPilotLayers();
   renderLegend();
 }
 function setBasemap(k) {
@@ -549,7 +561,12 @@ function updateStorm() {
 function updateGibs(iso) {
   if (!S.ready || S.gibs === "none") return;
   const s = map.getSource(`gibs-${S.gibs}`);
-  if (s && s._date !== iso) { s.setTiles([GIBS[S.gibs].url.replace("{date}", iso)]); s._date = iso; }
+  if (s && s._date !== iso) {
+    s.setTiles([GIBS[S.gibs].url.replace("{date}", iso)]); s._date = iso;
+    // 3D terrain keeps the old date's draped tiles until told otherwise
+    const refresh = () => { map.terrain?.sourceCache?.freeRtt?.(); map.triggerRepaint(); };
+    refresh(); map.once("idle", refresh);
+  }
 }
 function regionDaily() {
   if (S._rd) return S._rd;
@@ -665,8 +682,9 @@ function renderEvents() {
 
 // ---------------- motion helpers ----------------
 // sliding pill behind the pressed button of every segmented control
-function initSegs() {
-  document.querySelectorAll(".seg").forEach((seg) => {
+function initSegs(root = document) {
+  root.querySelectorAll(".seg").forEach((seg) => {
+    if (seg.querySelector(".seg-pill")) return;
     const pill = document.createElement("span"); pill.className = "seg-pill"; pill.setAttribute("aria-hidden", "true"); seg.prepend(pill);
     const place = () => { const b = seg.querySelector('button[aria-pressed="true"]'); if (!b || !b.offsetWidth) return; pill.style.width = `${b.offsetWidth}px`; pill.style.height = `${b.offsetHeight}px`; pill.style.top = `${b.offsetTop}px`; pill.style.transform = `translateX(${b.offsetLeft}px)`; };
     new MutationObserver(place).observe(seg, { attributes: true, subtree: true, attributeFilter: ["aria-pressed"] });
@@ -769,6 +787,9 @@ function renderLayers() {
     ${toggle("hotspots", "Flood hotspots", "Density of flooded farmland; fades as you zoom in")}
     ${toggle("flood", "Flooded farmland, 100 m", "Water on farmland, from zoom 9")}
     ${toggle("towns", "Towns", "Boundaries, shaded by share of farmland flooded")}
+    <p class="h">Field Drowning Risk, 30 m (sample fields)</p>
+    ${toggle("pilot", "Risk zones and fields", "High, watch and low cells; field outlines, flood edge and drainage channel. From zoom 11")}
+    ${toggle("sarchange", "Radar wetness change", "Cells where Sentinel-1 VV dropped by 1 dB or more after the storm")}
     <p class="h">Storm</p>
     ${toggle("storm", "Kristine's track", "NASA EONET every 6 hours, PAGASA colours")}
     <p class="callout"><i data-lucide="info"></i><span>Kristine's centre crossed northern Luzon, ${fmt(closest)} km north of Naga at its closest. Bicol flooded from the storm's southern rain bands: pick <b>Rain that day</b> and press play.</span></p>
@@ -809,18 +830,19 @@ function setField(k) {
 }
 
 function renderLegend() {
-  const parts = [];
-  if (S.field !== "none") {
+  const parts = [], z = S.ready ? map.getZoom() : 7;
+  if (S.field !== "none" && z < 10.5) {
     const f = FIELDS[S.field], L = lut(S.field);
     const grad = Array.from({ length: 9 }, (_, k) => { const j = Math.round((k / 8) * 255) * 4; return `rgba(${L[j]},${L[j + 1]},${L[j + 2]},${Math.max(0.15, L[j + 3] / 255)}) ${(k / 8) * 100}%`; }).join(",");
     const extra = S.field === "lstm" ? (S.aiMode === "hind" ? "Forecast issued 3 Nov 2024" : "Kristine's rain on today's soil") : `${short(dayISO(S.t))}`;
     parts.push(`<div><b>${f.name}${f.unit ? ` (${f.unit})` : ""}</b><small>${extra}</small><div class="ramp" style="background:linear-gradient(90deg,${grad})"></div><div class="ticks-row">${f.ticks.map((t) => `<span>${t}</span>`).join("")}</div></div>`);
   }
   const after = dayISO(S.t) >= "2024-11-02";
-  if (after && (S.layers.flood || S.layers.hotspots || S.layers.towns)) {
+  if (after && z < 12 && (S.layers.flood || S.layers.hotspots || S.layers.towns)) {
     parts.push(`<div><b>Flood, Sentinel-1 2 Nov</b><div class="sw">${S.layers.hotspots ? `<span><i style="background:linear-gradient(90deg,#ffe882,#ffb000,#ff5a1f,#be0028)"></i>Hotspot density</span>` : ""}${S.layers.flood ? `<span><i style="background:#4ec4de"></i>Flooded farmland</span><span><i style="background:#e9e4c9"></i>Farmland</span>` : ""}${S.layers.towns ? `<span><i style="background:rgba(27,95,168,0.5)"></i>Town share flooded</span>` : ""}</div></div>`);
   }
-  if (S.layers.storm) parts.push(`<div><b>Kristine, PAGASA category</b><div class="sw">${CATS.map((c) => `<span><i style="background:${c.c}"></i>${c.short}</span>`).join("")}</div></div>`);
+  if (S.pilot && S.layers.pilot && S.ready && map.getZoom() >= 10.5) parts.unshift(`<div><b>Field Drowning Risk, 30 m</b><div class="sw">${["high", "watch", "low"].map((k) => `<span><i style="background:${RISK_C[k]}"></i>${RISK_W[k]}</span>`).join("")}<span><i style="background:none;box-shadow:inset 0 0 0 2px #4ec4de"></i>Radar flood edge</span><span><i style="background:#7fe0ff"></i>Drainage channel</span></div></div>`);
+  if (S.layers.storm && z < 10) parts.push(`<div><b>Kristine, PAGASA category</b><div class="sw">${CATS.map((c) => `<span><i style="background:${c.c}"></i>${c.short}</span>`).join("")}</div></div>`);
   $("legend").innerHTML = parts.join("");
 }
 
@@ -888,6 +910,225 @@ function renderAI() {
     document.querySelectorAll("#ai-seg button").forEach((b) => b.addEventListener("click", () => { S.aiMode = b.dataset.ai; renderAI(); if (S.field === "lstm") { renderField(); renderLegend(); } }));
     $("btn-ai-map").addEventListener("click", () => setField("lstm"));
   }
+}
+
+
+// ================= Field Drowning Risk: the 30 m check on sample fields =================
+// Data: mock-data.json (the risk engine's output contract). Plot sizes, households, crops and bare-field days are
+// placeholders until LGU parcel data exist (provenance.pending_inputs), so they are tagged in the UI.
+const RISK_C = { high: "#e2533c", watch: "#ee9f27", low: "#7cc69a", missing: "#9aa59f", excluded: "#c9cfcb" };
+const RISK_W = { high: "High", watch: "Watch", low: "Low", missing: "No radar data", excluded: "Not farmland" };
+const PRIORITIES = { water: "Water", nitrogen: "Soil nitrogen", cash: "Cash income" };
+const pending = (k) => (S.pilot?.provenance?.pending_inputs || []).includes(k) ? `<span class="tag" title="Placeholder until LGU parcel and census data">sample</span>` : "";
+function plotFeat(id) { return S.pilot.plots.features.find((f) => f.properties.plot_id === id); }
+function plotCenter(f) {
+  let x = 0, y = 0, n = 0; f.geometry.coordinates[0].forEach(([a, b]) => { x += a; y += b; n++; }); return [x / n, y / n];
+}
+function pilotBounds() {
+  let w = 180, e = -180, s = 90, n = -90;
+  S.pilot.plots.features.forEach((f) => f.geometry.coordinates[0].forEach(([a, b]) => { w = Math.min(w, a); e = Math.max(e, a); s = Math.min(s, b); n = Math.max(n, b); }));
+  return [[w, s], [e, n]];
+}
+function flyToPilot() {
+  if (!S.pilot) return;
+  map.fitBounds(pilotBounds(), { padding: chromePadding(), pitch: S.view3d ? 45 : 0, bearing: 0, duration: 1600, maxZoom: 15 });
+}
+
+function addPilotLayers() {
+  const P = S.pilot; if (!P) return;
+  map.addSource("risk-zones", { type: "geojson", data: P.risk_zones });
+  map.addLayer({ id: "risk-zones", type: "fill", source: "risk-zones", minzoom: 10.5,
+    paint: { "fill-color": ["match", ["get", "risk_class"], "high", RISK_C.high, "watch", RISK_C.watch, "low", RISK_C.low, "excluded", RISK_C.excluded, RISK_C.missing],
+      "fill-opacity": ["interpolate", ["linear"], ["zoom"], 10.5, 0, 11.5, 0.5] } });
+  map.addSource("sar-change", { type: "geojson", data: P.sar_backscatter_comparison.after_event });
+  map.addLayer({ id: "sar-change", type: "fill", source: "sar-change", minzoom: 10.5, layout: { visibility: "none" }, paint: { "fill-color": "#1b5fa8", "fill-opacity": 0.45, "fill-outline-color": "#ffffff" } });
+  map.addSource("obs-flood", { type: "geojson", data: P.observed_flood_extent });
+  map.addLayer({ id: "obs-flood", type: "line", source: "obs-flood", minzoom: 10.5, paint: { "line-color": "#4ec4de", "line-width": 2, "line-dasharray": [2, 1] } });
+  map.addSource("drain", { type: "geojson", data: P.drainage_corridor });
+  map.addLayer({ id: "drain", type: "line", source: "drain", minzoom: 10.5, paint: { "line-color": "#7fe0ff", "line-width": 3, "line-blur": 0.5 }, layout: { "line-cap": "round" } });
+  map.addSource("plots", { type: "geojson", data: P.plots });
+  map.addLayer({ id: "plots-fill", type: "fill", source: "plots", minzoom: 10.5, paint: { "fill-color": "#ffffff", "fill-opacity": 0.01 } });
+  map.addLayer({ id: "plots-line", type: "line", source: "plots", minzoom: 10.5,
+    paint: { "line-color": ["match", ["get", "risk_class"], "high", RISK_C.high, "watch", RISK_C.watch, RISK_C.low], "line-width": ["case", ["==", ["get", "plot_id"], S.plot], 4, 2.2] } });
+  S.plotLabels = P.plots.features.map((f) => {
+    const el = document.createElement("button"); el.type = "button"; el.className = "plot-label";
+    el.style.setProperty("--rc", RISK_C[f.properties.risk_class]);
+    el.innerHTML = `<b>${f.properties.plot_id}</b>${f.properties.risk_score}`;
+    el.addEventListener("click", (ev) => { ev.stopPropagation(); selectPlot(f.properties.plot_id, true); });
+    return new maplibregl.Marker({ element: el }).setLngLat(plotCenter(f)).addTo(map);
+  });
+  const sync = () => { const on = S.layers.pilot && map.getZoom() >= 11.2; S.plotLabels.forEach((m) => (m.getElement().style.display = on ? "" : "none")); };
+  map.on("zoom", sync); sync();
+  map.on("mouseenter", "plots-fill", () => (map.getCanvas().style.cursor = "pointer"));
+  map.on("mouseleave", "plots-fill", () => (map.getCanvas().style.cursor = ""));
+  map.on("zoomend", renderLegend);
+}
+function applyPilotLayers() {
+  if (!S.ready || !S.pilot) return;
+  ["risk-zones", "plots-fill", "plots-line", "obs-flood", "drain"].forEach((id) => vis(id, S.layers.pilot));
+  vis("sar-change", S.layers.pilot && S.layers.sarchange);
+  (S.plotLabels || []).forEach((m) => (m.getElement().style.display = S.layers.pilot && map.getZoom() >= 11.2 ? "" : "none"));
+}
+
+function selectPlot(id, openTab) {
+  S.plot = id;
+  if (S.ready && map.getLayer("plots-line")) map.setPaintProperty("plots-line", "line-width", ["case", ["==", ["get", "plot_id"], id], 4, 2.2]);
+  renderFields();
+  if (openTab) showTab("fields");
+}
+function showTab(name) {
+  const b = document.querySelector(`.tabs button[data-tab="${name}"]`); if (b && b.getAttribute("aria-selected") !== "true") b.click();
+  if ($("app").classList.contains("no-panel")) togglePanel(true);
+}
+
+function rankRotations(p) {
+  const fit = p.rotation_fit || {}, order = { good: 0, caution: 1, poor: 2 };
+  return S.pilot.rotation_strategies.map((r) => ({ ...r, fit: fit[r.id] || null }))
+    .sort((a, b) => (order[a.fit?.fit] ?? 1) - (order[b.fit?.fit] ?? 1) || (a.priorities[S.priority] ?? 9) - (b.priorities[S.priority] ?? 9));
+}
+
+function renderFields() {
+  const P = S.pilot, box = $("tab-fields");
+  if (!P) { box.innerHTML = `<p class="note">The field-level risk file (mock-data.json) did not load. Run <b>python -m pipeline.risk_engine</b>.</p>`; return; }
+  const pv = P.provenance, feats = P.plots.features, p = plotFeat(S.plot).properties, rc = RISK_C[p.risk_class];
+  const rain = pv.rainfall?.r_total_mm;
+  const parts = [
+    { k: "Radar wetness change", v: `${p.sar_wetness_change_db} dB`, w: 45 * p.s_sar, c: "#1b5fa8" },
+    { k: "Terrain wetness index", v: `${p.twi_value}`, w: 35 * p.s_twi, c: "#2f9fd3" },
+    { k: "Storm rain", v: rain ? `${fmt(rain)} mm` : "", w: 20 * p.s_rain, c: "#7fc8e8" },
+  ];
+  const soil = p.soil_0_30cm;
+  const rots = rankRotations(p);
+  box.innerHTML = `
+    <div class="pilot-head">
+      <div><h2>Field Drowning Risk, 30 m</h2><p>Every 30 m cell scored from Sentinel-1 radar, NASADEM terrain and GPM rain. Shown here for five sample fields in Minalabac, Camarines Sur, in the worst-hit part of Bicol.</p></div>
+      <button type="button" class="btn ghost" id="btn-fly-pilot"><i data-lucide="locate-fixed"></i>Go</button>
+    </div>
+    <div class="metrics">
+      <div><b>${fmt(pv.total_high_risk_ha, 1)} ha</b><span>of the sample fields rated high risk${pending("hectares")}</span></div>
+      <div><b>${pv.high_risk_plots} of ${feats.length}</b><span>fields rated high</span></div>
+      <div><b class="hit">${esc(pv.sar_hit_rate)}</b><span>of radar-seen flooded farmland the terrain + rain model had already rated high</span></div>
+      <div><b>${fmt(pv.flooded_farmland_ha, 1)} ha</b><span>flooded farmland in the 30 m area on 2 Nov</span></div>
+    </div>
+    <h2 class="h">Barangays to reach first</h2>
+    <ol class="brgys">${(pv.barangay_ranking || []).map((b) => `<li><span class="n">${b.rank}</span><span>${esc(b.barangay)}<small>${b.plots} field${b.plots > 1 ? "s" : ""}, highest score ${b.max_risk_score}</small></span><span class="v">${fmt(b.high_risk_ha, 1)} ha high<small>${b.high_risk_households} households${pending("households")}</small></span></li>`).join("")}</ol>
+    <h2 class="h">Fields</h2>
+    <div class="plot-chips" role="group" aria-label="Sample fields">${feats.map((f) => `<button type="button" class="plot-chip" data-plot="${f.properties.plot_id}" aria-pressed="${f.properties.plot_id === S.plot}" style="--rc:${RISK_C[f.properties.risk_class]}"><i></i>${f.properties.plot_id}</button>`).join("")}</div>
+    <article class="plot-card" style="--rc:${rc}">
+      <h3>${esc(p.name)}</h3>
+      <p class="sub2">${esc(p.barangay)}, ${fmt(p.hectares, 1)} ha${pending("hectares")}, ${esc(p.current_crop)}${pending("current_crop")}</p>
+      <div class="score"><div class="num">${p.risk_score}<small>/100</small></div>
+        <div><span class="cls">${RISK_W[p.risk_class]} drowning risk</span><div class="scale"><i style="left:${p.risk_score}%"></i></div><div class="scale-l"><span>0</span><span>Watch 40</span><span>High 70</span><span>100</span></div></div></div>
+      <div class="why"><b style="font-size:12px;color:var(--muted)">What drives the score</b>
+        <div class="why-bar">${parts.map((x) => `<i style="width:${x.w}%;background:${x.c}"></i>`).join("")}</div>
+        <div class="why-rows">${parts.map((x) => `<div><i style="background:${x.c}"></i><span>${x.k} <b>${x.v}</b></span><span>+${Math.round(x.w)}</span></div>`).join("")}</div></div>
+      <dl class="kv">
+        <dt>Field under water on 2 Nov</dt><dd>${pct(p.flooded_pixel_fraction)}</dd>
+        <dt>Radar VV before → after</dt><dd>${p.vv_before_db} → ${p.vv_after_db} dB</dd>
+        <dt>Mean slope</dt><dd>${fmt(p.mean_slope_deg, 1)}°</dd>
+        <dt>Bare field each year</dt><dd>${p.bare_field_days_per_year} days${pending("bare_field_days_per_year")}</dd>
+      </dl>
+      ${soil ? `<b style="font-size:12px;color:var(--muted)">Topsoil 0–30 cm (SoilGrids): ${esc(soil.texture)}, organic carbon ${soil.soc_g_per_kg} g/kg</b>
+      <div class="soilbar"><span style="width:${soil.sand_pct}%;background:#c9a66b">Sand ${Math.round(soil.sand_pct)}%</span><span style="width:${soil.silt_pct}%;background:#9c8b6e">Silt ${Math.round(soil.silt_pct)}%</span><span style="width:${soil.clay_pct}%;background:#6e5a44">Clay ${Math.round(soil.clay_pct)}%</span></div>` : ""}
+    </article>
+    <h2 class="h">What to do</h2>
+    <ol class="steps">${(p.recommendations || []).map((r) => `<li><span><b>${esc(r.when)}</b><p>${esc(r.action)}</p><small>${esc(r.why)}</small>${(r.sources || []).map((x) => `<span class="src">${esc(x)}</span>`).join("")}</span></li>`).join("")}</ol>
+    <h2 class="h">SMS alert for this field</h2>
+    <div class="sms">${esc(p.sms_alert)}</div>
+    <div class="sms-meta"><span>${p.sms_alert.length} of 160 characters, readable on any phone</span><button type="button" class="link-btn" id="btn-sms"><i data-lucide="copy"></i>Copy</button></div>
+    <h2 class="h">Next season: three rotations against the current crop</h2>
+    <div class="seg prio" role="group" aria-label="Farmer priority" id="prio-seg">${Object.entries(PRIORITIES).map(([k, v]) => `<button type="button" data-prio="${k}" aria-pressed="${k === S.priority}">${v}</button>`).join("")}</div>
+    <div class="rot-now"><span>Now: <b>${esc(p.baseline_crop || p.current_crop)}</b>${pending("current_crop")}</span><span>${p.bare_field_days_per_year} bare days/yr</span></div>
+    <div class="rots">${rots.map((r, i) => `<div class="rot ${i === 0 ? "first" : ""}"><span class="rk">${i + 1}</span><div>
+      <h4>${esc(r.name)}</h4><div class="crops">${esc(r.crops)}</div>
+      ${r.fit ? `<span class="fit ${r.fit.fit}">${r.fit.fit === "good" ? "Good fit" : r.fit.fit === "caution" ? "Use with caution" : "Poor fit"} for this field</span><p>${esc(r.fit.why)}</p>` : ""}
+      <p><b>Benefits:</b> ${esc(r.benefits)}</p><p><b>Check locally:</b> ${esc(r.risks_and_gaps)}</p></div></div>`).join("")}</div>
+    <p class="note" style="margin-top:10px">Ranked by fit to this field's risk and soil, then by your priority. Rules of thumb to confirm with the Municipal Agriculture Office.</p>`;
+  box.querySelectorAll("[data-plot]").forEach((b) => b.addEventListener("click", () => {
+    selectPlot(b.dataset.plot);
+    if (S.ready && map.getZoom() >= 11) map.easeTo({ center: plotCenter(plotFeat(b.dataset.plot)), duration: 700 });
+  }));
+  $("btn-fly-pilot").addEventListener("click", flyToPilot);
+  $("btn-sms").addEventListener("click", async () => { try { await navigator.clipboard.writeText(p.sms_alert); toast("SMS text copied."); } catch (_) { toast("Select the SMS text to copy it."); } });
+  box.querySelectorAll("[data-prio]").forEach((b) => b.addEventListener("click", () => { S.priority = b.dataset.prio; const y = box.scrollTop; renderFields(); box.scrollTop = y; }));
+  initSegs(box);
+  icons();
+}
+
+function renderData() {
+  const P = S.pilot, pv = P?.provenance || {}, sm = S.summary;
+  const split = (d) => { const i = d.indexOf(" ("); return i > 0 ? [d.slice(0, i), d.slice(i + 2, -1)] : [d, ""]; };
+  const regional = [
+    ["NASA EONET", "Kristine's storm track, every 6 hours"],
+    ["NASA POWER regional daily", "rain and root-zone wetness for every 0.5° cell in Bicol (heatmaps, LSTM inputs)"],
+    ["NASA GIBS", "MODIS, VIIRS, IMERG and SMAP imagery for each day of the replay"],
+    ["Sentinel-1 RTC, both orbits", "Bicol flood screening at 100 m (2 Nov and 28 Oct passes)"],
+  ];
+  $("tab-data").innerHTML = `
+    <p class="h">How the Field Drowning Risk score works</p>
+    <div class="formula">Score = 100 × (<b>0.45</b> radar + <b>0.35</b> terrain + <b>0.20</b> rain)
+      <div class="w"><i style="width:45%;background:#1b5fa8"></i><i style="width:35%;background:#2f9fd3"></i><i style="width:20%;background:#7fc8e8"></i></div>
+      <div class="wl"><span>Radar: −ΔVV / 4 dB</span><span>Terrain: (TWI − 5) / 10</span><span>Rain: mm / 300</span></div>
+      <div style="margin-top:8px">High 70+ · Watch 40–69 · Low under 40. Built-up and permanent water are not scored.</div></div>
+    <p class="h">Does it work? The independent check</p>
+    <div class="hitbox"><b>${esc(pv.sar_hit_rate || "n/a")}</b><p>Of the farmland the radar saw flooded on 2 Nov, this share had already been rated high by the terrain + rain part of the model, which never saw the radar. The full model scores ${esc(pv.sar_hit_rate_full_model || "")}, but that number is circular because radar is in both the score and the flood map, so we do not headline it.</p></div>
+    <p class="h">NASA and partner data used</p>
+    <ul class="ds">${regional.map(([a, b]) => `<li><span><b>${a}</b><small>${b}</small></span></li>`).join("")}
+      ${(pv.datasets_used || []).map((d) => { const [a, b] = split(d); return `<li><span><b>${esc(a)}</b><small>${esc(b)}</small></span></li>`; }).join("")}</ul>
+    <p class="h">Future work (not used yet)</p>
+    <ul class="ds future">${(pv.future_work_datasets || []).map((d) => `<li><span><b>${esc(d)}</b></span></li>`).join("")}</ul>
+    <p class="h">Cost and speed</p>
+    <div class="facts2">
+      <div><b>₱0</b><span>data licensing: open NASA and Copernicus data</span></div>
+      <div><b>${esc(pv.processing_time || "n/a")}</b><span>to rebuild the 30 m risk map from cache</span></div>
+      ${sm ? `<div><b>${fmt(sm.processing_time_sec / 60, 0)} min</b><span>to screen all ${sm.municipalities} Bicol towns at 100 m</span></div>
+      <div><b>${pct(sm.radar_coverage)}</b><span>of Bicol farmland covered by radar</span></div>` : ""}
+    </div>
+    <p class="h">Limits, stated plainly</p>
+    <ul class="limits">
+      <li>${esc(pv.scientific_limit || "C-band radar measures surface wetness, not root-zone moisture.")}</li>
+      <li>NASA POWER and the LSTM work on about 50 km cells: regional soil, not a paddy sensor.</li>
+      <li>Field sizes, households, crops and bare-field days are sample values until the LGU shares parcel and census data.</li>
+      <li>Not claimed: L-band dielectric inversion, "7 days early" detection, or a 35–50% water saving. None is built or tested.</li>
+    </ul>
+    <p class="h">Team</p>
+    <p class="note">Adrian Xavier Moral (main developer: radar, risk engine, API, LSTM), Guian Emmanuel Beriso (terrain and rain, rotation inputs), Marqus Szymon Pelagio (dashboard, demo and submission), Engr. John Roy V. Galvez (mentor). NASA Space Apps 2026, Field Shift challenge.</p>`;
+}
+
+// ================= Story mode: the 30-second demo path =================
+const STORY = [
+  { title: "Kristine soaks Bicol", text: () => `21–26 Oct 2024. The storm's centre passes ${fmt(S.closest?.km || 263)} km north of Naga, but its rain bands drop up to 246 mm a day on Bicol. The heatmap is NASA POWER daily rain.`,
+    go: () => { setField("rain"); setGibs("none"); setTime(tAt("2024-10-22") + 0.5, true); map.fitBounds([[R.w, R.s], [R.e, R.n]], { padding: chromePadding(), pitch: 30, bearing: 0, duration: 1400 }); } },
+  { title: "Clouds blind optical satellites", text: () => "NASA MODIS on 23 Oct sees only cloud over Bicol. Optical images cannot show where the water is during a typhoon.",
+    go: () => { setField("none"); setGibs("modis"); setTime(tAt("2024-10-23") + 0.5, true); } },
+  { title: "Radar sees through the cloud", text: () => `Sentinel-1 radar on 2 Nov: ${fmt(S.summary?.flooded_farmland_ha)} ha of Bicol farmland still under water, worst in Bula, Baao and Nabua. Orange marks the flood hotspots.`,
+    go: () => { setGibs("none"); setField("rainsum"); setTime(tAt("2024-11-02") + 0.5, true); map.flyTo({ center: [123.3, 13.5], zoom: 9.4, pitch: 40, bearing: 0, duration: 1800 }); } },
+  { title: "Each field gets a drowning risk", text: () => { const p = plotFeat("PL-02")?.properties; return p ? `At 30 m, radar, terrain and rain give each field a score. ${p.plot_id} scores ${p.risk_score}/100 (high). The farmer gets an SMS: open outlets, trench the lowest bund, harvest early.` : ""; },
+    go: () => { S.layers.pilot = true; selectPlot("PL-02", true); flyToPilot(); applyLayers(); } },
+  { title: "What to plant next season", text: () => "SakaSAR ranks three rotations against the current rice crop using the field's soil and risk, so the farmer and the Municipal Agriculture Office can choose together.",
+    go: () => { showTab("fields"); setTimeout(() => { const el = document.querySelector(".rots"); el?.scrollIntoView({ behavior: "smooth", block: "start" }); }, 350); } },
+];
+function setGibs(k) { S.gibs = k; document.querySelectorAll("[data-gibs]").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.gibs === k))); if (k !== "none" && S.ready) { map.getSource(`gibs-${k}`)._date = null; updateGibs(dayISO(S.t)); } applyLayers(); }
+function storyGo(i) {
+  if (!S.pilot && i === 3) i = 4;
+  S.story = Math.max(0, Math.min(STORY.length - 1, i));
+  const st = STORY[S.story];
+  pause();
+  $("story").hidden = false;
+  $("story-steps").innerHTML = STORY.map((_, k) => `<i class="${k <= S.story ? "on" : ""}"></i>`).join("");
+  $("story-title").textContent = `${S.story + 1}. ${st.title}`;
+  $("story-text").textContent = st.text();
+  $("story-prev").disabled = S.story === 0;
+  $("story-next").innerHTML = S.story === STORY.length - 1 ? `Finish<i data-lucide="check"></i>` : `Next<i data-lucide="arrow-right"></i>`;
+  icons();
+  st.go();
+}
+function bindStory() {
+  $("btn-story").addEventListener("click", () => storyGo(0));
+  $("story-next").addEventListener("click", () => (S.story >= STORY.length - 1 ? ($("story").hidden = true) : storyGo(S.story + 1)));
+  $("story-prev").addEventListener("click", () => storyGo(S.story - 1));
+  $("story-close").addEventListener("click", () => ($("story").hidden = true));
+  document.addEventListener("keydown", (e) => { if ($("story").hidden || e.target.closest("input, textarea")) return; if (e.key === "Escape") $("story").hidden = true; });
 }
 
 init();

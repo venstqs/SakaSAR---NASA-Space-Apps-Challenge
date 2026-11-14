@@ -38,6 +38,8 @@
           <button type="button" data-view="2d">2D</button><button type="button" data-view="3d" aria-pressed="true">3D</button>
         </div>
         <span class="tb-sep" aria-hidden="true"></span>
+        <button type="button" class="tool story-btn" id="btn-story" data-tip="Walk through the storm in 5 steps"><i data-lucide="presentation"></i><span>Story</span></button>
+        <span class="tb-sep" aria-hidden="true"></span>
         <button type="button" class="tool" id="btn-fit-bicol" data-tip="Zoom to Bicol"><i data-lucide="scan"></i><span>Bicol</span></button>
         <button type="button" class="tool" id="btn-fit-storm" data-tip="Show Kristine's whole track"><i data-lucide="tornado"></i><span>Storm track</span></button>
         <span class="tb-sep" aria-hidden="true"></span>
@@ -51,8 +53,10 @@
       <nav class="tabs" role="tablist" aria-label="Panel"><span class="tab-ind" aria-hidden="true"></span>
         <button type="button" role="tab" data-tab="layers" aria-selected="true"><i data-lucide="layers"></i>Layers</button>
         <button type="button" role="tab" data-tab="towns" aria-selected="false"><i data-lucide="map-pin"></i>Towns</button>
+        <button type="button" role="tab" data-tab="fields" aria-selected="false"><i data-lucide="sprout"></i>Fields</button>
         <button type="button" role="tab" data-tab="forecast" aria-selected="false"><i data-lucide="brain-circuit"></i>Forecast</button>
         <button type="button" role="tab" data-tab="events" aria-selected="false"><i data-lucide="list"></i>Events</button>
+        <button type="button" role="tab" data-tab="data" aria-selected="false"><i data-lucide="database"></i>Data</button>
       </nav>
 
       <section class="tab-body" id="tab-layers" role="tabpanel"></section>
@@ -80,6 +84,9 @@
         <p class="note">An LSTM trained on 2001–2018 NASA POWER daily weather. It reads 30 days of rain, temperature, humidity, sunlight and soil wetness, then forecasts root-zone wetness for the next 7 days. Each grid cell is about 50 km across: this is regional soil, not a paddy sensor.</p>
       </section>
 
+      <section class="tab-body" id="tab-fields" role="tabpanel" hidden></section>
+      <section class="tab-body" id="tab-data" role="tabpanel" hidden></section>
+
       <section class="tab-body" id="tab-events" role="tabpanel" hidden>
         <p class="note">Generated from the data. Click an event to jump to it.</p>
         <ol class="events" id="events"></ol>
@@ -91,6 +98,18 @@
       <div id="map" aria-label="Map of the Bicol Region"></div>
       <div class="legend" id="legend" aria-live="polite"></div>
       <div class="readout" id="readout">Move over the map to read values</div>
+
+      <section class="story" id="story" hidden aria-live="polite">
+        <div class="story-steps" id="story-steps"></div>
+        <h2 id="story-title"></h2>
+        <p id="story-text"></p>
+        <div class="story-nav">
+          <button type="button" class="link-btn" id="story-close">Exit story</button>
+          <span class="spacer"></span>
+          <button type="button" class="tool" id="story-prev"><i data-lucide="arrow-left"></i>Back</button>
+          <button type="button" class="btn" id="story-next">Next<i data-lucide="arrow-right"></i></button>
+        </div>
+      </section>
 
       <section class="inspector" id="inspector" hidden aria-label="Point details">
         <header class="insp-head"><span><i data-lucide="crosshair"></i><b id="insp-title">Point</b></span>
