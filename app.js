@@ -1,16 +1,14 @@
 const DATA_SOURCE_URL = "mock-data.json";
 const ORIGIN_LNG_LAT = [123.2005, 13.6182];
+const DEFAULT_CENTER = ORIGIN_LNG_LAT;
+let mapCenter = ORIGIN_LNG_LAT;
 
 let appData = null;
 let map = null;
 let is3D = true;
 let playInterval = null;
-<<<<<<< HEAD
-const DEFAULT_CENTER = [123.2057, 13.5416]; // Minalabac pilot strip; overridden by provenance.map_center
-let mapCenter = DEFAULT_CENTER;
-=======
 let timelineStage = 2; // Starts on Post-Storm SAR
-let sarMode = "off";
+let sarMode = "post";
 let selectedPlotId = "PL-01";
 let mapAnimFrame = null;
 let sarSweepProgress = 0;
@@ -878,7 +876,10 @@ function buildThreeScene(mapInstance, gl) {
   const sarMesh = new THREE.Mesh(sarGeom, sarMat);
   sarMesh.position.set(basinCenterX + 120, 0, basinCenterZ);
   sarGroup.add(sarMesh);
-  sarGroup.visible = false;
+  sarGroup.visible = sarMode !== "off";
+  if (sarUniforms) {
+    sarUniforms.uMode.value = sarMode === "pre" ? 0.0 : 1.0;
+  }
   scene.add(sarGroup);
 
   scene.traverse((obj) => {
@@ -908,7 +909,6 @@ function updateThreeSelectedPlot(plotId) {
     }
   });
 }
->>>>>>> 2e80ca5 (Implement 3D WebGL water shader, PBR parcel models, and refined SAR animations)
 
 async function initApp() {
   const res = await fetch(DATA_SOURCE_URL);
@@ -950,15 +950,9 @@ async function initApp() {
         }
       ]
     },
-<<<<<<< HEAD
-    center: mapCenter,
-    zoom: 14.8,
-    pitch: 52,
-=======
     center: ORIGIN_LNG_LAT,
     zoom: 15.0,
     pitch: 30,
->>>>>>> 2e80ca5 (Implement 3D WebGL water shader, PBR parcel models, and refined SAR animations)
     bearing: -12,
     attributionControl: { compact: true }
   });
@@ -1145,6 +1139,39 @@ function closeRiskPopover() {
   }
 }
 
+function formatDeltaSarLabel(p) {
+  const normalizedMode = sarMode === "before" ? "pre" : sarMode === "after" ? "post" : sarMode;
+  if (normalizedMode === "pre") {
+    const preDb = (p.sar_wetness_change_db * 0.22).toFixed(1);
+    return `ΔSAR ${preDb} dB (Pre-Storm)`;
+  }
+  if (normalizedMode === "post") {
+    return `ΔSAR ${p.sar_wetness_change_db} dB`;
+  }
+  if (timelineStage === 3) {
+    const drainDb = (p.sar_wetness_change_db * 0.39).toFixed(1);
+    return `ΔSAR ${drainDb} dB (Draining)`;
+  }
+  return "ΔSAR 0.0 dB (Baseline)";
+}
+
+function updateInspectSarReadout() {
+  if (!appData || !appData.plots) return;
+  const feat = appData.plots.features.find((f) => f.properties.plot_id === selectedPlotId);
+  if (!feat) return;
+  const p = feat.properties;
+  const metaEl = document.getElementById("inspect-meta");
+  if (metaEl) {
+    metaEl.innerHTML = `
+      <span>${p.hectares} ha</span>
+      <span class="meta-dot" aria-hidden="true">·</span>
+      <span>${p.current_crop}</span>
+      <span class="meta-dot" aria-hidden="true">·</span>
+      <span>${formatDeltaSarLabel(p)}</span>
+    `;
+  }
+}
+
 function selectPlot(feat, fly = true) {
   const p = feat.properties;
   selectedPlotId = p.plot_id;
@@ -1156,13 +1183,7 @@ function selectPlot(feat, fly = true) {
   inspect.classList.remove("hidden");
 
   document.getElementById("inspect-title").textContent = `${p.plot_id} · ${p.barangay}`;
-  document.getElementById("inspect-meta").innerHTML = `
-    <span>${p.hectares} ha</span>
-    <span class="meta-dot" aria-hidden="true">·</span>
-    <span>${p.current_crop}</span>
-    <span class="meta-dot" aria-hidden="true">·</span>
-    <span>ΔSAR ${p.sar_wetness_change_db} dB</span>
-  `;
+  updateInspectSarReadout();
 
   const badge = document.getElementById("inspect-risk-badge");
   badge.className = `risk-tag ${p.risk_class}`;
@@ -1205,10 +1226,10 @@ function renderRotations(priorityKey) {
       <div class="rot-card">
         <h4>#${idx + 1} ${s.name}</h4>
         <div class="rot-crops"><strong>Crops:</strong> ${s.crops}</div>
-        <div class="rot-benefit">${s.benefits}</div>
+        <div class="rot-benefit"><strong>Benefits:</strong> ${s.benefits}</div>
         <div class="rot-gap" style="display:flex;align-items:flex-start;gap:6px;">
           <i data-lucide="alert-triangle" width="13" height="13" stroke-width="2" style="margin-top:2px;flex-shrink:0;" aria-hidden="true"></i>
-          <span><strong>Verify Locally:</strong> ${s.risks_and_gaps}</span>
+          <span><strong>Risks &amp; Gaps · Verify Locally:</strong> ${s.risks_and_gaps}</span>
         </div>
       </div>
     `
@@ -1244,9 +1265,18 @@ function bindUIEvents() {
     document.querySelector('[data-drawer="rotations"]').click();
   });
 
+  let smsToastTimer = null;
   document.getElementById("btn-open-sms").addEventListener("click", () => {
     closeRiskPopover();
     document.getElementById("inspect-card").classList.remove("hidden");
+    const toast = document.getElementById("sms-toast");
+    if (toast) {
+      const counter = document.getElementById("sms-counter")?.textContent || "160/160 CHARS";
+      toast.textContent = `Simulated SMS alert queued for ${selectedPlotId} (${counter.toLowerCase()}) — no external gateway`;
+      toast.classList.remove("hidden");
+      if (smsToastTimer) clearTimeout(smsToastTimer);
+      smsToastTimer = setTimeout(() => toast.classList.add("hidden"), 3200);
+    }
   });
 
   document.getElementById("btn-bell").addEventListener("click", (e) => {
@@ -1301,14 +1331,20 @@ function bindUIEvents() {
   });
 
   document.getElementById("chk-flood").addEventListener("change", (e) => {
-    threeState.showFlood = e.target.checked;
+    const checked = e.target.checked;
+    threeState.showFlood = checked;
     if (threeState.waterMesh) {
-      threeState.waterMesh.visible = e.target.checked;
+      threeState.waterMesh.visible = checked;
     }
     const dockFlood = document.getElementById("dock-flood");
     if (dockFlood) {
-      dockFlood.classList.toggle("active", e.target.checked);
-      dockFlood.setAttribute("aria-pressed", String(e.target.checked));
+      dockFlood.classList.toggle("active", checked);
+      dockFlood.setAttribute("aria-pressed", String(checked));
+    }
+    if (!checked && sarMode !== "off") {
+      setSarMode("off", false);
+    } else if (checked && sarMode === "off") {
+      setSarMode(timelineStage === 1 ? "pre" : "post", false);
     }
   });
 
@@ -1331,9 +1367,9 @@ function bindUIEvents() {
   // Timeline Scrubber
   const slider = document.getElementById("time-slider");
   const stages = [
-    { clock: "-7d Baseline", sub: "Dry C-Band SAR", sar: "before" },
-    { clock: "Storm Hits", sub: "Optical Blocked by Clouds", sar: "before" },
-    { clock: "Overpass +6h", sub: "Sentinel-1 Surface Wetness", sar: "after" },
+    { clock: "-7d Baseline", sub: "Dry C-Band SAR", sar: "off" },
+    { clock: "Storm Hits", sub: "Optical Blocked by Clouds", sar: "pre" },
+    { clock: "Overpass +6h", sub: "Sentinel-1 Surface Wetness", sar: "post" },
     { clock: "+48h Salvage", sub: "Trench & Early Harvest", sar: "off" },
     { clock: "Next Season", sub: "Legume / Bio-Tillage Shift", sar: "off" }
   ];
@@ -1348,13 +1384,6 @@ function bindUIEvents() {
     document.getElementById("stage-sub").textContent = stages[idx].sub;
     setSarMode(stages[idx].sar);
 
-    if (idx === 2) {
-      const chkFlood = document.getElementById("chk-flood");
-      if (chkFlood && !chkFlood.checked) {
-        chkFlood.checked = true;
-        chkFlood.dispatchEvent(new Event("change"));
-      }
-    }
     if (idx === 4) document.querySelector('[data-drawer="rotations"]').click();
   });
 
@@ -1393,7 +1422,7 @@ function bindUIEvents() {
   document.getElementById("dock-sar").addEventListener("click", (e) => {
     const active = e.currentTarget.classList.toggle("active");
     e.currentTarget.setAttribute("aria-pressed", String(active));
-    setSarMode(active ? "after" : "off");
+    setSarMode(active ? "post" : "off");
   });
   document.getElementById("dock-flood").addEventListener("click", () => {
     const chk = document.getElementById("chk-flood");
@@ -1435,30 +1464,52 @@ function bindUIEvents() {
   }
 }
 
-function setSarMode(mode) {
-  sarMode = mode;
+function setSarMode(mode, syncFloodCheckbox = true) {
+  const normalized = mode === "before" ? "pre" : mode === "after" ? "post" : mode;
+  sarMode = normalized;
+
   document.querySelectorAll(".mini-btn").forEach((b) => {
-    b.classList.toggle("active", b.dataset.sar === mode);
+    b.classList.toggle("active", b.dataset.sar === normalized);
   });
+
   const dockSar = document.getElementById("dock-sar");
   if (dockSar) {
-    const isActive = mode !== "off";
+    const isActive = normalized !== "off";
     dockSar.classList.toggle("active", isActive);
     dockSar.setAttribute("aria-pressed", String(isActive));
   }
 
+  if (syncFloodCheckbox) {
+    const isSarActive = normalized !== "off";
+    const chkFlood = document.getElementById("chk-flood");
+    if (chkFlood) {
+      chkFlood.checked = isSarActive;
+    }
+    threeState.showFlood = isSarActive;
+    if (threeState.waterMesh) {
+      threeState.waterMesh.visible = isSarActive;
+    }
+    const dockFlood = document.getElementById("dock-flood");
+    if (dockFlood) {
+      dockFlood.classList.toggle("active", isSarActive);
+      dockFlood.setAttribute("aria-pressed", String(isSarActive));
+    }
+  }
+
   if (threeState.sarGroup) {
-    if (mode === "off") {
+    if (normalized === "off") {
       threeState.sarGroup.visible = false;
       sarSweepProgress = 0;
     } else {
       threeState.sarGroup.visible = true;
       if (threeState.sarUniforms) {
-        threeState.sarUniforms.uMode.value = mode === "before" ? 0.0 : 1.0;
+        threeState.sarUniforms.uMode.value = normalized === "pre" ? 0.0 : 1.0;
       }
-      sarSweepProgress = mode === "after" ? 0.01 : 0;
+      sarSweepProgress = normalized === "post" ? 0.01 : 0;
     }
   }
+
+  updateInspectSarReadout();
 }
 
 function startMapAnimations() {

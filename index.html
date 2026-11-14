@@ -127,9 +127,9 @@
         </label>
         <div class="sar-mini-toggle">
           <span>SAR Scene:</span>
-          <button class="mini-btn active" data-sar="off" type="button">Off</button>
-          <button class="mini-btn" data-sar="before" type="button">Pre-Storm</button>
-          <button class="mini-btn" data-sar="after" type="button">Post-Storm</button>
+          <button class="mini-btn" data-sar="off" type="button">Off</button>
+          <button class="mini-btn" data-sar="pre" type="button">Pre-Storm</button>
+          <button class="mini-btn active" data-sar="post" type="button">Post-Storm</button>
         </div>
       </div>
 
@@ -182,61 +182,6 @@
     <div class="time-readout">
       <strong id="stage-clock">Overpass +6h</strong>
       <span id="stage-sub">Sentinel-1 C-Band</span>
-    </div>
-
-    <div class="overall-risk-meter">
-      <button
-        class="risk-meter-trigger"
-        id="btn-risk-popover"
-        type="button"
-        aria-expanded="false"
-        aria-controls="risk-symbology-popover"
-        title="View field drowning risk symbology details"
-      >
-        <span>Field drowning risk</span>
-        <i data-lucide="chevron-down" width="14" height="14" stroke-width="2" aria-hidden="true"></i>
-      </button>
-      <div class="risk-bar-row">
-        <span>Low</span>
-        <div class="gradient-bar" role="presentation"></div>
-        <span>High</span>
-      </div>
-
-      <!-- Detailed Symbology Popover -->
-      <div class="floating-card risk-popover hidden" id="risk-symbology-popover" role="dialog" aria-label="Field drowning risk symbology details">
-        <div class="symbology-header">
-          <span class="sym-dot" aria-hidden="true"></span>
-          <strong>FIELD DROWNING RISK SYMBOLOGY</strong>
-          <span class="sym-scale">30m SAR + TWI</span>
-        </div>
-        <div class="sym-pills">
-          <div class="sym-pill low">
-            <span class="dot" aria-hidden="true"></span>
-            <div>
-              <strong>Low: Under 35</strong>
-              <span>Normal Field Drainage</span>
-            </div>
-          </div>
-          <div class="sym-pill watch">
-            <span class="dot" aria-hidden="true"></span>
-            <div>
-              <strong>Watch: 35–69</strong>
-              <span>Clear Perimeter Canals</span>
-            </div>
-          </div>
-          <div class="sym-pill high">
-            <span class="dot" aria-hidden="true"></span>
-            <div>
-              <strong>High: 70 &amp; above</strong>
-              <span>Dig Trench / Early Harvest</span>
-            </div>
-          </div>
-        </div>
-        <div class="sym-footnote">
-          <i data-lucide="info" width="14" height="14" stroke-width="2" aria-hidden="true"></i>
-          <span>C-band Sentinel-1 surface wetness + NASADEM TWI + GPM 7-day rain · Dashed blue = Observed SAR flood extent</span>
-        </div>
-      </div>
     </div>
   </header>
 
@@ -351,9 +296,11 @@
     <div class="telemetry-pill">
       <span class="telemetry-scale">30m Grid · ~500 m</span>
       <span class="telemetry-sep" aria-hidden="true">|</span>
-      <span class="telemetry-coord" id="coord-readout">13.6175, 123.1995</span>
+      <span class="telemetry-coord" id="coord-readout">13.6182, 123.2005</span>
     </div>
   </footer>
+
+  <div id="sms-toast" class="sms-toast hidden" role="status" aria-live="polite"></div>
 
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
