@@ -41,7 +41,7 @@
     "otsu_raw_db": -3.09,
     "bbox_mean_delta_vv_db": 1.37,
     "bbox_flooded_fraction": 0.0,
-    "processing_time_sec": 61.36
+    "processing_time_sec": 0.19
   },
   "plots": [
     {
