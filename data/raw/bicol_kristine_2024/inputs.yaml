@@ -1,0 +1,106 @@
+dataset_bundle: bicol_kristine_2024
+location: "Bicol River Basin floodplain (Naga, Milaor, Minalabac, Pili), Camarines Sur"
+event: "Severe Tropical Storm Kristine (Trami), Oct 2024"
+
+files:
+  nasadem:
+    path: dem/nasadem_buffered_with_swb.tif
+    source: "GEE NASA/NASADEM_HGT/001"
+    native_resolution_m: 30
+    crs: "EPSG:4326"
+    nodata_note: "Header nodata tag is -inf; ignore tag. Band 2 (swb) is all zeros; ignore band 2."
+    bands:
+      1:
+        name: elevation
+        units: m
+        meaning: "Surface elevation above WGS84/EGM96 geoid (cells <= 0m are valid low ground/river channel)"
+      2:
+        name: swb
+        units: flag
+        meaning: "Surface water body mask (all zeros in this clip; unused)"
+
+  imerg:
+    path: rain/imerg_buffered_mm.tif
+    source: "GEE NASA/GPM_L3/IMERG_V07 (V07B Final Run, status: permanent)"
+    native_resolution_deg: 0.1
+    crs: "EPSG:4326"
+    method: "Sum of 48 half-hourly precipitation rate images per day multiplied by 0.5 hr"
+    bands:
+      1:
+        name: event_rain_mm
+        units: mm
+        window_utc: ["2024-10-21T00:00:00Z", "2024-10-26T00:00:00Z"]
+        meaning: "5-day event total precipitation (240 half-hour images)"
+      2:
+        name: prior7d_rain_mm
+        units: mm
+        window_utc: ["2024-10-14T00:00:00Z", "2024-10-21T00:00:00Z"]
+        meaning: "7-day pre-event total precipitation (336 half-hour images)"
+
+  smap_raster:
+    path: smap/smap_rootzone_buffered.tif
+    source: "GEE NASA/SMAP/SPL4SMGP/008 (SMAP L4 root-zone soil moisture, model-assimilated, 0-100 cm)"
+    native_resolution_m: 11000
+    crs: "EPSG:4326"
+    bands:
+      1:
+        name: smap_event_mean
+        units: "m3/m3"
+        window: ["2024-10-21", "2024-10-26"]
+        meaning: "Event-window mean root-zone soil moisture"
+      2:
+        name: smap_base30d_mean
+        units: "m3/m3"
+        window: ["2024-09-21", "2024-10-21"]
+        meaning: "30-day pre-event baseline mean"
+      3:
+        name: smap_base30d_std
+        units: "m3/m3"
+        window: ["2024-09-21", "2024-10-21"]
+        meaning: "30-day pre-event baseline standard deviation"
+      4:
+        name: smap_oct_clim_mean
+        units: "m3/m3"
+        window: "Oct 2021-2023 (excludes Oct 2024)"
+        meaning: "3-year October climatology mean"
+      5:
+        name: smap_oct_clim_std
+        units: "m3/m3"
+        window: "Oct 2021-2023 (excludes Oct 2024)"
+        meaning: "3-year October climatology standard deviation"
+
+  smap_summary:
+    path: smap/smap_rootzone_summary.csv
+    source: "GEE reduceRegion mean over inner pilot bbox"
+    units: "m3/m3"
+
+  power:
+    path: power/nasa_power_daily_2000_2026.csv
+    source: "NASA POWER Agroclimatology Daily Point API"
+    centroid_lon_lat: [123.205, 13.605]
+    period: ["2000-01-01", "2026-11-01"]
+    missing_flag: -999
+    columns:
+      T2M: "°C"
+      T2M_MAX: "°C"
+      T2M_MIN: "°C"
+      PRECTOTCORR: "mm/day"
+      RH2M: "%"
+      ALLSKY_SFC_SW_DWN: "MJ/m2/day"
+
+  soilgrids:
+    path: soil/soilgrids_0_30cm_250m.tif
+    source: "ISRIC SoilGrids 250m v2.0 (0-30 cm thickness-weighted: 5*[0-5]+10*[5-15]+15*[15-30])/30"
+    native_resolution_m: 250
+    bands:
+      1: {name: sand_0_30cm, units: "g/kg"}
+      2: {name: silt_0_30cm, units: "g/kg"}
+      3: {name: clay_0_30cm, units: "g/kg"}
+      4: {name: soc_0_30cm, units: "dg/kg", note: "Modelled estimate; use texture as primary input"}
+
+  ndvi:
+    path: ndvi/modis_ndvi_cropland_cloudmasked.csv
+    source: "MODIS/061/MOD13Q1 (250m 16-day), SummaryQA <= 1, ESA WorldCover v200 Class 40"
+    period: ["2020-01-01", "2026-11-01"]
+    units: "unitless"
+    columns: ["date", "ndvi_mean", "ndvi_p10", "ndvi_p50", "ndvi_p90"]
