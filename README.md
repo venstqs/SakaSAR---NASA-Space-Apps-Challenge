@@ -57,6 +57,14 @@ Everything runs on **free, open data (₱0 licensing)** and is **reproducible fr
 
 ## 📊 Results: Typhoon Kristine, October 2024
 
+**Whole Bicol Region (100 m, all 114 towns, 100% radar coverage):** **3,137 ha** of farmland still under water on the
+2 Nov 2024 Sentinel-1 pass. Towns to reach first: **Bula** (1,155 ha, 21% of its farmland), **Baao** (736 ha, 28%),
+**Nabua** (444 ha), **Bato** (407 ha) in Camarines Sur and **Libon** (246 ha) in Albay, around Lake Bato and Lake Baao and the
+Bicol River floodplain. This is a floor: the pass came 9 days after the storm and 100 m cells miss small flooded paddies.
+Built by `python -m pipeline.bicol_region`; data in [`data/region/`](data/region/).
+
+**Minalabac field view (30 m):**
+
 **Pilot:** rice paddies in Brgy. **Bagongbong, Taban and Catanusan, Minalabac, Camarines Sur** (Bicol River basin), about 9 km south of Naga City.
 **Event:** Severe Tropical Storm Kristine (Trami), 21–26 October 2024.
 **Radar:** Sentinel-1, relative orbit 134. Baseline = median of 4 calm passes (Aug–Sep 2024) · just before = 9 Oct · **after = 2 Nov 2024**.
@@ -74,11 +82,9 @@ Everything runs on **free, open data (₱0 licensing)** and is **reproducible fr
 
 <sub>\* Plot outlines, hectares and households are illustrative sample values placed evenly on real farmland. The satellite measurements on them are real. See [Limits](#%EF%B8%8F-limits-and-what-we-do-not-claim).</sub>
 
-| Farmer view: plot risk, 30 m risk zones, recommendations | LGU / MDRRMO view: barangay priority list |
+| Minalabac field view: risk, what to do, drainage forecast | Bicol Region: flooded farmland by town |
 | :---: | :---: |
-| ![Farmer view](assets/screenshots/01-farmer-view.jpg) | ![Barangay priority list](assets/screenshots/02-lgu-barangay-priority.jpg) |
-| **Rotation fit versus the current crop** | **LSTM root-zone saturation outlook** |
-| ![Rotation fit](assets/screenshots/03-rotation-fit.jpg) | ![LSTM outlook](assets/screenshots/04-lstm-soil-outlook.jpg) |
+| ![Field view](assets/screenshots/01-farmer-view.jpg) | ![Bicol Region](assets/screenshots/02-lgu-barangay-priority.jpg) |
 
 <details>
 <summary><b>Phone view</b> (the dashboard works on mobile)</summary>

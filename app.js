@@ -893,9 +893,9 @@ function updateThreeSelectedPlot(plotId) {
 // SakaSAR dashboard: region → town → field, driven by the storm ribbon
 // =====================================================================================
 const REGION_BBOX = [[122.3, 11.8], [124.45, 14.6]];
-const RISK_COLOR = { high: "#f25f3a", watch: "#ebb043", low: "#7cc69a" };
+const RISK_COLOR = { high: "#d9482a", watch: "#c98a12", low: "#3e9a66" };
 const RISK_WORD = { high: "High risk of drowning", watch: "Watch this field", low: "Low risk" };
-const FIT_COLOR = { good: "#7cc69a", neutral: "#9fb8ae", caution: "#ebb043" };
+const FIT_COLOR = { good: "#3e9a66", neutral: "#8aa39a", caution: "#c98a12" };
 const FIT_LABEL = { good: "Good fit", neutral: "Possible", caution: "Caution" };
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const $ = (id) => document.getElementById(id);
@@ -1025,7 +1025,7 @@ async function initApp() {
           attribution: "Imagery Esri · Radar Copernicus Sentinel-1 · NASA NASADEM · ESA WorldCover · Boundaries NAMRIA/PSA",
         },
       },
-      layers: [{ id: "satellite-base", type: "raster", source: "satellite", paint: { "raster-saturation": -0.25, "raster-brightness-max": 0.85 } }],
+      layers: [{ id: "satellite-base", type: "raster", source: "satellite", paint: { "raster-saturation": -0.15 } }],
     },
     center: [123.35, 13.2],
     zoom: 7.3,
@@ -1062,12 +1062,12 @@ function updateZoomClass() {
 function addRegionLayers() {
   if (region.overlay) {
     map.addSource("bicol-flood", { type: "image", url: region.overlay.image, coordinates: region.overlay.coordinates });
-    map.addLayer({ id: "bicol-flood", type: "raster", source: "bicol-flood",
+    map.addLayer({ id: "bicol-flood", type: "raster", source: "bicol-flood", maxzoom: 12.5,
       paint: { "raster-opacity": 0.95, "raster-fade-duration": 0, "raster-resampling": "nearest" } });
   }
   if (region.munis) {
     map.addSource("munis", { type: "geojson", data: region.munis });
-    map.addLayer({ id: "munis-fill", type: "fill", source: "munis",
+    map.addLayer({ id: "munis-fill", type: "fill", source: "munis", maxzoom: 12.5,
       paint: { "fill-color": ["interpolate", ["linear"], ["get", "flooded_share"],
         0, "rgba(78,196,222,0)", 0.01, "rgba(78,196,222,0.10)", 0.05, "rgba(78,196,222,0.28)", 0.15, "rgba(78,196,222,0.5)"] } });
     map.addLayer({ id: "munis-line", type: "line", source: "munis",
@@ -1283,7 +1283,7 @@ function selectMuni(name, province, at) {
     .setHTML(`<b>${escapeHtml(p.name)}, ${escapeHtml(p.province)}</b><br>
       ${fmt(p.flooded_farmland_ha)} ha of ${fmt(p.farmland_ha)} ha farmland flooded (${pct(p.flooded_share)}).<br>
       Rank ${p.rank} of ${muniRows().length} towns in Bicol.<br>
-      <span style="color:#9fb8ae">Sentinel-1 ${escapeHtml(p.sentinel1)}; radar covered ${pct(p.radar_coverage)} of the town.</span>${pilotBtn}`)
+      <span style="color:#5c716a">Sentinel-1 ${escapeHtml(p.sentinel1)}; radar covered ${pct(p.radar_coverage)} of the town.</span>${pilotBtn}`)
     .addTo(map);
   $("popup-pilot")?.addEventListener("click", () => setScope("pilot"));
   renderMuniList($("muni-search").value);

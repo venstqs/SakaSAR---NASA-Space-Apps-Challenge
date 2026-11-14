@@ -3,17 +3,18 @@
    a traffic-light risk scale, and type chosen for legibility on cheap phones in sunlight. */
 
 :root {
-  --river: #0f2b2a;        /* panel: deep river silt */
-  --river-2: #17393a;      /* raised rows, inputs */
-  --river-3: #21494a;      /* hover, dividers */
-  --mist: #e7efea;         /* primary text */
-  --reed: #9fb8ae;         /* secondary text */
-  --flood: #4ec4de;        /* water, radar, interactive */
-  --flood-ink: #062c33;    /* text on flood */
-  --straw: #e9e4c9;        /* farmland tint */
-  --high: #f25f3a;
-  --watch: #ebb043;
-  --low: #7cc69a;
+  --river: #ffffff;        /* panels */
+  --river-2: #f3f6f5;      /* rows, inputs */
+  --river-3: #dfe7e3;      /* dividers */
+  --mist: #13302b;         /* primary text */
+  --reed: #5c716a;         /* secondary text */
+  --flood: #0a7f9c;        /* water / interactive, readable on white */
+  --flood-ink: #ffffff;    /* text on flood */
+  --water: #4ec4de;        /* radar water on the map */
+  --straw: #e9e4c9;
+  --high: #d9482a;
+  --watch: #c98a12;
+  --low: #3e9a66;
 
   --font-body: "Atkinson Hyperlegible", system-ui, sans-serif;
   --font-head: "Archivo", "Atkinson Hyperlegible", system-ui, sans-serif;
@@ -26,6 +27,7 @@
   --s-30: 1.875rem;
 
   --sidebar-w: 400px;
+  --shadow: 0 1px 2px rgba(19, 48, 43, 0.08), 0 4px 14px rgba(19, 48, 43, 0.08);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -50,11 +52,11 @@ ol { margin: 0; padding: 0; list-style: none; }
 .sidebar {
   display: flex; flex-direction: column; min-height: 0;
   background: var(--river);
-  border-right: 1px solid var(--river-3);
+  border-right: 1px solid var(--river-3); box-shadow: 2px 0 12px rgba(19, 48, 43, 0.06);
   position: relative; z-index: 5;
 }
 .sb-head { display: flex; gap: 12px; align-items: center; padding: 18px 20px 14px; }
-.sb-logo { border-radius: 50%; flex-shrink: 0; background: var(--mist); }
+.sb-logo { border-radius: 50%; flex-shrink: 0; }
 .sb-title { font-size: var(--s-24); font-weight: 800; font-stretch: 118%; letter-spacing: -0.01em; }
 .sb-sub { color: var(--reed); font-size: var(--s-13); line-height: 1.35; margin-top: 2px; }
 
@@ -101,7 +103,7 @@ ol { margin: 0; padding: 0; list-style: none; }
 .rank-val { text-align: right; font-variant-numeric: tabular-nums; }
 .rank-val b { font-family: var(--font-head); font-weight: 800; display: block; }
 .rank-val small { color: var(--reed); font-size: var(--s-13); }
-.rank-row.pilot .rank-name::after { content: "30 m field view"; margin-left: 8px; font: 700 0.6875rem var(--font-body); color: var(--flood-ink); background: var(--flood); padding: 1px 7px; border-radius: 99px; vertical-align: 2px; }
+.rank-row.pilot .rank-sub::after { content: ", 30 m field view available"; color: var(--flood); }
 .rank-list.compact .rank-row { padding: 8px 4px; }
 .empty { color: var(--reed); padding: 12px 4px; }
 
@@ -180,42 +182,42 @@ ol { margin: 0; padding: 0; list-style: none; }
 
 .map-tools { position: absolute; top: 14px; right: 14px; z-index: 4; display: flex; gap: 6px; align-items: flex-start; }
 .tool {
-  min-width: 40px; height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid rgba(231, 239, 234, 0.18);
-  background: rgba(15, 43, 42, 0.88); color: var(--mist); cursor: pointer; font-weight: 700; backdrop-filter: blur(6px);
+  min-width: 40px; height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--river-3); box-shadow: var(--shadow);
+  background: rgba(255, 255, 255, 0.96); color: var(--mist); cursor: pointer; font-weight: 700; backdrop-filter: blur(6px);
 }
 .tool.icon { padding: 0; font-size: var(--s-20); line-height: 1; }
 .tool[aria-pressed="true"], .tool[aria-expanded="true"] { background: var(--flood); color: var(--flood-ink); }
 .layers-panel {
   position: absolute; top: 48px; right: 0; width: 250px; padding: 12px 14px; border-radius: 10px;
-  background: rgba(15, 43, 42, 0.95); border: 1px solid var(--river-3); display: grid; gap: 8px; font-size: var(--s-13);
+  background: rgba(255, 255, 255, 0.96); border: 1px solid var(--river-3); display: grid; gap: 8px; font-size: var(--s-13);
 }
 .layers-panel label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
 .layers-panel input { accent-color: var(--flood); width: 16px; height: 16px; }
 
 .legend {
   position: absolute; left: 14px; bottom: 124px; z-index: 3; padding: 10px 12px; border-radius: 10px;
-  background: rgba(15, 43, 42, 0.88); font-size: 0.75rem; display: grid; gap: 5px; max-width: 230px; backdrop-filter: blur(6px);
+  background: rgba(255, 255, 255, 0.96); font-size: 0.75rem; display: grid; gap: 5px; max-width: 230px; backdrop-filter: blur(6px);
 }
 .legend b { font-family: var(--font-head); font-size: var(--s-13); }
 .lg { display: flex; gap: 8px; align-items: center; color: var(--mist); }
 .lg i { width: 14px; height: 10px; border-radius: 3px; background: var(--c); flex-shrink: 0; }
-.lg-ramp { height: 8px; border-radius: 4px; background: linear-gradient(90deg, rgba(78, 196, 222, 0.08), rgba(78, 196, 222, 0.95)); }
+.lg-ramp { height: 8px; border-radius: 4px; background: linear-gradient(90deg, rgba(78, 196, 222, 0.1), rgba(10, 127, 156, 0.9)); }
 .lg-ends { display: flex; justify-content: space-between; color: var(--reed); }
 
 /* the storm ribbon */
 .ribbon {
   position: absolute; left: 14px; right: 14px; bottom: 14px; z-index: 3; height: 98px;
   display: flex; gap: 12px; align-items: center; padding: 8px 14px 8px 10px; border-radius: 12px;
-  background: rgba(15, 43, 42, 0.92); border: 1px solid var(--river-3); backdrop-filter: blur(6px);
+  background: rgba(255, 255, 255, 0.96); border: 1px solid var(--river-3); backdrop-filter: blur(6px);
 }
 .ribbon-play { width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--flood); color: var(--flood-ink); cursor: pointer; font-size: var(--s-17); flex-shrink: 0; }
 .ribbon-body { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; }
 #ribbon-svg { flex: 1; width: 100%; min-height: 0; overflow: visible; }
 .ribbon-caption { font-size: var(--s-13); color: var(--mist); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ribbon-caption b { color: var(--flood); }
-.rb-bar { fill: rgba(231, 239, 234, 0.42); }
-.rb-bar.storm { fill: rgba(231, 239, 234, 0.8); }
-.rb-storm { fill: rgba(242, 95, 58, 0.14); }
+.rb-bar { fill: rgba(19, 48, 43, 0.22); }
+.rb-bar.storm { fill: rgba(19, 48, 43, 0.55); }
+.rb-storm { fill: rgba(217, 72, 42, 0.08); }
 .rb-axis { fill: var(--reed); font-size: 10px; font-family: var(--font-body); }
 .rb-pass { cursor: pointer; }
 .rb-pass line { stroke: var(--flood); stroke-width: 2; }
@@ -229,7 +231,7 @@ ol { margin: 0; padding: 0; list-style: none; }
 /* plot labels on the map */
 .plot-pill-marker {
   display: inline-flex; gap: 6px; align-items: center; padding: 4px 9px; border-radius: 99px; cursor: pointer;
-  background: rgba(15, 43, 42, 0.9); color: var(--mist); border: 1px solid rgba(231, 239, 234, 0.25);
+  background: rgba(255, 255, 255, 0.96); color: var(--mist); border: 1px solid var(--river-3); box-shadow: var(--shadow);
   font: 700 0.75rem var(--font-body); white-space: nowrap;
 }
 .plot-pill-marker .marker-dot { width: 8px; height: 8px; border-radius: 50%; }
@@ -237,7 +239,7 @@ ol { margin: 0; padding: 0; list-style: none; }
 .map-wrap.zoomed-out .plot-pill-marker { display: none; }
 .pilot-marker {
   padding: 5px 10px; border-radius: 99px; background: var(--flood); color: var(--flood-ink);
-  font: 700 0.75rem var(--font-body); cursor: pointer; border: 0; white-space: nowrap; box-shadow: 0 0 0 3px rgba(78, 196, 222, 0.3);
+  font: 700 0.75rem var(--font-body); cursor: pointer; border: 0; white-space: nowrap; box-shadow: var(--shadow);
 }
 .map-wrap:not(.zoomed-out) .pilot-marker { display: none; }
 .maplibregl-ctrl-attrib { font-size: 10px; }
@@ -247,7 +249,7 @@ ol { margin: 0; padding: 0; list-style: none; }
 
 /* dialog + toast */
 .about { max-width: 640px; width: calc(100vw - 32px); max-height: 85dvh; border: 1px solid var(--river-3); border-radius: 14px; background: var(--river); color: var(--mist); padding: 22px 24px; }
-.about::backdrop { background: rgba(6, 20, 20, 0.6); }
+.about::backdrop { background: rgba(19, 48, 43, 0.35); }
 .about h2 { font-size: var(--s-24); margin-bottom: 10px; }
 .about h3 { font-size: var(--s-17); margin: 18px 0 6px; }
 .about p, .about li { color: var(--mist); font-size: var(--s-15); }
@@ -288,8 +290,23 @@ ol { margin: 0; padding: 0; list-style: none; }
 .layers-panel[hidden] { display: none; }
 .maplibregl-ctrl-bottom-right, .maplibregl-ctrl-bottom-left { bottom: 120px; }
 @media (max-width: 760px) { .maplibregl-ctrl-bottom-right, .maplibregl-ctrl-bottom-left { bottom: 84px; } }
-.maplibregl-ctrl-attrib { background: rgba(15, 43, 42, 0.85) !important; color: var(--reed); }
+.maplibregl-ctrl-attrib { background: rgba(255, 255, 255, 0.96) !important; color: var(--reed); }
 .maplibregl-ctrl-attrib a { color: var(--reed); }
 @media (max-width: 760px) {
   .maplibregl-ctrl-attrib:not(.maplibregl-compact-show) .maplibregl-ctrl-attrib-inner { display: none; }
 }
+
+/* light theme details */
+.sms { background: #13302b; color: #fff; }
+.toast { background: #13302b; color: #fff; box-shadow: var(--shadow); }
+.risk-pin { background: #13302b; box-shadow: 0 0 0 2px #fff; }
+.prov-fill, .dday i::after { background: var(--water); }
+.scope-btn[aria-selected="true"] { background: var(--mist); color: #fff; }
+.ribbon-play { background: var(--mist); color: #fff; }
+.tool[aria-pressed="true"], .tool[aria-expanded="true"] { background: var(--mist); color: #fff; border-color: var(--mist); }
+.plot-pill-marker.active { background: var(--mist); color: #fff; border-color: var(--mist); }
+.pilot-marker { background: #fff; color: var(--mist); border: 1px solid var(--river-3); }
+.maplibregl-ctrl-attrib { background: rgba(255, 255, 255, 0.9) !important; }
+.btn:hover { color: #fff; }
+.lede strong { color: var(--mist); }
+.rb-pass circle { fill: #fff; }
