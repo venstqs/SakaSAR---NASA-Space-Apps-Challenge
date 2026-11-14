@@ -20,7 +20,7 @@
   <meta name="twitter:image" content="https://sakasar.vercel.app/assets/logo.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&display=swap" rel="stylesheet" />
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -28,23 +28,27 @@
   <div class="app" id="app">
     <!-- ===== Top bar ===== -->
     <header class="topbar">
-      <button type="button" class="icon-btn" id="btn-panel" aria-label="Show or hide the side panel" aria-expanded="true"><i data-lucide="panel-left"></i></button>
-      <img src="assets/sakasar-logo.png" alt="" width="30" height="30" class="logo" />
-      <div class="brand"><h1>SakaSAR</h1><p>Typhoon Kristine replay, Bicol Region</p></div>
-      <div class="top-actions">
-        <div class="seg small" role="group" aria-label="View">
+      <div class="brandchip">
+        <button type="button" class="icon-btn" id="btn-panel" aria-label="Show or hide the side panel" aria-expanded="true" data-tip="Panel"><i data-lucide="panel-left"></i></button>
+        <img src="assets/sakasar-logo.png" alt="" width="28" height="28" class="logo" />
+        <div class="brand"><h1>SakaSAR</h1><p>Typhoon Kristine, Bicol Region</p></div>
+      </div>
+      <div class="toolbar" role="toolbar" aria-label="Map tools">
+        <div class="seg" role="group" aria-label="View">
           <button type="button" data-view="2d">2D</button><button type="button" data-view="3d" aria-pressed="true">3D</button>
         </div>
-        <button type="button" class="tool" id="btn-fit-bicol"><i data-lucide="scan"></i><span>Bicol</span></button>
-        <button type="button" class="tool" id="btn-fit-storm"><i data-lucide="tornado"></i><span>Storm track</span></button>
-        <button type="button" class="tool" id="btn-shot"><i data-lucide="image-down"></i><span>Save image</span></button>
-        <button type="button" class="tool" id="btn-link"><i data-lucide="link"></i><span>Copy link</span></button>
+        <span class="tb-sep" aria-hidden="true"></span>
+        <button type="button" class="tool" id="btn-fit-bicol" data-tip="Zoom to Bicol"><i data-lucide="scan"></i><span>Bicol</span></button>
+        <button type="button" class="tool" id="btn-fit-storm" data-tip="Show Kristine's whole track"><i data-lucide="tornado"></i><span>Storm track</span></button>
+        <span class="tb-sep" aria-hidden="true"></span>
+        <button type="button" class="tool icon-only" id="btn-shot" aria-label="Save map image" data-tip="Save map image"><i data-lucide="image-down"></i></button>
+        <button type="button" class="tool icon-only" id="btn-link" aria-label="Copy link to this view" data-tip="Copy link to this view"><i data-lucide="link"></i></button>
       </div>
     </header>
 
     <!-- ===== Side panel ===== -->
     <aside class="panel" id="panel">
-      <nav class="tabs" role="tablist" aria-label="Panel">
+      <nav class="tabs" role="tablist" aria-label="Panel"><span class="tab-ind" aria-hidden="true"></span>
         <button type="button" role="tab" data-tab="layers" aria-selected="true"><i data-lucide="layers"></i>Layers</button>
         <button type="button" role="tab" data-tab="towns" aria-selected="false"><i data-lucide="map-pin"></i>Towns</button>
         <button type="button" role="tab" data-tab="forecast" aria-selected="false"><i data-lucide="brain-circuit"></i>Forecast</button>

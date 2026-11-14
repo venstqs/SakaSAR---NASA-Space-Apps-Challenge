@@ -110,7 +110,7 @@ async function init() {
     return { name: f.properties.name, province: f.properties.province, lon: x / n, lat: y / n };
   });
   prepareGrid();
-  if (window.Chart) { Chart.defaults.font.family = "Outfit, system-ui, sans-serif"; Chart.defaults.color = "#5f7468"; }
+  if (window.Chart) { Chart.defaults.font.family = "Geist, system-ui, sans-serif"; Chart.defaults.color = "#5f7468"; }
   if (window.innerWidth <= 760) togglePanel(false);
   buildEvents();
   bindChrome();
@@ -215,7 +215,14 @@ function renderField() {
     }
   }
   R.ctx.putImageData(img, 0, 0);
-  src.play(); requestAnimationFrame(() => src.pause()); // canvas source: upload this frame, then stop
+  const snap = document.createElement("canvas"); snap.width = R.W; snap.height = R.H; snap.getContext("2d").drawImage(R.canvas, 0, 0);
+  const key = `${S.field}-${S.aiMode}-${Math.floor(S.t)}`;
+  registerRaster("field", snap, R.w, R.e, R.n, R.s, true);
+  if (!src) {
+    map.addSource("field", { type: "raster", tiles: [`saka://field/${key}/{z}/{x}/{y}`], tileSize: 256, minzoom: 4, maxzoom: 11, bounds: [R.w, R.s, R.e, R.n] });
+    map.addLayer({ id: "field", type: "raster", source: "field", paint: { "raster-opacity": fieldOp(), "raster-fade-duration": 0, "raster-resampling": "linear" } }, map.getLayer("towns-fill") ? "towns-fill" : undefined);
+    map.getSource("field")._key = key;
+  } else if (src._key !== key) { src._key = key; src.setTiles([`saka://field/${key}/{z}/{x}/{y}`]); }
   map.setPaintProperty("field", "raster-opacity", fieldOp());
   vis("field", true);
 }
@@ -241,7 +248,8 @@ function loadFloodPixels() {
       const lon = w + (((bx + 0.5) * B) / c.width) * (e - w), lat = latFromMercY(yN - (((by + 0.5) * B) / c.height) * (yN - yS));
       return { type: "Feature", properties: { w: v / max }, geometry: { type: "Point", coordinates: [lon, lat] } };
     });
-    const go = () => { map.getSource("hotspots").setData({ type: "FeatureCollection", features: feats }); };
+    registerRaster("flood", c, w, e, n, s, false);
+    const go = () => { map.getSource("hotspots").setData({ type: "FeatureCollection", features: feats }); map.getSource("flood")?.setTiles(["saka://flood/ready/{z}/{x}/{y}"]); };
     S.ready ? go() : map.once("style.load", go);
   };
   img.src = S.overlay.image;
@@ -253,6 +261,35 @@ function floodAt(lon, lat) {
   const a = R.flood[(y * R.fw + x) * 4 + 3];
   return a >= 200 ? "flooded" : a > 0 ? "farmland" : "other";
 }
+
+// ---------------- browser-made map tiles ----------------
+// MapLibre 4 drapes an image/canvas source only onto the terrain tiles it assigns to it, so a raster that straddles
+// tile boundaries gets cut in 3D. Serving our rasters as ordinary {z}/{x}/{y} tiles avoids that everywhere.
+const TILE_SRC = {}; // name -> { canvas, w, e, n, s, smooth }
+function registerRaster(name, canvas, w, e, n, s, smooth) {
+  const yN = mercY(n), yS = mercY(s);
+  TILE_SRC[name] = { canvas, smooth, mx0: (w + 180) / 360, mx1: (e + 180) / 360, my0: (1 - yN / Math.PI) / 2, my1: (1 - yS / Math.PI) / 2 };
+}
+maplibregl.addProtocol("saka", async (params) => {
+  const m = params.url.match(/^saka:\/\/([^/]+)\/[^/]+\/(\d+)\/(\d+)\/(\d+)/);
+  const src = m && TILE_SRC[m[1]];
+  const out = document.createElement("canvas"); out.width = out.height = 256;
+  if (src) {
+    const z = Number(m[2]), x = Number(m[3]), y = Number(m[4]), n = 2 ** z, c = src.canvas;
+    const sx = ((x / n - src.mx0) / (src.mx1 - src.mx0)) * c.width, sw = (1 / n / (src.mx1 - src.mx0)) * c.width;
+    const sy = ((y / n - src.my0) / (src.my1 - src.my0)) * c.height, sh = (1 / n / (src.my1 - src.my0)) * c.height;
+    // clip the source rect to the canvas and scale the destination to match
+    const cx0 = Math.max(0, sx), cy0 = Math.max(0, sy), cx1 = Math.min(c.width, sx + sw), cy1 = Math.min(c.height, sy + sh);
+    if (cx1 > cx0 && cy1 > cy0) {
+      const ctx = out.getContext("2d"); ctx.imageSmoothingEnabled = src.smooth;
+      ctx.drawImage(c, cx0, cy0, cx1 - cx0, cy1 - cy0, ((cx0 - sx) / sw) * 256, ((cy0 - sy) / sh) * 256, ((cx1 - cx0) / sw) * 256, ((cy1 - cy0) / sh) * 256);
+    }
+  }
+  // synchronous encode: toBlob callbacks can stall while the map is busy, leaving tiles stuck in "loading"
+  const bin = atob(out.toDataURL("image/png").split(",")[1]), bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return { data: bytes.buffer };
+});
 
 // ---------------- map ----------------
 function initMap() {
@@ -273,12 +310,20 @@ function initMap() {
       terrain: { source: "dem", exaggeration: 1.8 },
       sky: { "sky-color": "#bcdcf0", "horizon-color": "#eef3f0", "fog-color": "#eef3f0", "sky-horizon-blend": 0.5, "horizon-fog-blend": 0.5, "fog-ground-blend": 0.2 },
     },
-    bounds: [[R.w, R.s], [R.e, R.n]], fitBoundsOptions: { padding: 30 }, pitch: 30,
+    bounds: [[R.w, R.s], [R.e, R.n]], fitBoundsOptions: { padding: chromePadding() }, pitch: 30,
   });
   map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
   map.addControl(new maplibregl.ScaleControl({ unit: "metric", maxWidth: 110 }), "bottom-right");
-  map.once("style.load", () => { addLayers(); S.ready = true; applyLayers(); setTime(S.t, true); });
+  map.once("style.load", () => { map.setPadding(chromePadding()); addLayers(); S.ready = true; applyLayers(); setTime(S.t, true); });
   loadFloodPixels();
+  // when our browser-made tiles arrive, the 3D terrain must re-drape them (it caches each tile's layers)
+  let rttQueued = false;
+  map.on("sourcedata", (e) => {
+    if ((e.sourceId === "field" || e.sourceId === "flood") && e.tile && !rttQueued) {
+      rttQueued = true;
+      requestAnimationFrame(() => { rttQueued = false; map.terrain?.sourceCache?.freeRtt?.(); map.triggerRepaint(); });
+    }
+  });
   map.on("mousemove", onHover);
   map.on("mouseout", () => { $("readout").innerHTML = "Move over the map to read values"; hoverPopup?.remove(); });
   map.on("click", (e) => inspect(e.lngLat.lng, e.lngLat.lat));
@@ -289,9 +334,6 @@ function addLayers() {
     map.addSource(`gibs-${k}`, { type: "raster", tileSize: 256, maxzoom: g.max, tiles: [g.url.replace("{date}", dayISO(S.t))], attribution: "NASA GIBS" });
     map.addLayer({ id: `gibs-${k}`, type: "raster", source: `gibs-${k}`, paint: { "raster-opacity": k === "imerg" || k === "smap" ? 0.8 : 1 }, layout: { visibility: "none" } });
   });
-  R.ctx.clearRect(0, 0, R.W, R.H);
-  map.addSource("field", { type: "canvas", canvas: R.canvas, coordinates: R.coords, animate: false });
-  map.addLayer({ id: "field", type: "raster", source: "field", paint: { "raster-opacity": fieldOp(), "raster-fade-duration": 0, "raster-resampling": "linear" } });
 
   map.addSource("munis", { type: "geojson", data: S.munis, promoteId: "rank" });
   map.addLayer({ id: "towns-fill", type: "fill", source: "munis",
@@ -306,10 +348,11 @@ function addLayers() {
       "heatmap-weight": ["get", "w"], "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 7, 1.4, 11, 2.5],
       "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 7, 12, 9, 22, 11, 36],
       "heatmap-color": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(0,0,0,0)", 0.12, "rgba(255,232,130,0.55)", 0.4, "rgba(255,176,0,0.85)", 0.7, "rgba(255,90,31,0.92)", 1, "rgba(190,0,40,0.95)"],
-      "heatmap-opacity": ["interpolate", ["linear"], ["zoom"], 9.5, 1, 12, 0.15],
+      "heatmap-opacity": ["interpolate", ["linear"], ["zoom"], 8.5, 1, 10.5, 0.22],
     } });
   if (S.overlay) {
-    map.addSource("flood", { type: "image", url: S.overlay.image, coordinates: S.overlay.coordinates });
+    map.addSource("flood", { type: "raster", tiles: ["saka://flood/wait/{z}/{x}/{y}"], tileSize: 256, minzoom: 6, maxzoom: 13,
+      bounds: [S.overlay.coordinates[0][0], S.overlay.coordinates[2][1], S.overlay.coordinates[1][0], S.overlay.coordinates[0][1]] });
     map.addLayer({ id: "flood", type: "raster", source: "flood", minzoom: 8.5, paint: { "raster-opacity": ["interpolate", ["linear"], ["zoom"], 8.5, 0, 9.5, 1], "raster-fade-duration": 0, "raster-resampling": "nearest" } });
   }
 
@@ -430,7 +473,15 @@ function inspect(lon, lat) {
     </dl>
     ${h ? `<div class="insp-chart"><canvas id="ch-insp"></canvas></div>` : ""}
     ${acts.length ? `<div class="kv"><div class="sec">What to do</div></div><ul class="actions">${acts.map((a, i) => `<li class="${i === 0 && share >= 0.15 ? "warn" : ""}">${esc(a)}</li>`).join("")}</ul>` : ""}`;
-  $("inspector").hidden = false;
+  const box = $("inspector");
+  if (box.hidden) {
+    const pt = map.project([lon, lat]), r = box.parentElement.getBoundingClientRect();
+    box.hidden = false;
+    const br = box.getBoundingClientRect();
+    box.style.setProperty("--ox", `${Math.max(0, Math.min(100, ((pt.x + r.left - br.left) / br.width) * 100))}%`);
+    box.style.setProperty("--oy", `${Math.max(0, Math.min(100, ((pt.y + r.top - br.top) / br.height) * 100))}%`);
+    box.classList.remove("pop"); void box.offsetWidth; box.classList.add("pop");
+  }
   if (h && window.Chart) {
     S.charts.insp?.destroy();
     const start = new Date(tl.lstm_hindcast.issued + "T00:00:00");
@@ -511,17 +562,17 @@ function regionDaily() {
 function renderStats(di) {
   const rd = regionDaily(), cum = rd.slice(0, di + 1).reduce((a, b) => a + b.mean, 0);
   const sat = S.tl.rootzone.filter((r) => (r[di] ?? 0) >= 0.97).length;
-  const st = S.storm?.active ? `${S.storm.wind} kt` : "None";
-  $("sim-stats").innerHTML = [
-    [`${fmt(rd[di].mean)} mm`, `Bicol rain that day (max ${fmt(rd[di].max)})`],
-    [`${fmt(cum)} mm`, "Bicol rain since 10 Oct"],
-    [`${sat} of ${S.tl.cells.length}`, "grid cells waterlogged"],
-    [st, "storm wind (NASA EONET)"],
-  ].map(([b, s]) => `<div><b>${b}</b><span>${s}</span></div>`).join("");
+    if (!$("st-0")) $("sim-stats").innerHTML = [0, 1, 2, 3].map((i) => `<div><b id="st-${i}">0</b><span id="sl-${i}"></span></div>`).join("");
+  countTo($("st-0"), rd[di].mean, 0, " mm"); $("sl-0").textContent = `Bicol rain that day (max ${fmt(rd[di].max)})`;
+  countTo($("st-1"), cum, 0, " mm"); $("sl-1").textContent = "Bicol rain since 10 Oct";
+  countTo($("st-2"), sat, 0, ` of ${S.tl.cells.length}`); $("sl-2").textContent = "grid cells waterlogged";
+  if (S.storm?.active) countTo($("st-3"), S.storm.wind, 0, " kt"); else { cancelAnimationFrame($("st-3")._raf); $("st-3").textContent = "None"; delete $("st-3").dataset.v; }
+  $("sl-3").textContent = "storm wind (NASA EONET)";
 }
 function buildTimeline() {
   const rd = regionDaily(), max = Math.max(...rd.map((d) => d.mean)), passes = new Set(S.tl.passes.filter((p) => p.used).map((p) => p.date));
-  $("bars").innerHTML = S.tl.days.map((d, i) => `<i class="${d >= "2024-10-20" && d <= "2024-10-26" ? "storm" : ""}${passes.has(d) ? " pass" : ""}" style="height:${Math.max(4, (rd[i].mean / max) * 100)}%" title="${short(d)}: ${fmt(rd[i].mean)} mm Bicol average"></i>`).join("");
+  $("bars").innerHTML = S.tl.days.map((d, i) => `<i class="${d >= "2024-10-20" && d <= "2024-10-26" ? "storm" : ""}${passes.has(d) ? " pass" : ""}" style="height:${Math.max(4, (rd[i].mean / max) * 100)}%;--i:${i}" title="${short(d)}: ${fmt(rd[i].mean)} mm Bicol average"></i>`).join("");
+  $("bars").classList.add("intro"); setTimeout(() => $("bars").classList.remove("intro"), 1400);
   $("days").innerHTML = S.tl.days.map((d, i) => (i % 4 === 0 || d === "2024-11-02" ? `<span style="left:${((i + 0.5) / N()) * 100}%">${short(d)}</span>` : "")).join("");
   $("ticks").innerHTML = S.events.map((e) => `<i style="left:${(e.t / N()) * 100}%;--c:${e.c}" title="${esc(short(dayISO(e.t)) + ": " + e.text)}"></i>`).join("");
   const scrub = $("scrub");
@@ -546,7 +597,7 @@ function buildTimeline() {
 function play() {
   if (S.t >= N() - 0.05) setTime(0, true);
   S.playing = true; S.last = performance.now();
-  $("btn-play").innerHTML = `<i data-lucide="pause"></i>`; $("btn-play").setAttribute("aria-label", "Pause"); icons();
+  $("btn-play").innerHTML = `<i data-lucide="pause"></i>`; $("btn-play").setAttribute("aria-label", "Pause"); $("btn-play").classList.add("on"); icons();
   const step = (now) => {
     if (!S.playing) return;
     const dt = Math.min(0.1, (now - S.last) / 1000); S.last = now;
@@ -561,7 +612,7 @@ function play() {
 }
 function pause() {
   if (!S.playing && $("btn-play").getAttribute("aria-label") === "Play") return;
-  S.playing = false; $("btn-play").innerHTML = `<i data-lucide="play"></i>`; $("btn-play").setAttribute("aria-label", "Play"); icons();
+  S.playing = false; $("btn-play").classList.remove("on"); $("btn-play").innerHTML = `<i data-lucide="play"></i>`; $("btn-play").setAttribute("aria-label", "Play"); icons();
 }
 
 // ---------------- events ----------------
@@ -612,11 +663,38 @@ function renderEvents() {
   }));
 }
 
+// ---------------- motion helpers ----------------
+// sliding pill behind the pressed button of every segmented control
+function initSegs() {
+  document.querySelectorAll(".seg").forEach((seg) => {
+    const pill = document.createElement("span"); pill.className = "seg-pill"; pill.setAttribute("aria-hidden", "true"); seg.prepend(pill);
+    const place = () => { const b = seg.querySelector('button[aria-pressed="true"]'); if (!b || !b.offsetWidth) return; pill.style.width = `${b.offsetWidth}px`; pill.style.height = `${b.offsetHeight}px`; pill.style.top = `${b.offsetTop}px`; pill.style.transform = `translateX(${b.offsetLeft}px)`; };
+    new MutationObserver(place).observe(seg, { attributes: true, subtree: true, attributeFilter: ["aria-pressed"] });
+    requestAnimationFrame(place); window.addEventListener("resize", place); seg._place = place;
+  });
+}
+// numbers ease to their new value (count-up)
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+function countTo(el, to, decimals = 0, suffix = "") {
+  if (!el) return;
+  const from = Number(el.dataset.v ?? to); el.dataset.v = to;
+  cancelAnimationFrame(el._raf);
+  if (reduceMotion || from === to || !isFinite(from)) { el.textContent = fmt(to, decimals) + suffix; return; }
+  const start = performance.now(), dur = 420;
+  const tick = (now) => { const k = Math.min(1, (now - start) / dur), e = 1 - (1 - k) ** 3; el.textContent = fmt(from + (to - from) * e, decimals) + suffix; if (k < 1) el._raf = requestAnimationFrame(tick); };
+  el._raf = requestAnimationFrame(tick);
+}
+
 // ---------------- side panel ----------------
 function bindChrome() {
+  initSegs();
   document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => {
-    document.querySelectorAll(".tabs button").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
-    document.querySelectorAll(".tab-body").forEach((s) => (s.hidden = s.id !== `tab-${b.dataset.tab}`));
+    const tabs = [...document.querySelectorAll(".tabs button")];
+    tabs.forEach((x) => x.setAttribute("aria-selected", String(x === b)));
+    document.querySelector(".tab-ind").style.transform = `translateX(${tabs.indexOf(b) * 100}%)`;
+    document.querySelectorAll(".tab-body").forEach((s) => { s.hidden = s.id !== `tab-${b.dataset.tab}`; s.classList.remove("enter"); });
+    const body = $(`tab-${b.dataset.tab}`); void body.offsetWidth; body.classList.add("enter");
+    document.querySelectorAll("#tab-forecast .seg").forEach((sg) => sg._place?.());
     if (window.innerWidth <= 760) togglePanel(true);
     S.charts.ai?.resize();
   }));
@@ -627,10 +705,10 @@ function bindChrome() {
     map.easeTo({ pitch: S.view3d ? 45 : 0, bearing: S.view3d ? map.getBearing() : 0, duration: 800 });
     applyLayers();
   }));
-  $("btn-fit-bicol").addEventListener("click", () => map.fitBounds([[R.w, R.s], [R.e, R.n]], { padding: 30, pitch: S.view3d ? 30 : 0, bearing: 0, duration: 1200 }));
+  $("btn-fit-bicol").addEventListener("click", () => map.fitBounds([[R.w, R.s], [R.e, R.n]], { padding: chromePadding(), pitch: S.view3d ? 30 : 0, bearing: 0, duration: 1200 }));
   $("btn-fit-storm").addEventListener("click", () => {
     const st = S.tl.storm, lons = [...st.map((p) => p.lon), R.w, R.e], lats = [...st.map((p) => p.lat), R.s, R.n];
-    map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: 50, pitch: 0, bearing: 0, duration: 1400 });
+    map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: chromePadding(), pitch: 0, bearing: 0, duration: 1400 });
   });
   $("btn-shot").addEventListener("click", () => {
     try {
@@ -658,52 +736,75 @@ function bindChrome() {
   head.addEventListener("pointerup", () => (on = false));
   window.addEventListener("resize", () => map?.resize());
 }
+function chromePadding() {
+  const phone = window.innerWidth <= 760, open = !$("app").classList.contains("no-panel");
+  return phone ? { top: 60, bottom: 100, left: 10, right: 10 } : { top: 70, bottom: 130, left: open ? 370 : 20, right: 60 };
+}
 function togglePanel(force) {
   const app = $("app"), show = force ?? app.classList.contains("no-panel");
   app.classList.toggle("no-panel", !show);
   $("btn-panel").setAttribute("aria-expanded", String(show));
-  setTimeout(() => map?.resize(), 30);
+  if (map && S.ready) map.easeTo({ padding: chromePadding(), duration: 380 });
 }
 
+function rampCSS(field) {
+  const L = lut(field);
+  return `linear-gradient(90deg,${Array.from({ length: 7 }, (_, k) => { const j = Math.round((k / 6) * 255) * 4; return `rgba(${L[j]},${L[j + 1]},${L[j + 2]},${Math.max(0.12, L[j + 3] / 255)}) ${(k / 6) * 100}%`; }).join(",")})`;
+}
 function renderLayers() {
-  const radio = (name, val, cur, title, sub) => `<label class="opt"><input type="radio" name="${name}" value="${val}" ${val === cur ? "checked" : ""} /><span><b>${title}</b>${sub ? `<small>${sub}</small>` : ""}</span></label>`;
-  const check = (k, title, sub) => `<label class="opt"><input type="checkbox" data-layer="${k}" ${S.layers[k] ? "checked" : ""} /><span><b>${title}</b><small>${sub}</small></span></label>`;
+  const tile = (tiles) => tiles[0].replace("{z}", "6").replace("{x}", "54").replace("{y}", "29");
+  const toggle = (k, title, sub) => `<label class="toggle"><span><b>${title}</b><small>${sub}</small></span><input type="checkbox" data-layer="${k}" ${S.layers[k] ? "checked" : ""} /><span class="switch" aria-hidden="true"></span></label>`;
+  const slider = (id, label, min, max, step, val, out) => `<div class="slider-row"><label for="${id}">${label}</label><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${val}" /><output id="${id}-v">${out}</output></div>`;
+  const closest = Math.min(...S.tl.storm.map((p) => km(p, NAGA)));
+  const gibsNote = () => (S.gibs === "none" ? "From NASA GIBS, for the date on the timeline." : GIBS[S.gibs].sub);
   $("tab-layers").innerHTML = `
-    <div class="lgroup"><p class="h">Heatmap</p>
-      ${Object.entries(FIELDS).map(([k, f]) => radio("field", k, S.field, f.name, f.sub)).join("")}
-      <div class="slider-row"><span>Opacity</span><input type="range" id="field-op" min="0.2" max="1" step="0.05" value="${S.fieldOpacity}" aria-label="Heatmap opacity" /><span id="field-op-v">${Math.round(S.fieldOpacity * 100)}%</span></div>
+    <p class="h">Heatmap</p>
+    <div class="fields" role="radiogroup" aria-label="Heatmap">
+      ${Object.entries(FIELDS).map(([k, f]) => `<button type="button" class="field-opt" role="radio" data-field="${k}" aria-checked="${k === S.field}">
+        <span class="sw ${k === "none" ? "none" : ""}" style="${k === "none" ? "" : `background:${rampCSS(k)}`}"></span>
+        <span><b>${f.name}</b><small>${f.sub || "Show the map without a heatmap"}</small></span></button>`).join("")}
     </div>
-    <div class="lgroup"><p class="h">Flood, Sentinel-1 radar (from 2 Nov)</p>
-      ${check("hotspots", "Flood hotspots", "Density of flooded farmland pixels; fades out as you zoom in")}
-      ${check("flood", "Flooded farmland, 100 m", "Blue = water on farmland. Appears from zoom 9")}
-      ${check("towns", "Towns", "Boundaries; shaded by share of farmland flooded")}
+    ${slider("field-op", "Opacity", 0.2, 1, 0.05, S.fieldOpacity, `${Math.round(S.fieldOpacity * 100)}%`)}
+    <p class="h">Flood, Sentinel-1 radar (from 2 Nov)</p>
+    ${toggle("hotspots", "Flood hotspots", "Density of flooded farmland; fades as you zoom in")}
+    ${toggle("flood", "Flooded farmland, 100 m", "Water on farmland, from zoom 9")}
+    ${toggle("towns", "Towns", "Boundaries, shaded by share of farmland flooded")}
+    <p class="h">Storm</p>
+    ${toggle("storm", "Kristine's track", "NASA EONET every 6 hours, PAGASA colours")}
+    <p class="callout"><i data-lucide="info"></i><span>Kristine's centre crossed northern Luzon, ${fmt(closest)} km north of Naga at its closest. Bicol flooded from the storm's southern rain bands: pick <b>Rain that day</b> and press play.</span></p>
+    <p class="h">NASA satellite image of the day</p>
+    <div class="chips" role="group" aria-label="NASA GIBS image">
+      <button type="button" class="chip" data-gibs="none" aria-pressed="${S.gibs === "none"}">Off</button>
+      ${Object.entries(GIBS).map(([k, g]) => `<button type="button" class="chip" data-gibs="${k}" aria-pressed="${S.gibs === k}">${g.name.replace(" true colour", "").replace(" rain rate", " rain").replace(" soil moisture", " soil")}</button>`).join("")}
     </div>
-    <div class="lgroup"><p class="h">Storm</p>
-      ${check("storm", "Kristine's track", "NASA EONET, every 6 hours, coloured by PAGASA category")}
-      <p class="callout">Kristine's centre crossed northern Luzon, about ${S.tl ? fmt(Math.min(...S.tl.storm.map((p) => km(p, NAGA)))) : "260"} km north of Naga. Bicol flooded from the storm's southern rain bands: turn on <b>Rain that day</b> and press play.</p>
-    </div>
-    <div class="lgroup"><p class="h">NASA satellite image of the day (GIBS)</p>
-      ${radio("gibs", "none", S.gibs, "None", "")}
-      ${Object.entries(GIBS).map(([k, g]) => radio("gibs", k, S.gibs, g.name, g.sub)).join("")}
-    </div>
-    <div class="lgroup"><p class="h">Base map and terrain</p>
-      ${Object.entries(BASEMAPS).map(([k, b]) => radio("basemap", k, S.basemap, b.name, "")).join("")}
-      ${check("terrain", "3D terrain", "AWS Terrain Tiles; works in 3D view")}
-      <div class="slider-row"><span>Height</span><input type="range" id="exag" min="1" max="4" step="0.1" value="1.8" aria-label="Terrain exaggeration" /><span id="exag-v">1.8×</span></div>
-      ${check("hillshade", "Hillshade", "Shaded relief")}
-    </div>`;
+    <p class="note chip-note" id="gibs-note">${gibsNote()}</p>
+    <p class="h">Base map</p>
+    <div class="basemaps">${Object.entries(BASEMAPS).map(([k, b]) => `<button type="button" class="bm" data-bm="${k}" aria-pressed="${S.basemap === k}" style="background-image:url('${tile(b.tiles)}')"><span>${b.name}</span></button>`).join("")}</div>
+    <p class="h">Terrain</p>
+    ${toggle("terrain", "3D terrain", "Elevation from AWS Terrain Tiles, in 3D view")}
+    ${slider("exag", "Height", 1, 4, 0.1, 1.8, "1.8×")}
+    ${toggle("hillshade", "Hillshade", "Shaded relief")}`;
   const tab = $("tab-layers");
-  tab.querySelectorAll('input[name="field"]').forEach((i) => i.addEventListener("change", () => { S.field = i.value; renderField(); renderLegend(); }));
-  tab.querySelectorAll('input[name="gibs"]').forEach((i) => i.addEventListener("change", () => {
-    S.gibs = i.value; if (S.gibs !== "none") { map.getSource(`gibs-${S.gibs}`)._date = null; updateGibs(dayISO(S.t)); } applyLayers();
+  tab.querySelectorAll(".field-opt").forEach((b) => b.addEventListener("click", () => setField(b.dataset.field)));
+  tab.querySelectorAll("[data-gibs]").forEach((b) => b.addEventListener("click", () => {
+    S.gibs = b.dataset.gibs;
+    tab.querySelectorAll("[data-gibs]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    $("gibs-note").textContent = gibsNote();
+    if (S.gibs !== "none" && S.ready) { map.getSource(`gibs-${S.gibs}`)._date = null; updateGibs(dayISO(S.t)); }
+    applyLayers();
   }));
-  tab.querySelectorAll('input[name="basemap"]').forEach((i) => i.addEventListener("change", () => setBasemap(i.value)));
+  tab.querySelectorAll("[data-bm]").forEach((b) => b.addEventListener("click", () => {
+    tab.querySelectorAll("[data-bm]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    setBasemap(b.dataset.bm);
+  }));
   tab.querySelectorAll("input[data-layer]").forEach((i) => i.addEventListener("change", () => { S.layers[i.dataset.layer] = i.checked; applyLayers(); }));
-  $("field-op").addEventListener("input", (e) => { S.fieldOpacity = Number(e.target.value); $("field-op-v").textContent = `${Math.round(S.fieldOpacity * 100)}%`; if (S.ready) map.setPaintProperty("field", "raster-opacity", fieldOp()); });
-  $("exag").addEventListener("input", (e) => { $("exag-v").textContent = `${Number(e.target.value).toFixed(1)}×`; applyLayers(); });
+  const fillRange = (el) => el.style.setProperty("--p", `${((el.value - el.min) / (el.max - el.min)) * 100}%`);
+  tab.querySelectorAll('input[type="range"]').forEach(fillRange);
+  $("field-op").addEventListener("input", (e) => { fillRange(e.target); S.fieldOpacity = Number(e.target.value); $("field-op-v").textContent = `${Math.round(S.fieldOpacity * 100)}%`; if (S.ready) map.setPaintProperty("field", "raster-opacity", fieldOp()); });
+  $("exag").addEventListener("input", (e) => { fillRange(e.target); $("exag-v").textContent = `${Number(e.target.value).toFixed(1)}×`; applyLayers(); });
 }
 function setField(k) {
-  S.field = k; const r = document.querySelector(`input[name="field"][value="${k}"]`); if (r) r.checked = true;
+  S.field = k; document.querySelectorAll(".field-opt").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.field === k)));
   renderField(); renderLegend();
 }
 
@@ -728,9 +829,10 @@ function renderTowns() {
   const s = S.summary, towns = S.munis.features.map((f) => f.properties).sort((a, b) => a.rank - b.rank);
   const affected = towns.filter((t) => t.flooded_farmland_ha >= 1).length;
   $("summary").innerHTML = s ? `
-    <div class="big"><b>${fmt(s.flooded_farmland_ha)} ha</b><span>farmland under water on 2 Nov 2024 (Sentinel-1, 100 m, both orbits)</span></div>
+    <div class="big"><b><i id="sum-ha" style="font-style:normal">0</i><small>ha</small></b><span>farmland under water on 2 Nov 2024 (Sentinel-1, 100 m, both orbits)</span></div>
     <div><b>${affected} of ${towns.length}</b><span>towns with flooded farmland</span></div>
     <div><b>${pct(s.flooded_farmland_ha / s.farmland_ha)}</b><span>of ${fmt(s.farmland_ha)} ha farmland</span></div>` : "";
+  if (s) { $("sum-ha").dataset.v = 0; countTo($("sum-ha"), s.flooded_farmland_ha); }
   const pmax = Math.max(...(s?.provinces || []).map((p) => p.flooded_farmland_ha), 1);
   $("provinces").innerHTML = (s?.provinces || []).slice().sort((a, b) => b.flooded_farmland_ha - a.flooded_farmland_ha)
     .map((p) => `<li><span>${esc(p.province)}</span><span class="bar"><i style="width:${(100 * p.flooded_farmland_ha) / pmax}%"></i></span><span class="v">${fmt(p.flooded_farmland_ha)} ha</span></li>`).join("");

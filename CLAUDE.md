@@ -118,7 +118,13 @@ Never mount the repo root as static files.
   town and the active heatmap value. Towns tab: provinces, ranking, search, CSV export.
 - NASA GIBS image of the day (MODIS, VIIRS, IMERG, SMAP) and basemaps (Esri satellite, CARTO map) are radio choices.
 - The map background is sea-coloured so tiles still loading never flash white.
-- Tokens: logo green `#1f8a4c` (controls), water `#2f9fd3`/`#1b5fa8`, storm `#e2533c`. Font: Outfit. Only measured values.
+- Rasters (heatmap, flood) are served as `saka://` tiles from a `maplibregl.addProtocol` handler that crops the
+  in-browser canvas. Do NOT go back to image/canvas sources: with 3D terrain MapLibre 4 drapes them only on some
+  tiles (Sorsogon, Masbate, Catanduanes went blank). After our tiles load we call `terrain.sourceCache.freeRtt()`.
+- UI: full-bleed map with floating glass sheets (brand chip, toolbar, panel, legend, timeline, inspector). Fonts: Geist (UI),
+  Bricolage Grotesque (date, figures). Motion is vanilla JS (count-up numbers, sliding tab/segment pills, inspector opens
+  from the click point, timeline bars rise once on load); React is not used. Respect prefers-reduced-motion.
+- Tokens: logo green `#1f8a4c` (controls), water `#2f9fd3`/`#1b5fa8`, storm `#e2533c`, ink `#0f1f17`. Only measured values.
 
 ## 7. Honesty rules for code, docs and pitch
 
