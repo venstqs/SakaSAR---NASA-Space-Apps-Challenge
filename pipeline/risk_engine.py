@@ -137,17 +137,17 @@ def farmer_text(p: dict, rain_mm: float) -> tuple[str, str]:
         action = (f"High drowning risk driven by {driver} on ground that collects runoff "
                   f"(TWI {p['twi_value']}). Open field outlets and cut a 30 cm drainage trench along the lowest bund "
                   f"within 48 h; harvest mature {crop} early if water stands more than 2 days.")
-        sms = f"FIELD SHIFT ALERT: {pid} ({ha}ha, {brgy}) HIGH drowning risk ({score}/100). Open outlets, trench lowest bund in 48h; harvest mature {crop} early."
+        sms = f"SAKASAR ALERT: {pid} ({ha}ha, {brgy}) HIGH drowning risk ({score}/100). Open outlets, trench lowest bund in 48h; harvest mature {crop} early."
     elif cls == "watch":
         action = (f"Moderate drowning risk, mainly from {driver}. Clear perimeter furrows and field outlets before "
                   f"the next rain band and re-check after the next Sentinel-1 pass (12-day repeat).")
-        sms = f"FIELD SHIFT WATCH: {pid} ({ha}ha, {brgy}) moderate risk ({score}/100). Clear furrows and outlets before next rain; recheck in 12 days."
+        sms = f"SAKASAR WATCH: {pid} ({ha}ha, {brgy}) moderate risk ({score}/100). Clear furrows and outlets before next rain; recheck in 12 days."
     else:
         sar_note = ("no ponding signal in Sentinel-1 (VV backscatter "
                     f"{'rose' if p['sar_wetness_change_db'] >= 0 else 'fell'} {abs(p['sar_wetness_change_db']):.1f} dB)")
         action = (f"Low drowning risk: {sar_note} and moderate terrain wetness (TWI {p['twi_value']}). "
                   f"Normal drainage is adequate; good candidate for a post-harvest legume rotation.")
-        sms = f"FIELD SHIFT CLEAR: {pid} ({ha}ha, {brgy}) LOW risk ({score}/100). No ponding seen by satellite; keep outlets clear, plan legume rotation."
+        sms = f"SAKASAR CLEAR: {pid} ({ha}ha, {brgy}) LOW risk ({score}/100). No ponding seen by satellite; keep outlets clear, plan legume rotation."
     if len(sms) > SMS_MAX:
         sms = sms[: SMS_MAX - 1] + "…"
     return action, sms

@@ -1,4 +1,4 @@
-/* Field Shift — LSTM soil outlook panel (uses the dashboard's tokens from style.css) */
+/* SakaSAR — LSTM soil outlook panel (uses the dashboard's tokens from style.css) */
 .fs-outlook { position: fixed; right: var(--space-4, 16px); bottom: 64px; z-index: 40;
   font-family: Inter, system-ui, sans-serif; color: var(--text-main, #0f172a); }
 .fs-outlook-fab { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border: 0;

@@ -1,4 +1,6 @@
-# Field Shift — Methods
+# SakaSAR — Methods
+
+Built for the 2026 NASA Space Apps *Field Shift: Adapting Farms with NASA Data* challenge.
 
 How the Field Drowning Risk map is computed. Everything runs on one 30 m grid
 (EPSG:32651, UTM 51N) covering the pilot strip plus a 2 km margin, and is reproducible with:

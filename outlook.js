@@ -1,4 +1,4 @@
-// Field Shift — LSTM soil-saturation outlook panel (reads /api/soil-outlook or data/soil_outlook.json).
+// SakaSAR — LSTM soil-saturation outlook panel (reads /api/soil-outlook or data/soil_outlook.json).
 (function () {
   const SVG = "http://www.w3.org/2000/svg";
   const WATERLOGGED = 0.97;

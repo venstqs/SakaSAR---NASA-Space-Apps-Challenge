@@ -948,7 +948,7 @@ async function initApp() {
       type: "custom",
       renderingMode: "3d",
       onAdd: function (mapInstance, gl) {
-        console.log("FieldShift 3D WebGL Layer initialized. THREE.REVISION:", THREE.REVISION);
+        console.log("SakaSAR 3D WebGL layer initialized. THREE.REVISION:", THREE.REVISION);
         buildThreeScene(mapInstance, gl);
       },
       render: function (gl, matrix) {

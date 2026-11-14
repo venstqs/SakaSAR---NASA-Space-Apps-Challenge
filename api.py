@@ -1,4 +1,4 @@
-"""Field Shift FastAPI server — serves the pipeline JSON and the MapLibre dashboard from one origin.
+"""SakaSAR FastAPI server — serves the pipeline JSON and the MapLibre dashboard from one origin.
 
     uvicorn api:app --reload --port 8000
     → http://localhost:8000/          dashboard
@@ -22,7 +22,7 @@ DATA_PATH = ROOT / "mock-data.json"
 OUTLOOK_PATH = ROOT / "data" / "soil_outlook.json"
 DASHBOARD_FILES = {"index.html", "app.js", "style.css", "mock-data.json", "outlook.js", "outlook.css"}
 
-app = FastAPI(title="Field Shift API", version="1.1.0",
+app = FastAPI(title="SakaSAR API", version="1.1.0",
               description="SAR root-zone hydrology and drowning-risk data for the Camarines Sur pilot.")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"], allow_headers=["*"])
 
@@ -89,7 +89,7 @@ def dashboard():
     index_file = ROOT / "index.html"
     if index_file.exists():
         return FileResponse(index_file)
-    return {"service": "Field Shift API", "status": "ok", "docs": "/docs"}
+    return {"service": "SakaSAR API", "status": "ok", "docs": "/docs"}
 
 
 ASSETS_DIR = ROOT / "assets"

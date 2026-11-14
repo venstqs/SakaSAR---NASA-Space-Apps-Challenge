@@ -2,7 +2,7 @@
 
 <img src="assets/logo.png" alt="SakaSAR Logo" width="160" />
 
-# SakaSAR — Field Shift: Agro-Hydrological Decision Support
+# SakaSAR: Agro-Hydrological Decision Support
 ### *Sub-Surface Dielectric & Micro-Topographic SAR Analytics for Root-Zone Hydrology and Adaptive Crop Rotation under Extreme Weather Regimes*
 
 [![NASA Space Apps Challenge 2026](https://img.shields.io/badge/NASA%20Space%20Apps-2026-0B3D91?style=for-the-badge&logo=nasa&logoColor=white)](https://www.spaceappschallenge.org/)
@@ -17,9 +17,9 @@
 
 ## 🌍 Overview
 
-**Field Shift** is a cloud-penetrating agro-hydrological decision-support platform built for the **2026 NASA Space Apps Challenge** (*Field Shift: Adapting Farms with NASA Data*).
+**SakaSAR** is a cloud-penetrating agro-hydrological decision-support platform built for the **2026 NASA Space Apps Challenge** (*Field Shift: Adapting Farms with NASA Data*).
 
-Optical satellite sensors (Landsat, MODIS) are blinded by cloud cover during typhoons and monsoon events—precisely when smallholder farmers need actionable flood and waterlogging intelligence. **Field Shift** fuses **C-band Synthetic Aperture Radar (Sentinel-1 SAR)** backscatter shifts with **NASADEM 30 m micro-topography** and **NASA precipitation & agro-meteorology (NASA POWER / GPM IMERG)** on a shared 30 m grid to:
+Optical satellite sensors (Landsat, MODIS) are blinded by cloud cover during typhoons and monsoon events—precisely when smallholder farmers need actionable flood and waterlogging intelligence. **SakaSAR** fuses **C-band Synthetic Aperture Radar (Sentinel-1 SAR)** backscatter shifts with **NASADEM 30 m micro-topography** and **NASA precipitation & agro-meteorology (NASA POWER / GPM IMERG)** on a shared 30 m grid to:
 
 1. **Map Field Drowning Risk (`High` / `Watch` / `Low`)** across farm parcels and identify low-lying runoff channels where water pools.
 2. **Validate Risk Against Observed SAR Flooding** by computing the independent spatial hit rate against post-storm standing-water masks.
@@ -47,7 +47,7 @@ Per our 12-hour engineering checklist, three developers work across **six isolat
 ## 🛰️ Datasets & Sensor Fusion Grid
 
 ### Datasets Used in the Build
-| Dataset | Source / Agency | Resolution | Role in Field Shift |
+| Dataset | Source / Agency | Resolution | Role in SakaSAR |
 | :--- | :--- | :--- | :--- |
 | **Sentinel-1 RTC (VV / VH)** | ESA / Copernicus (via Planetary Computer) | $10\text{ m} \to 30\text{ m}$ / 12-day | Cloud-piercing C-band ($5.405\text{ GHz}$) backscatter change ($\Delta\sigma^0_{\text{VV}}$) for surface wetness shift and post-storm standing-water flood extent. |
 | **NASADEM** | NASA / JPL | $30\text{ m}$ Spatial | Micro-topographic Slope ($\beta$), D8 Flow Accumulation ($a$), drainage corridor routing, and Topographic Wetness Index ($\text{TWI} = \ln(a/\tan\beta)$). |

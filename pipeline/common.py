@@ -1,4 +1,4 @@
-"""Shared grid, data access, caching and vector helpers for the Field Shift pipeline.
+"""Shared grid, data access, caching and vector helpers for the SakaSAR pipeline.
 
 All raster math happens on one 30 m grid in EPSG:32651 (UTM 51N). Vector outputs are
 exported as EPSG:4326 GeoJSON for the MapLibre dashboard.
