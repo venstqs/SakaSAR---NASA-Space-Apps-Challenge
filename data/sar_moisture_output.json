@@ -1,0 +1,1293 @@
+{
+  "provenance": {
+    "data_mode": "live",
+    "collection": "sentinel-1-rtc",
+    "before_scene": {
+      "data_mode": "live",
+      "item_id": "S1A_IW_GRDH_1SDV_20241009T213901_20241009T213930_056031_06DA7E_rtc",
+      "datetime": "2024-10-09T21:39:16.008195Z",
+      "platform": "SENTINEL-1A",
+      "orbit_state": "descending",
+      "relative_orbit": 134,
+      "product": "Sentinel-1 RTC gamma0 (Microsoft Planetary Computer)"
+    },
+    "after_scene": {
+      "data_mode": "live",
+      "item_id": "S1A_IW_GRDH_1SDV_20241021T213901_20241021T213930_056206_06E170_rtc",
+      "datetime": "2024-10-21T21:39:15.685927Z",
+      "platform": "SENTINEL-1A",
+      "orbit_state": "descending",
+      "relative_orbit": 134,
+      "product": "Sentinel-1 RTC gamma0 (Microsoft Planetary Computer)"
+    },
+    "dem": {
+      "data_mode": "live",
+      "source": "Microsoft Planetary Computer / nasadem",
+      "item_id": "NASADEM_HGT_n13e123"
+    },
+    "grid": {
+      "crs": "EPSG:32651",
+      "cell_m": 30.0,
+      "shape": [
+        158,
+        203
+      ]
+    },
+    "lee_filter": {
+      "window": 5,
+      "looks": 18.0
+    },
+    "flood_threshold_db": -15.0,
+    "otsu_raw_db": -3.09,
+    "bbox_mean_delta_vv_db": 1.37,
+    "bbox_flooded_fraction": 0.0,
+    "processing_time_sec": 61.36
+  },
+  "plots": [
+    {
+      "plot_id": "PL-01",
+      "pixels_30m": 130,
+      "vv_before_db": -3.42,
+      "vv_after_db": -2.14,
+      "sar_wetness_change_db": 1.28,
+      "s_sar": 0.0,
+      "flooded_pixel_fraction": 0.0,
+      "vh_wetness_change_db": 0.39
+    },
+    {
+      "plot_id": "PL-02",
+      "pixels_30m": 110,
+      "vv_before_db": -4.17,
+      "vv_after_db": -1.8,
+      "sar_wetness_change_db": 2.37,
+      "s_sar": 0.0,
+      "flooded_pixel_fraction": 0.0,
+      "vh_wetness_change_db": 0.57
+    },
+    {
+      "plot_id": "PL-03",
+      "pixels_30m": 110,
+      "vv_before_db": -3.65,
+      "vv_after_db": -2.25,
+      "sar_wetness_change_db": 1.4,
+      "s_sar": 0.0,
+      "flooded_pixel_fraction": 0.0,
+      "vh_wetness_change_db": 0.48
+    },
+    {
+      "plot_id": "PL-04",
+      "pixels_30m": 110,
+      "vv_before_db": -3.93,
+      "vv_after_db": -3.11,
+      "sar_wetness_change_db": 0.82,
+      "s_sar": 0.0,
+      "flooded_pixel_fraction": 0.0,
+      "vh_wetness_change_db": 0.62
+    },
+    {
+      "plot_id": "PL-05",
+      "pixels_30m": 120,
+      "vv_before_db": -4.7,
+      "vv_after_db": -3.27,
+      "sar_wetness_change_db": 1.43,
+      "s_sar": 0.0,
+      "flooded_pixel_fraction": 0.0,
+      "vh_wetness_change_db": 0.72
+    }
+  ],
+  "observed_flood_extent": {
+    "type": "FeatureCollection",
+    "features": []
+  },
+  "sar_backscatter_comparison": {
+    "before_event": {
+      "type": "FeatureCollection",
+      "features": []
+    },
+    "after_event": {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.193681,
+                  13.616662
+                ],
+                [
+                  123.194236,
+                  13.616661
+                ],
+                [
+                  123.194235,
+                  13.61639
+                ],
+                [
+                  123.193681,
+                  13.61639
+                ],
+                [
+                  123.193681,
+                  13.616662
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.1912,
+                  13.617477
+                ],
+                [
+                  123.1912,
+                  13.617749
+                ],
+                [
+                  123.192018,
+                  13.617748
+                ],
+                [
+                  123.192018,
+                  13.617477
+                ],
+                [
+                  123.1912,
+                  13.617477
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.192573,
+                  13.61829
+                ],
+                [
+                  123.19285,
+                  13.61829
+                ],
+                [
+                  123.19285,
+                  13.617747
+                ],
+                [
+                  123.192295,
+                  13.617748
+                ],
+                [
+                  123.192295,
+                  13.618019
+                ],
+                [
+                  123.192573,
+                  13.618019
+                ],
+                [
+                  123.192573,
+                  13.61829
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.194237,
+                  13.618289
+                ],
+                [
+                  123.194514,
+                  13.618289
+                ],
+                [
+                  123.194514,
+                  13.617746
+                ],
+                [
+                  123.194237,
+                  13.617746
+                ],
+                [
+                  123.194237,
+                  13.618289
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.192851,
+                  13.618833
+                ],
+                [
+                  123.192851,
+                  13.619375
+                ],
+                [
+                  123.193406,
+                  13.619375
+                ],
+                [
+                  123.193406,
+                  13.619103
+                ],
+                [
+                  123.193128,
+                  13.619104
+                ],
+                [
+                  123.193128,
+                  13.618832
+                ],
+                [
+                  123.192851,
+                  13.618833
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.193129,
+                  13.620189
+                ],
+                [
+                  123.193684,
+                  13.620188
+                ],
+                [
+                  123.193684,
+                  13.619917
+                ],
+                [
+                  123.193406,
+                  13.619917
+                ],
+                [
+                  123.193406,
+                  13.619646
+                ],
+                [
+                  123.193129,
+                  13.619646
+                ],
+                [
+                  123.193129,
+                  13.620189
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.191742,
+                  13.619918
+                ],
+                [
+                  123.191743,
+                  13.620461
+                ],
+                [
+                  123.19202,
+                  13.620461
+                ],
+                [
+                  123.19202,
+                  13.619918
+                ],
+                [
+                  123.191742,
+                  13.619918
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.191743,
+                  13.621275
+                ],
+                [
+                  123.191743,
+                  13.6215
+                ],
+                [
+                  123.192576,
+                  13.6215
+                ],
+                [
+                  123.192575,
+                  13.621274
+                ],
+                [
+                  123.191743,
+                  13.621275
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.196453,
+                  13.615303
+                ],
+                [
+                  123.196454,
+                  13.615846
+                ],
+                [
+                  123.196731,
+                  13.615846
+                ],
+                [
+                  123.196731,
+                  13.615303
+                ],
+                [
+                  123.196453,
+                  13.615303
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.197841,
+                  13.615845
+                ],
+                [
+                  123.198118,
+                  13.615844
+                ],
+                [
+                  123.198117,
+                  13.615302
+                ],
+                [
+                  123.19784,
+                  13.615302
+                ],
+                [
+                  123.197841,
+                  13.615845
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.199227,
+                  13.616115
+                ],
+                [
+                  123.199505,
+                  13.616115
+                ],
+                [
+                  123.199504,
+                  13.615572
+                ],
+                [
+                  123.199227,
+                  13.615572
+                ],
+                [
+                  123.199227,
+                  13.616115
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.199505,
+                  13.616928
+                ],
+                [
+                  123.199506,
+                  13.6172
+                ],
+                [
+                  123.20006,
+                  13.617199
+                ],
+                [
+                  123.20006,
+                  13.616928
+                ],
+                [
+                  123.199505,
+                  13.616928
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.197843,
+                  13.618286
+                ],
+                [
+                  123.198397,
+                  13.618286
+                ],
+                [
+                  123.198397,
+                  13.618014
+                ],
+                [
+                  123.197842,
+                  13.618015
+                ],
+                [
+                  123.197843,
+                  13.618286
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.200061,
+                  13.618284
+                ],
+                [
+                  123.199507,
+                  13.618285
+                ],
+                [
+                  123.199506,
+                  13.618013
+                ],
+                [
+                  123.199229,
+                  13.618014
+                ],
+                [
+                  123.19923,
+                  13.618828
+                ],
+                [
+                  123.199784,
+                  13.618827
+                ],
+                [
+                  123.199784,
+                  13.618556
+                ],
+                [
+                  123.200062,
+                  13.618556
+                ],
+                [
+                  123.200061,
+                  13.618284
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.20034,
+                  13.619369
+                ],
+                [
+                  123.200894,
+                  13.619369
+                ],
+                [
+                  123.200894,
+                  13.619097
+                ],
+                [
+                  123.200339,
+                  13.619098
+                ],
+                [
+                  123.20034,
+                  13.619369
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.204774,
+                  13.615839
+                ],
+                [
+                  123.204774,
+                  13.61611
+                ],
+                [
+                  123.205329,
+                  13.61611
+                ],
+                [
+                  123.205329,
+                  13.615839
+                ],
+                [
+                  123.204774,
+                  13.615839
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.204221,
+                  13.617196
+                ],
+                [
+                  123.204775,
+                  13.617195
+                ],
+                [
+                  123.204775,
+                  13.616924
+                ],
+                [
+                  123.20422,
+                  13.616925
+                ],
+                [
+                  123.204221,
+                  13.617196
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.202834,
+                  13.617468
+                ],
+                [
+                  123.203111,
+                  13.617468
+                ],
+                [
+                  123.203112,
+                  13.617739
+                ],
+                [
+                  123.203389,
+                  13.617739
+                ],
+                [
+                  123.203389,
+                  13.617197
+                ],
+                [
+                  123.203111,
+                  13.617197
+                ],
+                [
+                  123.203111,
+                  13.616926
+                ],
+                [
+                  123.202834,
+                  13.616926
+                ],
+                [
+                  123.202833,
+                  13.616654
+                ],
+                [
+                  123.202556,
+                  13.616655
+                ],
+                [
+                  123.202556,
+                  13.616926
+                ],
+                [
+                  123.202279,
+                  13.616926
+                ],
+                [
+                  123.202279,
+                  13.617197
+                ],
+                [
+                  123.202834,
+                  13.617197
+                ],
+                [
+                  123.202834,
+                  13.617468
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.205607,
+                  13.617195
+                ],
+                [
+                  123.205608,
+                  13.617466
+                ],
+                [
+                  123.206162,
+                  13.617466
+                ],
+                [
+                  123.206162,
+                  13.617194
+                ],
+                [
+                  123.205607,
+                  13.617195
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.205053,
+                  13.617738
+                ],
+                [
+                  123.205608,
+                  13.617737
+                ],
+                [
+                  123.205608,
+                  13.617466
+                ],
+                [
+                  123.205053,
+                  13.617466
+                ],
+                [
+                  123.205053,
+                  13.617738
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.203667,
+                  13.618824
+                ],
+                [
+                  123.203668,
+                  13.619366
+                ],
+                [
+                  123.203945,
+                  13.619366
+                ],
+                [
+                  123.203945,
+                  13.618824
+                ],
+                [
+                  123.203667,
+                  13.618824
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.202559,
+                  13.620452
+                ],
+                [
+                  123.20256,
+                  13.620724
+                ],
+                [
+                  123.203114,
+                  13.620723
+                ],
+                [
+                  123.203114,
+                  13.620452
+                ],
+                [
+                  123.202559,
+                  13.620452
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.206993,
+                  13.615837
+                ],
+                [
+                  123.206993,
+                  13.61638
+                ],
+                [
+                  123.207271,
+                  13.61638
+                ],
+                [
+                  123.20727,
+                  13.616108
+                ],
+                [
+                  123.207825,
+                  13.616108
+                ],
+                [
+                  123.207825,
+                  13.615837
+                ],
+                [
+                  123.206993,
+                  13.615837
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.207271,
+                  13.617193
+                ],
+                [
+                  123.207272,
+                  13.617465
+                ],
+                [
+                  123.207826,
+                  13.617464
+                ],
+                [
+                  123.207826,
+                  13.616922
+                ],
+                [
+                  123.207549,
+                  13.616922
+                ],
+                [
+                  123.207549,
+                  13.617193
+                ],
+                [
+                  123.207271,
+                  13.617193
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.209767,
+                  13.61692
+                ],
+                [
+                  123.209768,
+                  13.617191
+                ],
+                [
+                  123.210045,
+                  13.617191
+                ],
+                [
+                  123.210046,
+                  13.618005
+                ],
+                [
+                  123.2102,
+                  13.618005
+                ],
+                [
+                  123.2102,
+                  13.61692
+                ],
+                [
+                  123.209767,
+                  13.61692
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.206995,
+                  13.617736
+                ],
+                [
+                  123.206994,
+                  13.617465
+                ],
+                [
+                  123.206162,
+                  13.617466
+                ],
+                [
+                  123.206163,
+                  13.617737
+                ],
+                [
+                  123.20644,
+                  13.617737
+                ],
+                [
+                  123.20644,
+                  13.618008
+                ],
+                [
+                  123.206717,
+                  13.618008
+                ],
+                [
+                  123.206717,
+                  13.617736
+                ],
+                [
+                  123.206995,
+                  13.617736
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.208105,
+                  13.61882
+                ],
+                [
+                  123.208104,
+                  13.618278
+                ],
+                [
+                  123.20755,
+                  13.618278
+                ],
+                [
+                  123.20755,
+                  13.618821
+                ],
+                [
+                  123.207828,
+                  13.61882
+                ],
+                [
+                  123.207828,
+                  13.619092
+                ],
+                [
+                  123.208382,
+                  13.619091
+                ],
+                [
+                  123.208382,
+                  13.61882
+                ],
+                [
+                  123.208105,
+                  13.61882
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.206164,
+                  13.619636
+                ],
+                [
+                  123.206441,
+                  13.619635
+                ],
+                [
+                  123.206441,
+                  13.619093
+                ],
+                [
+                  123.205886,
+                  13.619093
+                ],
+                [
+                  123.205887,
+                  13.619365
+                ],
+                [
+                  123.206164,
+                  13.619364
+                ],
+                [
+                  123.206164,
+                  13.619636
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.208661,
+                  13.62099
+                ],
+                [
+                  123.208939,
+                  13.62099
+                ],
+                [
+                  123.208938,
+                  13.620447
+                ],
+                [
+                  123.208661,
+                  13.620447
+                ],
+                [
+                  123.208661,
+                  13.62099
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.207553,
+                  13.6215
+                ],
+                [
+                  123.208107,
+                  13.6215
+                ],
+                [
+                  123.208107,
+                  13.621262
+                ],
+                [
+                  123.20783,
+                  13.621262
+                ],
+                [
+                  123.207829,
+                  13.620991
+                ],
+                [
+                  123.207275,
+                  13.620991
+                ],
+                [
+                  123.207275,
+                  13.621262
+                ],
+                [
+                  123.207552,
+                  13.621262
+                ],
+                [
+                  123.207553,
+                  13.6215
+                ]
+              ]
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

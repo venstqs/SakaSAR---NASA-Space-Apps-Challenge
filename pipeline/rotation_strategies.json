@@ -1,0 +1,41 @@
+[
+  {
+    "id": "legume",
+    "name": "Nitrogen-Fixing & Soil Restorative Rotation",
+    "crops": "Mungbean / Cowpea (Legume-Dominant)",
+    "priorities": {
+      "nitrogen": 1,
+      "cash": 2,
+      "water": 2
+    },
+    "mechanics": "Integrates deep-rooted legumes during post-harvest bare-field windows identified via multi-year NDVI.",
+    "benefits": "Restores soil organic matter, fixes atmospheric N2 to cut synthetic fertilizer purchases, and breaks root-knot nematode pest cycles.",
+    "risks_and_gaps": "Verify local mungbean/cowpea seed supply and check plot soil pH compatibility with Municipal Agriculture Office."
+  },
+  {
+    "id": "biotillage",
+    "name": "Deep-Rooting & Erosion Control Cover Crop (Bio-Tillage)",
+    "crops": "Forage Radish / Sorghum-Sudangrass",
+    "priorities": {
+      "nitrogen": 2,
+      "cash": 3,
+      "water": 3
+    },
+    "mechanics": "Plants deep-rooting brassicas or grasses across NASADEM high-velocity micro-slope runoff channels.",
+    "benefits": "Creates sub-surface macro-pores that accelerate water infiltration, relieve surface ponding, and anchor topsoil against heavy rain.",
+    "risks_and_gaps": "Evaluate local labor or forage harvesting equipment requirements before planting."
+  },
+  {
+    "id": "shortcycle",
+    "name": "Water-Conserving & Heat-Tolerant Short-Cycle Rotation",
+    "crops": "Pearl Millet / Sesame",
+    "priorities": {
+      "water": 1,
+      "cash": 1,
+      "nitrogen": 3
+    },
+    "mechanics": "Transitions water-intensive cereal crops during dry windows to short-cycle, low-water-demand grains.",
+    "benefits": "Lowers seasonal irrigation demand while avoiding flowering-stage heat stress and diversifying household cash income.",
+    "risks_and_gaps": "Review local buyer demand and farmgate price stability with extension officers."
+  }
+]

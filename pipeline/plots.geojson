@@ -1,0 +1,200 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "plot_id": "PL-01",
+        "name": "San Isidro Lowland Parcel A",
+        "barangay": "Brgy. San Isidro",
+        "hectares": 3.4,
+        "households": 10,
+        "current_crop": "Irrigated Lowland Rice",
+        "bare_field_days_per_year": 72
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              123.192,
+              13.616
+            ],
+            [
+              123.1955,
+              13.616
+            ],
+            [
+              123.1955,
+              13.6188
+            ],
+            [
+              123.192,
+              13.6188
+            ],
+            [
+              123.192,
+              13.616
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "plot_id": "PL-02",
+        "name": "San Isidro Creek-Edge Parcel B",
+        "barangay": "Brgy. San Isidro",
+        "hectares": 2.8,
+        "households": 8,
+        "current_crop": "Irrigated Lowland Rice",
+        "bare_field_days_per_year": 66
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              123.1958,
+              13.6158
+            ],
+            [
+              123.199,
+              13.6158
+            ],
+            [
+              123.199,
+              13.6185
+            ],
+            [
+              123.1958,
+              13.6185
+            ],
+            [
+              123.1958,
+              13.6158
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "plot_id": "PL-03",
+        "name": "Mabuhay Mid-Slope Parcel C",
+        "barangay": "Brgy. Mabuhay",
+        "hectares": 2.1,
+        "households": 5,
+        "current_crop": "White Corn",
+        "bare_field_days_per_year": 81
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              123.1994,
+              13.6164
+            ],
+            [
+              123.2025,
+              13.6164
+            ],
+            [
+              123.2025,
+              13.6192
+            ],
+            [
+              123.1994,
+              13.6192
+            ],
+            [
+              123.1994,
+              13.6164
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "plot_id": "PL-04",
+        "name": "Pacol Transition Terrace D",
+        "barangay": "Brgy. Pacol",
+        "hectares": 1.9,
+        "households": 4,
+        "current_crop": "Yellow Corn",
+        "bare_field_days_per_year": 64
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              123.2029,
+              13.6172
+            ],
+            [
+              123.2058,
+              13.6172
+            ],
+            [
+              123.2058,
+              13.6198
+            ],
+            [
+              123.2029,
+              13.6198
+            ],
+            [
+              123.2029,
+              13.6172
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "plot_id": "PL-05",
+        "name": "Carolina Upland Parcel E",
+        "barangay": "Brgy. Carolina",
+        "hectares": 3.5,
+        "households": 6,
+        "current_crop": "Upland Rice",
+        "bare_field_days_per_year": 55
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              123.2062,
+              13.618
+            ],
+            [
+              123.2096,
+              13.618
+            ],
+            [
+              123.2096,
+              13.6208
+            ],
+            [
+              123.2062,
+              13.6208
+            ],
+            [
+              123.2062,
+              13.618
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}
