@@ -1,0 +1,76 @@
+nodata_conventions:
+  float32: -9999.0
+  uint8: 255
+
+layers:
+  dem_30m:
+    filename: "dem_30m.tif"
+    dtype: "float32"
+    nodata: -9999.0
+    units: "m"
+    band_name: "elevation_m"
+    description: "NASADEM 30m surface elevation (m)"
+
+  slope_deg_30m:
+    filename: "slope_deg_30m.tif"
+    dtype: "float32"
+    nodata: -9999.0
+    units: "degrees"
+    band_name: "slope_deg"
+    description: "Terrain slope in degrees from conditioned NASADEM"
+
+  flow_acc_m2_30m:
+    filename: "flow_acc_m2_30m.tif"
+    dtype: "float32"
+    nodata: -9999.0
+    units: "m2"
+    band_name: "flow_acc_m2"
+    description: "Local D8 upslope contributing area in m2 (cells * 900)"
+
+  twi_30m:
+    filename: "twi_30m.tif"
+    dtype: "float32"
+    nodata: -9999.0
+    units: "unitless"
+    band_name: "twi"
+    description: "Topographic Wetness Index ln(SCA / tan(max(slope, 0.1 deg)))"
+
+  pooling_zones_30m:
+    filename: "pooling_zones_30m.tif"
+    dtype: "uint8"
+    nodata: 255
+    units: "class"
+    band_name: "pooling_zone"
+    description: "Binary pooling zone (1 = pooling, 0 = non-pooling)"
+
+  lowground_mask_30m:
+    filename: "lowground_mask_30m.tif"
+    dtype: "uint8"
+    nodata: 255
+    units: "flag"
+    band_name: "lowground_mask"
+    description: "Low-ground reliability mask (1 where DEM <= 0 m, 0 otherwise)"
+
+  rain_event_mm_30m:
+    filename: "rain_event_mm_30m.tif"
+    dtype: "float32"
+    nodata: -9999.0
+    units: "mm"
+    band_name: "rain_event_mm"
+    description: "GPM IMERG V07B event total rainfall (2024-10-21 to 2024-10-26, mm)"
+
+  rain_prior7d_mm_30m:
+    filename: "rain_prior7d_mm_30m.tif"
+    dtype: "float32"
+    nodata: -9999.0
+    units: "mm"
+    band_name: "rain_prior7d_mm"
+    description: "GPM IMERG V07B 7-day pre-event total rainfall (2024-10-14 to 2024-10-21, mm)"
+
+  smap_anomaly_zscore_30m:
+    filename: "smap_anomaly_zscore_30m.tif"
+    dtype: "float32"
+    nodata: -9999.0
+    units: "zscore"
+    band_name: "smap_anomaly_zscore"
+    description: "SMAP L4 root-zone soil moisture anomaly z-score vs Oct 2021-2023 baseline"
