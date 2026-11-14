@@ -1,0 +1,191 @@
+{
+  "provenance": {
+    "pilot_area": "Pilot Farming Cluster (Mock Bounding Box — Update at Hour 1)",
+    "event_reference": "Past Extreme-Rain / Typhoon Event (Mock)",
+    "grid_resolution": "30m Shared Grid",
+    "datasets_used": [
+      "Sentinel-1 (ESA/Copernicus C-Band SAR)",
+      "NASADEM (30m Slope, Flow Accumulation, TWI)",
+      "GPM IMERG (Event & 7-Day Rainfall Totals)",
+      "SMAP (Coarse Soil-Moisture Anomaly)",
+      "NASA POWER (Daily Temp & Rainfall History)",
+      "Landsat 8-9 / MODIS (Multi-Year NDVI Bare-Field Windows)",
+      "SoilGrids (250m Sand/Silt/Clay & Organic Carbon)"
+    ],
+    "future_work_datasets": ["NISAR", "ECOSTRESS", "GRACE / GRACE-FO"],
+    "limitations": [
+      "Surface wetness layers are derived from C-band Sentinel-1 SAR backscatter, not direct root-zone soil moisture measurements.",
+      "High-risk alerts and rotation rankings are rule-based decision aids and require local verification of drainage feasibility, seed availability, soil pH, labor, and market demand."
+    ]
+  },
+  "plots": {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "properties": {
+          "plot_id": "PLOT-01",
+          "barangay": "Barangay San Isidro",
+          "hectares": 2.4,
+          "risk_class": "high",
+          "risk_score": 0.86,
+          "sar_wetness_change_db": -3.4,
+          "twi_class": "High Pooling Zone",
+          "current_crop": "Irrigated Lowland Rice (Baseline)",
+          "bare_field_days_per_year": 68,
+          "plain_language_action": "High waterlogging danger in low-lying runoff channel. Dig targeted micro-drainage trenches along the eastern edge or execute an emergency early harvest on mature sections before roots rot.",
+          "sms_alert": "ALERT: PLOT-01 (2.4 ha, Brgy. San Isidro) is at HIGH Field Drowning Risk. Dig micro-drainage trenches or harvest mature crops early to prevent root rot."
+        },
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [[
+            [123.1820, 13.6210],
+            [123.1845, 13.6210],
+            [123.1845, 13.6228],
+            [123.1820, 13.6228],
+            [123.1820, 13.6210]
+          ]]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "plot_id": "PLOT-02",
+          "barangay": "Barangay San Isidro",
+          "hectares": 1.8,
+          "risk_class": "watch",
+          "risk_score": 0.54,
+          "sar_wetness_change_db": -1.6,
+          "twi_class": "Moderate Slope Runoff",
+          "current_crop": "White Corn (Baseline)",
+          "bare_field_days_per_year": 82,
+          "plain_language_action": "Soil saturation rising after 7-day GPM rainfall accumulation. Clear existing perimeter canals and monitor pooling after the next heavy rain band.",
+          "sms_alert": "WATCH: PLOT-02 (1.8 ha, Brgy. San Isidro) shows rising soil saturation. Clear perimeter drainage canals and check low-lying corners after heavy rain."
+        },
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [[
+            [123.1848, 13.6212],
+            [123.1870, 13.6212],
+            [123.1870, 13.6230],
+            [123.1848, 13.6230],
+            [123.1848, 13.6212]
+          ]]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "plot_id": "PLOT-03",
+          "barangay": "Barangay Mabuhay",
+          "hectares": 3.1,
+          "risk_class": "low",
+          "risk_score": 0.21,
+          "sar_wetness_change_db": -0.3,
+          "twi_class": "Well-Drained Upper Slope",
+          "current_crop": "Irrigated Lowland Rice (Baseline)",
+          "bare_field_days_per_year": 54,
+          "plain_language_action": "Normal drainage conditions with low pooling accumulation. Maintain standard field bunds and prepare post-harvest bare-field cover crop seeding.",
+          "sms_alert": "LOW RISK: PLOT-03 (3.1 ha, Brgy. Mabuhay) shows normal surface drainage. No emergency trenching needed; maintain standard bund checks."
+        },
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [[
+            [123.1822, 13.6232],
+            [123.1852, 13.6232],
+            [123.1852, 13.6250],
+            [123.1822, 13.6250],
+            [123.1822, 13.6232]
+          ]]
+        }
+      }
+    ]
+  },
+  "observed_flood_extent": {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "properties": {
+          "source": "Post-Event Sentinel-1 SAR Standing Water Mask"
+        },
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [[
+            [123.1823, 13.6212],
+            [123.1843, 13.6212],
+            [123.1843, 13.6224],
+            [123.1823, 13.6224],
+            [123.1823, 13.6212]
+          ]]
+        }
+      }
+    ]
+  },
+  "sar_backscatter_comparison": {
+    "before_event": {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "type": "Feature",
+          "properties": { "wetness_index": 0.25, "label": "Pre-Storm Baseline (Dry)" },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [[
+              [123.1818, 13.6208],
+              [123.1873, 13.6208],
+              [123.1873, 13.6252],
+              [123.1818, 13.6252],
+              [123.1818, 13.6208]
+            ]]
+          }
+        }
+      ]
+    },
+    "after_event": {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "type": "Feature",
+          "properties": { "wetness_index": 0.88, "label": "Post-Storm Surface Wetness" },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [[
+              [123.1818, 13.6208],
+              [123.1855, 13.6208],
+              [123.1855, 13.6234],
+              [123.1818, 13.6234],
+              [123.1818, 13.6208]
+            ]]
+          }
+        }
+      ]
+    }
+  },
+  "rotation_strategies": [
+    {
+      "rank": 1,
+      "name": "Strategy 1: Nitrogen-Fixing & Soil Restorative Rotation",
+      "crops": "Mungbean / Cowpea (Legume-Dominant)",
+      "mechanics": "Plant deep-rooted legumes during post-harvest bare-field windows identified from multi-year NDVI.",
+      "benefits": "Restores soil organic matter, fixes atmospheric nitrogen (N2) to reduce synthetic fertilizer demand, and breaks root-knot nematode pest cycles.",
+      "risks_and_gaps": "Requires local verification of mungbean/cowpea seed market availability and plot soil pH compatibility."
+    },
+    {
+      "rank": 2,
+      "name": "Strategy 2: Deep-Rooting & Erosion Control Cover Crop (Bio-Tillage)",
+      "crops": "Forage Radish / Sorghum-Sudangrass",
+      "mechanics": "Seed deep-rooting cover crops across micro-slopes flagged by NASADEM as high-velocity runoff channels.",
+      "benefits": "Creates sub-surface macro-pores that improve water infiltration, relieve surface ponding, and anchor topsoil against heavy rain erosion.",
+      "risks_and_gaps": "Requires farmer and extension review of forage harvesting labor or machinery availability."
+    },
+    {
+      "rank": 3,
+      "name": "Strategy 3: Water-Conserving & Heat-Tolerant Short-Cycle Rotation",
+      "crops": "Pearl Millet / Sesame",
+      "mechanics": "Transition water-intensive crops during dry post-monsoon windows to short-cycle, low-water-demand grains.",
+      "benefits": "Lowers seasonal irrigation demand during high-temperature windows while providing supplemental cash income.",
+      "risks_and_gaps": "Local buyer demand and market price fluctuations require Municipal Agriculture Office / extension review."
+    }
+  ]
+}
