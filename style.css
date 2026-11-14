@@ -1498,12 +1498,35 @@ button svg,
 }
 
 @media (max-width: 640px) {
-  .left-panel {
-    width: calc(100vw - 32px);
-    bottom: auto;
-    max-height: 46vh;
+  /* Phone layout: action pills on top, command panel below them, plot card as a bottom sheet.
+     Map controls live in the Layers drawer and pinch-zoom, so the side dock is hidden. */
+  .top-right-actions {
+    top: 12px;
+    right: 12px;
+    left: 12px;
+    height: 44px;
+    justify-content: flex-end;
   }
-  .right-tool-dock {
-    top: 76px;
+  .left-panel {
+    top: 64px;
+    left: 12px;
+    width: calc(100vw - 24px);
+    bottom: auto;
+    max-height: 42vh;
+    overflow-y: auto;
+  }
+  .right-tool-dock,
+  .bottom-right-HUD,
+  .telemetry-coord {
+    display: none;
+  }
+  .inspect-card {
+    left: 12px;
+    right: 12px;
+    bottom: 64px;
+    width: auto;
+    max-width: none;
+    max-height: 40vh;
+    overflow-y: auto;
   }
 }

@@ -92,6 +92,18 @@ def dashboard():
     return {"service": "Field Shift API", "status": "ok", "docs": "/docs"}
 
 
+ASSETS_DIR = ROOT / "assets"
+
+
+@app.get("/assets/{name}", include_in_schema=False)
+def dashboard_static_asset(name: str) -> FileResponse:
+    """Images used by the dashboard (logo). Only plain filenames inside assets/ are served."""
+    target = (ASSETS_DIR / name).resolve()
+    if target.parent != ASSETS_DIR.resolve() or not target.is_file() or target.suffix.lower() not in {".png", ".jpg", ".jpeg", ".svg", ".webp", ".ico"}:
+        raise HTTPException(404)
+    return FileResponse(target)
+
+
 @app.get("/{filename}", include_in_schema=False)
 def dashboard_asset(filename: str) -> FileResponse:
     target = ROOT / filename

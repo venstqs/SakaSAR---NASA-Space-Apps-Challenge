@@ -146,7 +146,12 @@ def vectorize(mask: np.ndarray, grid: Grid = GRID, min_area_m2: float = 2 * CELL
     for p in parts:
         if p.geom_type != "Polygon" or p.area < min_area_m2:
             continue
-        out.append(to_wgs(p.simplify(simplify_m, preserve_topology=True)))
+        # simplify, then a 1 m morphological opening removes zero-width spurs that clipping
+        # along the bbox edge can leave (they render as hairlines across the map)
+        clean = p.simplify(simplify_m, preserve_topology=True).buffer(-1.0, join_style=2).buffer(1.0, join_style=2)
+        for q in getattr(clean, "geoms", [clean]):
+            if q.geom_type == "Polygon" and q.area >= min_area_m2:
+                out.append(to_wgs(q))
     return out
 
 

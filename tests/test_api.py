@@ -66,3 +66,9 @@ def test_soil_outlook_endpoint_and_panel_served():
     for f in ("outlook.js", "outlook.css"):
         assert client.get(f"/{f}").status_code == 200
     assert client.post("/api/advisor/chat", json={"message": "hi"}).status_code in (404, 405)
+
+
+def test_logo_served_and_assets_locked_down():
+    assert client.get("/assets/sakasar-logo.png").status_code == 200
+    for bad in ("/assets/..%2Fapi.py", "/assets/../CLAUDE.md", "/assets/missing.png"):
+        assert client.get(bad).status_code == 404

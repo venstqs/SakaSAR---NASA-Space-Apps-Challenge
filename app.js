@@ -1,7 +1,8 @@
 const DATA_SOURCE_URL = "mock-data.json";
-const ORIGIN_LNG_LAT = [123.2005, 13.6182];
-const DEFAULT_CENTER = ORIGIN_LNG_LAT;
-let mapCenter = ORIGIN_LNG_LAT;
+// Fallback only — the real centre comes from provenance.map_center (Minalabac pilot strip).
+const DEFAULT_CENTER = [123.2057, 13.5416];
+let mapCenter = DEFAULT_CENTER;
+let pilotBounds = null; // [minLng, minLat, maxLng, maxLat] from the plots + SAR flood mask
 
 let appData = null;
 let map = null;
@@ -478,19 +479,21 @@ function createRiskGridTexture(riskClass) {
   return tex;
 }
 
-function createPhysicalWaterMaterial(isCanal = false) {
+function createPhysicalWaterMaterial(isCanal = false, fromMask = false) {
   const uniforms = {
     uTime: { value: 0 },
     uWaterLevel: { value: 1.0 },
     uSunDir: { value: new THREE.Vector3(0.52, 0.76, 0.39).normalize() },
     uCamPos: { value: new THREE.Vector3(0, 450, 450) },
-    uIsCanal: { value: isCanal ? 1.0 : 0.0 }
+    uIsCanal: { value: isCanal ? 1.0 : 0.0 },
+    uFromMask: { value: fromMask ? 1.0 : 0.0 }
   };
 
   const vertexShader = `
     uniform float uTime;
     uniform float uWaterLevel;
     uniform float uIsCanal;
+    uniform float uFromMask;
     varying vec3 vWorldPos;
     varying vec2 vUv;
     varying float vDepth;
@@ -499,7 +502,13 @@ function createPhysicalWaterMaterial(isCanal = false) {
       vUv = uv;
       vec3 pos = position;
 
-      if (uIsCanal < 0.5) {
+      if (uIsCanal < 0.5 && uFromMask > 0.5) {
+        // Real Sentinel-1 flood mask: SAR shows WHERE water stands, not how deep,
+        // so the whole mask gets one water tone that rises/falls with the timeline.
+        vDepth = 0.24 * uWaterLevel;
+        float swell = (sin(pos.x * 0.08 + uTime * 2.1) + cos(pos.z * 0.09 - uTime * 1.7)) * 0.06 * uWaterLevel;
+        pos.y = mix(0.2, 1.4, uWaterLevel) + swell;
+      } else if (uIsCanal < 0.5) {
         // Organic basin depth field concentrated in PL-01, PL-02, and lower PL-03
         vec2 basinUv = uv * 2.0 - 1.0;
         float westBias = smoothstep(1.0, -0.85, basinUv.x);
@@ -583,8 +592,8 @@ function createPhysicalWaterMaterial(isCanal = false) {
     void main() {
       if (vDepth <= 0.025) discard;
 
-      // SAR pixel-speckle fringe at shallow inundation boundary
-      if (uIsCanal < 0.5 && vDepth < 0.22) {
+      // SAR pixel-speckle fringe at shallow inundation boundary (only while water is rising/receding)
+      if (uIsCanal < 0.5 && vDepth < 0.2) {
         vec2 cell = floor(vWorldPos.xz / 9.0);
         float n = hash21(cell);
         if (n > vDepth * 4.8) discard;
@@ -642,7 +651,7 @@ function createPhysicalWaterMaterial(isCanal = false) {
 }
 
 function buildThreeScene(mapInstance, gl) {
-  threeOrigin = maplibregl.MercatorCoordinate.fromLngLat(ORIGIN_LNG_LAT, 0);
+  threeOrigin = maplibregl.MercatorCoordinate.fromLngLat(mapCenter, 0);
   threeScale = threeOrigin.meterInMercatorCoordinateUnits();
 
   const scene = new THREE.Scene();
@@ -822,64 +831,31 @@ function buildThreeScene(mapInstance, gl) {
   const { group: canalGroup, canalWater } = buildDrainageCanalMeshes(corridorCoords, soilMat, canalWaterMat);
   scene.add(canalGroup);
 
-  // 3. Subdivided 128x128 Physical Floodwater Surface Mesh (Clipped to PL-01, PL-02, lower PL-03 basin)
-  const basinMin = lngLatToLocalMeters([123.1920, 13.6194]);
-  const basinMax = lngLatToLocalMeters([123.2022, 13.6156]);
-  const basinW = Math.abs(basinMax.x - basinMin.x);
-  const basinH = Math.abs(basinMax.z - basinMin.z);
-  const basinCenterX = (basinMin.x + basinMax.x) * 0.5;
-  const basinCenterZ = (basinMin.z + basinMax.z) * 0.5;
-
-  const waterGeom = new THREE.PlaneGeometry(basinW, basinH, 96, 96);
-  waterGeom.rotateX(-Math.PI / 2);
-  const { mat: waterMat, uniforms: waterUniforms } = createPhysicalWaterMaterial(false);
-  const waterMesh = new THREE.Mesh(waterGeom, waterMat);
-  waterMesh.position.set(basinCenterX, 0, basinCenterZ);
+  // 3. Floodwater surface built from the REAL Sentinel-1 observed_flood_extent polygons
+  //    (pipeline output), so the animated water only appears where the radar saw standing water.
+  const { mat: waterMat, uniforms: waterUniforms } = createPhysicalWaterMaterial(false, true);
+  const waterMesh = new THREE.Group();
+  const toShapePoints = (ring) =>
+    ring.map(([lng, lat]) => {
+      const p = lngLatToLocalMeters([lng, lat]);
+      return new THREE.Vector2(p.x, -p.z); // rotateX(-90°) maps shape y -> world -z
+    });
+  (appData.observed_flood_extent?.features || []).forEach((f) => {
+    const polys = f.geometry.type === "MultiPolygon" ? f.geometry.coordinates : [f.geometry.coordinates];
+    polys.forEach((rings) => {
+      const shape = new THREE.Shape(toShapePoints(rings[0]));
+      rings.slice(1).forEach((hole) => shape.holes.push(new THREE.Path(toShapePoints(hole))));
+      const geom = new THREE.ShapeGeometry(shape);
+      geom.rotateX(-Math.PI / 2);
+      waterMesh.add(new THREE.Mesh(geom, waterMat));
+    });
+  });
   scene.add(waterMesh);
 
-  // 4. 3D C-Band SAR Backscatter Wireframe Relief (No flat 2D boxes)
+  // 4. SAR before/after is drawn from real pipeline polygons as MapLibre layers
+  //    ("sar-pre-fill" / "sar-post-fill", see initApp). The group is kept so existing toggles work.
   const sarGroup = new THREE.Group();
-  const sarUniforms = {
-    uTime: { value: 0 },
-    uMode: { value: 1.0 }
-  };
-  const sarGeom = new THREE.PlaneGeometry(basinW * 1.45, basinH * 1.25, 42, 24);
-  sarGeom.rotateX(-Math.PI / 2);
-  const sarMat = new THREE.ShaderMaterial({
-    uniforms: sarUniforms,
-    wireframe: true,
-    transparent: true,
-    depthWrite: false,
-    vertexShader: `
-      uniform float uTime;
-      uniform float uMode;
-      varying float vElev;
-      void main() {
-        vec3 p = position;
-        float wave = sin(p.x * 0.03 + uTime * 1.6) * cos(p.z * 0.04 - uTime * 1.2);
-        p.y = 4.5 + (uMode > 0.5 ? 2.4 * wave : 1.0 * wave);
-        vElev = wave * 0.5 + 0.5;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
-      }
-    `,
-    fragmentShader: `
-      uniform float uMode;
-      varying float vElev;
-      void main() {
-        vec3 preCol = mix(vec3(0.58, 0.64, 0.72), vec3(0.95, 0.75, 0.35), vElev);
-        vec3 postCol = mix(vec3(0.03, 0.57, 0.70), vec3(0.40, 0.91, 0.98), vElev);
-        vec3 col = mix(preCol, postCol, uMode);
-        gl_FragColor = vec4(col, uMode > 0.5 ? 0.42 : 0.28);
-      }
-    `
-  });
-  const sarMesh = new THREE.Mesh(sarGeom, sarMat);
-  sarMesh.position.set(basinCenterX + 120, 0, basinCenterZ);
-  sarGroup.add(sarMesh);
-  sarGroup.visible = sarMode !== "off";
-  if (sarUniforms) {
-    sarUniforms.uMode.value = sarMode === "pre" ? 0.0 : 1.0;
-  }
+  const sarUniforms = { uTime: { value: 0 }, uMode: { value: sarMode === "pre" ? 0.0 : 1.0 } };
   scene.add(sarGroup);
 
   scene.traverse((obj) => {
@@ -914,6 +890,9 @@ async function initApp() {
   const res = await fetch(DATA_SOURCE_URL);
   appData = await res.json();
   mapCenter = (appData.provenance && appData.provenance.map_center) || DEFAULT_CENTER;
+  pilotBounds = computePilotBounds(appData);
+  const coordEl = document.getElementById("coord-readout");
+  if (coordEl) coordEl.textContent = `${mapCenter[1].toFixed(4)}, ${mapCenter[0].toFixed(4)}`;
 
   // Initialize MapLibre with Satellite Imagery + Hybrid Reference Labels
   map = new maplibregl.Map({
@@ -950,7 +929,7 @@ async function initApp() {
         }
       ]
     },
-    center: ORIGIN_LNG_LAT,
+    center: mapCenter,
     zoom: 15.0,
     pitch: 30,
     bearing: -12,
@@ -1014,6 +993,21 @@ async function initApp() {
       }
     };
 
+    // Real Sentinel-1 before/after layers from the pipeline (toggled by the SAR Scene buttons)
+    const sarCmp = appData.sar_backscatter_comparison || {};
+    map.addSource("sar-pre-source", { type: "geojson", data: sarCmp.before_event || { type: "FeatureCollection", features: [] } });
+    map.addSource("sar-post-source", { type: "geojson", data: sarCmp.after_event || { type: "FeatureCollection", features: [] } });
+    map.addLayer({
+      id: "sar-pre-fill", type: "fill", source: "sar-pre-source",
+      layout: { visibility: sarMode === "pre" ? "visible" : "none" },
+      paint: { "fill-color": "#64748b", "fill-opacity": 0.45, "fill-outline-color": "#cbd5e1" }
+    });
+    map.addLayer({
+      id: "sar-post-fill", type: "fill", source: "sar-post-source",
+      layout: { visibility: sarMode === "post" ? "visible" : "none" },
+      paint: { "fill-color": "#06b6d4", "fill-opacity": 0.28, "fill-outline-color": "#67e8f9" }
+    });
+
     map.addSource("plots-source", {
       type: "geojson",
       data: appData.plots
@@ -1065,12 +1059,51 @@ async function initApp() {
     });
 
     startMapAnimations();
+    fitPilot(false);
   });
 
   populateLeftPanel();
   renderRotations("nitrogen");
   selectPlot(appData.plots.features[0], false);
   bindUIEvents();
+  // On phones, start with the map visible; the plot card opens when a plot is tapped.
+  if (window.matchMedia("(max-width: 640px)").matches) {
+    document.getElementById("inspect-card")?.classList.add("hidden");
+  }
+}
+
+// Frame all plots between the floating panels (left command panel, right plot card).
+function fitPilot(animate = true) {
+  if (!map || !appData) return;
+  const pts = appData.plots.features.flatMap((f) => f.geometry.coordinates[0]);
+  const lngs = pts.map((p) => p[0]);
+  const lats = pts.map((p) => p[1]);
+  const phone = window.matchMedia("(max-width: 640px)").matches;
+  const tablet = window.matchMedia("(max-width: 1024px)").matches;
+  const padding = phone
+    ? { top: Math.round(window.innerHeight * 0.52), bottom: 70, left: 24, right: 24 }
+    : tablet
+      ? { top: 90, bottom: 90, left: 380, right: 40 }
+      : { top: 110, bottom: 90, left: 390, right: 480 };
+  map.fitBounds(
+    [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+    { padding, pitch: is3D ? 45 : 0, bearing: -12, duration: animate ? 900 : 0, maxZoom: 17 }
+  );
+}
+
+function computePilotBounds(data) {
+  const pts = [];
+  const collect = (geom) => {
+    if (!geom) return;
+    const polys = geom.type === "MultiPolygon" ? geom.coordinates : [geom.coordinates];
+    polys.forEach((rings) => rings[0].forEach((c) => pts.push(c)));
+  };
+  (data.plots?.features || []).forEach((f) => collect(f.geometry));
+  (data.observed_flood_extent?.features || []).forEach((f) => collect(f.geometry));
+  if (!pts.length) return null;
+  const lngs = pts.map((p) => p[0]);
+  const lats = pts.map((p) => p[1]);
+  return [Math.min(...lngs), Math.min(...lats), Math.max(...lngs), Math.max(...lats)];
 }
 
 function getPolygonCenter(ring) {
@@ -1291,9 +1324,7 @@ function bindUIEvents() {
     document.getElementById("inspect-card").classList.add("hidden");
   });
 
-  document.getElementById("btn-reset-bounds").addEventListener("click", () => {
-    map.flyTo({ center: mapCenter, zoom: 14.8, pitch: is3D ? 52 : 0, bearing: -12 });
-  });
+  document.getElementById("btn-reset-bounds").addEventListener("click", () => fitPilot(true));
 
   // Collapse Left Panel (smooth accordion shrink)
   const leftPanel = document.getElementById("left-panel");
@@ -1496,6 +1527,11 @@ function setSarMode(mode, syncFloodCheckbox = true) {
     }
   }
 
+  if (map && map.getLayer("sar-pre-fill")) {
+    map.setLayoutProperty("sar-pre-fill", "visibility", normalized === "pre" ? "visible" : "none");
+    map.setLayoutProperty("sar-post-fill", "visibility", normalized === "post" ? "visible" : "none");
+  }
+
   if (threeState.sarGroup) {
     if (normalized === "off") {
       threeState.sarGroup.visible = false;
@@ -1618,9 +1654,9 @@ function startMapAnimations() {
       }
 
       // Soft feathered SAR radar beam confined to pilot bounding box
-      if (sarSweepProgress > 0 && map) {
-        const pNW = map.project([123.1912, 13.6215]);
-        const pSE = map.project([123.2102, 13.6152]);
+      if (sarSweepProgress > 0 && map && pilotBounds) {
+        const pNW = map.project([pilotBounds[0], pilotBounds[3]]);
+        const pSE = map.project([pilotBounds[2], pilotBounds[1]]);
         const minX = Math.max(0, Math.min(pNW.x, pSE.x) - 24);
         const maxX = Math.min(cssWidth, Math.max(pNW.x, pSE.x) + 24);
         const minY = Math.min(pNW.y, pSE.y) - 20;
