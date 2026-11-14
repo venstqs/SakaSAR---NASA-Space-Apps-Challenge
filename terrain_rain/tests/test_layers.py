@@ -9,6 +9,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from terrain_rain.grid import get_inner_grid
 from terrain_rain.io import write_layer
+from terrain_rain.terrain import _run_numpy_scipy_terrain_fallback
 
 
 def test_layers_yaml_contract() -> None:
@@ -67,3 +68,18 @@ def test_write_layer_roundtrip(tmp_path: Path) -> None:
         assert src.tags(1).get("units") == "mm"
         data = src.read(1)
         assert np.allclose(data, 42.5)
+
+
+def test_offline_terrain_engine_fallback() -> None:
+    rows, cols = 20, 20
+    y, x = np.meshgrid(np.linspace(10.0, 0.0, rows), np.linspace(10.0, 0.0, cols), indexing="ij")
+    dem = (y + x).astype(np.float32)
+    # Create an artificial depression in the center
+    dem[8:12, 8:12] -= 2.0
+
+    res = _run_numpy_scipy_terrain_fallback(dem, cell_size=30.0, slope_floor_deg=0.1)
+    assert set(res.keys()) == {"dem", "slope_deg", "flow_acc_m2", "twi", "depression_depth"}
+    assert np.all(np.isfinite(res["slope_deg"]))
+    assert np.all(res["flow_acc_m2"] >= 900.0)
+    assert np.all(np.isfinite(res["twi"]))
+    assert np.max(res["depression_depth"][8:12, 8:12]) > 0.5
