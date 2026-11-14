@@ -212,7 +212,7 @@ function addLayers() {
   map.addLayer({ id: "soil", type: "fill", source: "cells", paint: { "fill-color": rampSoil, "fill-opacity": 0.55 } });
   map.addLayer({ id: "lstm", type: "fill", source: "cells", paint: { "fill-color": rampLstm, "fill-opacity": 0.6 } });
   map.addSource("cols", { type: "geojson", data: cellPolys(0.07) });
-  map.addLayer({ id: "rain", type: "fill-extrusion", source: "cols", maxzoom: 9.6,
+  map.addLayer({ id: "rain", type: "fill-extrusion", source: "cols", maxzoom: 9.6, filter: [">=", ["get", "rain"], 1],
     paint: { "fill-extrusion-color": rampRain, "fill-extrusion-height": ["*", ["get", "rain"], 160], "fill-extrusion-base": 0, "fill-extrusion-opacity": 0.85, "fill-extrusion-vertical-gradient": true } });
   map.on("click", "rain", (e) => selectCell(e.features[0].properties.i));
   map.on("click", "soil", (e) => selectCell(e.features[0].properties.i));
@@ -444,7 +444,7 @@ function renderSituationState() {
     ? `<div class="kpi hero"><b>${fmt(s.flooded_farmland_ha)} ha</b><span>farmland under water on 2 Nov (Sentinel-1, 100 m)</span></div>
        <div class="kpi"><b>${affected}/${towns.length}</b><span>towns with flooded farmland</span></div>
        <div class="kpi"><b>${esc(towns[0].name)}</b><span>hardest hit, ${fmt(towns[0].flooded_farmland_ha)} ha</span></div>`
-    : `<div class="kpi hero"><b>Waiting for radar</b><span>The flood map comes with the calm 2 Nov Sentinel-1 pass. Press play.</span></div>
+    : `<div class="kpi hero status"><b>Waiting for radar</b><span>The flood map comes with the calm 2 Nov Sentinel-1 pass. Press play.</span></div>
        <div class="kpi"><b>${fmt(rd[peak].max)} mm</b><span>wettest day in one cell, ${short(S.tl.days[peak])}</span></div>
        <div class="kpi"><b>${s ? s.municipalities : "—"}</b><span>towns watched</span></div>`);
   $("towns-hint").textContent = after ? "Ranked by farmland the radar saw under water." : "Ranking from the 2 Nov flood map (shown ahead of time).";

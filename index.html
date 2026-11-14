@@ -50,13 +50,13 @@
           <button type="button" data-speed="1" aria-pressed="true">1×</button><button type="button" data-speed="2">2×</button><button type="button" data-speed="4">4×</button>
         </div>
       </div>
-      <input type="range" id="sim-slider" min="0" max="29" step="0.05" value="23" aria-label="Day" />
       <div class="sim-chart"><canvas id="ch-sim"></canvas></div>
+      <input type="range" id="sim-slider" min="0" max="29" step="0.05" value="23" aria-label="Day" />
       <div class="sim-stats" id="sim-stats"></div>
     </div>
   </section>
 
-  <section class="win" id="win-situation" data-title="Situation" data-icon="gauge" style="--x:16px;--y:84px;--w:340px">
+  <section class="win" id="win-situation" data-title="Situation" data-icon="gauge" style="--x:16px;--y:84px;--w:316px">
     <header class="win-head"><span class="win-title"><i data-lucide="gauge"></i>Situation</span><span class="win-ctl"></span></header>
     <div class="win-body">
       <div class="kpis" id="kpis"></div>
@@ -67,7 +67,7 @@
     </div>
   </section>
 
-  <section class="win" id="win-layers" data-title="Layers" data-icon="layers" style="--x:calc(100% - 16px);--y:84px;--w:300px" data-anchor="right">
+  <section class="win" id="win-layers" data-title="Layers" data-icon="layers" style="--x:calc(100% - 16px);--y:84px;--w:300px" data-anchor="right" data-start="min">
     <header class="win-head"><span class="win-title"><i data-lucide="layers"></i>Layers</span><span class="win-ctl"></span></header>
     <div class="win-body layers" id="layers"></div>
   </section>

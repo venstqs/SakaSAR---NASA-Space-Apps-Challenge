@@ -1,6 +1,6 @@
 /* SakaSAR — full-screen 3D map with floating, draggable windows (light, logo green). */
 :root {
-  --card: rgba(255, 255, 255, 0.97);
+  --card: rgba(255, 255, 255, 0.9);
   --line: #e3ece6;
   --ink: #12261b;
   --muted: #64786c;
@@ -41,17 +41,17 @@ ol, ul { margin: 0; padding: 0; list-style: none; }
 
 /* windows */
 .win { position: fixed; z-index: 20; width: var(--w); max-width: calc(100vw - 24px); background: var(--card); border-radius: 18px;
-  box-shadow: var(--shadow); display: flex; flex-direction: column; max-height: calc(100vh - 110px); backdrop-filter: blur(8px); }
+  box-shadow: var(--shadow); display: flex; flex-direction: column; max-height: calc(100vh - 110px); backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2); }
 .win[hidden] { display: none; }
 .win.focused { z-index: 25; }
-.win-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 10px 10px 14px; cursor: grab; user-select: none; touch-action: none; border-bottom: 1px solid var(--line); }
+.win-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 10px 10px 14px; cursor: grab; user-select: none; touch-action: none; }
 .win.dragging .win-head { cursor: grabbing; }
-.win-title { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
+.win-title { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; color: var(--muted); }
 .win-title [data-lucide] { color: var(--green); }
 .win-ctl { display: inline-flex; gap: 2px; }
 .win-ctl button { width: 26px; height: 26px; border: 0; border-radius: 8px; background: none; cursor: pointer; display: grid; place-items: center; color: var(--muted); }
 .win-ctl button:hover { background: var(--green-tint); color: var(--green-dark); }
-.win-body { padding: 14px; overflow-y: auto; min-height: 0; }
+.win-body { padding: 2px 14px 14px; overflow-y: auto; min-height: 0; font-variant-numeric: tabular-nums; }
 .win.min .win-body { display: none; }
 .win.min .win-head { border-bottom: 0; }
 
@@ -64,20 +64,23 @@ ol, ul { margin: 0; padding: 0; list-style: none; }
 .speed { margin-left: auto; display: inline-flex; background: #f1f6f3; border-radius: 10px; padding: 3px; }
 .speed button { border: 0; background: none; border-radius: 8px; padding: 4px 9px; cursor: pointer; font-size: 12px; color: var(--muted); }
 .speed button[aria-pressed="true"] { background: #fff; color: var(--green-dark); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); }
-#sim-slider { width: 100%; margin: 12px 0 4px; accent-color: var(--green); }
-.sim-chart { position: relative; height: 64px; margin-top: 4px; }
-.sim-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
-.stat { background: #f4f8f5; border-radius: 12px; padding: 6px 10px; line-height: 1.25; }
-.stat b { display: block; font-size: 16px; font-weight: 700; }
+#sim-slider { width: 100%; margin: 0; accent-color: var(--green); height: 18px; }
+.sim-chart { position: relative; height: 72px; margin-top: 10px; }
+.sim-stats { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 8px; }
+.stat { padding: 2px 12px; line-height: 1.25; border-left: 1px solid var(--line); }
+.stat:first-child { border-left: 0; padding-left: 0; }
+.stat b { display: block; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
 .stat span { font-size: 11px; color: var(--muted); }
 
 /* situation */
 .kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.kpi { background: #f4f8f5; border-radius: 14px; padding: 10px 12px; }
-.kpi.hero { background: linear-gradient(135deg, #22a057, #146b39); color: #fff; grid-column: 1 / -1; }
-.kpi b { display: block; font-size: 24px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+.kpi { padding: 8px 0 0; }
+.kpi.hero { background: none; padding: 4px 0 8px; grid-column: 1 / -1; border-radius: 0; border-bottom: 1px solid var(--line); }
+.kpi.hero b { font-size: 34px; color: var(--water); }
+.kpi b { display: block; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
 .kpi span { font-size: 12px; color: var(--muted); }
-.kpi.hero span { color: rgba(255, 255, 255, 0.85); }
+.kpi.hero span { font-size: 13px; }
+.kpi.hero.status b { font-size: 22px; color: var(--ink); }
 .sub { font-size: 14px; font-weight: 600; margin: 16px 0 2px; }
 .search { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 12px; padding: 0 10px; margin: 8px 0; color: var(--muted); }
 .search input { border: 0; outline: 0; background: none; padding: 8px 0; flex: 1; color: var(--ink); }
