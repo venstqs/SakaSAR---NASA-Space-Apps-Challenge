@@ -1,0 +1,9 @@
+data/cache/
+data/cache_region/
+data/raw/
+pipeline/__pycache__/
+tests/
+.pytest_cache/
+*.npy
+*.npz
+*.pyc

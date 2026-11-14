@@ -1,0 +1,13 @@
+[project]
+name = "sakasar"
+version = "1.0.0"
+description = "SakaSAR — Agro-Hydrological Decision Support (NASA Space Apps Challenge 2026)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn>=0.29.0",
+]
+
+[tool.vercel]
+entrypoint = "api:app"

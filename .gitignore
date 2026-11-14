@@ -7,3 +7,6 @@ __pycache__/
 !.env.example
 terrain_rain/outputs/
 terrain_rain/data_interim/
+data/cache_region/
+
+.vercel
