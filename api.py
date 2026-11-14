@@ -19,9 +19,10 @@ from fastapi.responses import FileResponse
 
 ROOT = Path(__file__).resolve().parent
 DATA_PATH = ROOT / "mock-data.json"
-DASHBOARD_FILES = {"index.html", "app.js", "style.css", "mock-data.json"}
+OUTLOOK_PATH = ROOT / "data" / "soil_outlook.json"
+DASHBOARD_FILES = {"index.html", "app.js", "style.css", "mock-data.json", "outlook.js", "outlook.css"}
 
-app = FastAPI(title="Field Shift API", version="1.0.0",
+app = FastAPI(title="Field Shift API", version="1.1.0",
               description="SAR root-zone hydrology and drowning-risk data for the Camarines Sur pilot.")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"], allow_headers=["*"])
 
@@ -73,6 +74,14 @@ def get_rotations(priority: Priority | None = None) -> list:
 @app.get("/api/provenance", tags=["data"], summary="Data sources, scenes and validation metrics")
 def get_provenance() -> dict:
     return load_data()["provenance"]
+
+
+@app.get("/api/soil-outlook", tags=["data"], summary="LSTM root-zone saturation outlook, hindcasts and accuracy")
+def get_soil_outlook() -> dict:
+    try:
+        return json.loads(OUTLOOK_PATH.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        raise HTTPException(503, "soil_outlook.json not found — run `python -m pipeline.soil_lstm`")
 
 
 @app.get("/", include_in_schema=False)

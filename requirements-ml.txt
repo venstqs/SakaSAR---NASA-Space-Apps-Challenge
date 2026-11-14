@@ -1,0 +1,3 @@
+# Extra dependencies to retrain the LSTM soil-saturation model (not needed to run the API)
+-r requirements.txt
+torch>=2.2

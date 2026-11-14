@@ -8,8 +8,8 @@
     "event_reference": "STS Kristine (Trami) — Oct 21-26, 2024 (Sentinel-1 Pass 2024-11-02)",
     "grid_resolution": "30m Shared Grid",
     "licensing_cost": "₱0 (Open NASA & Copernicus Data)",
-    "processing_time": "1.4 sec",
-    "sar_hit_rate": "100%",
+    "processing_time": "0.7 sec",
+    "sar_hit_rate": "31%",
     "total_high_risk_ha": 6.2,
     "high_risk_plots": 2,
     "households_affected": 18,
@@ -61,7 +61,8 @@
     },
     "sar_hit_rate_plots": "10%",
     "sar_hit_rate_terrain_only": "31%",
-    "sar_hit_rate_note": "sar_hit_rate = share of SAR-flooded 30 m cells in the pilot bbox that the full risk map rated high. It shares ΔVV with the flood mask, so it is a consistency check. sar_hit_rate_terrain_only uses a model without SAR (terrain + rain) and is the independent test. sar_hit_rate_plots uses whole-plot classes (CLAUDE.md §3D.3). All are n/a when the SAR flood mask is empty.",
+    "sar_hit_rate_full_model": "100%",
+    "sar_hit_rate_note": "sar_hit_rate = share of SAR-flooded farmland cells (2 Nov) that the terrain + rain model had ALREADY rated high without seeing the radar: an independent test. sar_hit_rate_full_model also uses ΔVV, the same signal as the flood mask, so it is circular (consistency check only). sar_hit_rate_plots uses whole-plot classes. All are n/a when the SAR flood mask is empty.",
     "risk_class_thresholds": {
       "high": ">= 70",
       "watch": "40-69",
@@ -147,6 +148,18 @@
       "peak_day": "20241022",
       "peak_day_mm": 230.9,
       "s_rain": 1.0
+    },
+    "soil_moisture_outlook": {
+      "model": "LSTM (1 layer, 64 hidden), PyTorch",
+      "after_2_nov_pass": {
+        "root_zone": 0.98,
+        "waterlogged_days_next_7_pred": 7,
+        "waterlogged_days_next_7_actual": 7
+      },
+      "skill_vs_persistence_pct": 60.4,
+      "skill_vs_ridge_pct": 24.5,
+      "test_period": "2022-01-01..2026-11-03",
+      "details": "/api/soil-outlook"
     },
     "pending_inputs": [
       "bare_field_days_per_year",

@@ -71,9 +71,10 @@ from which per-plot and per-barangay hectares and shares in each class are compu
 
 Share of SAR-flooded farmland cells that the map rated **high**.
 
-- **`sar_hit_rate_terrain_only`: the independent test.** It uses the same rule without the SAR term
-  (terrain + rain only), so it predicts flooding without looking at the radar.
-- `sar_hit_rate` (full model): a consistency check only, because ΔVV is in both the score and the flood mask.
+- **`sar_hit_rate` (headline, 31%): the independent test.** It uses the same rule without the SAR term
+  (terrain + rain only), so it rates the land *before* seeing the radar, matching the checklist's
+  "flooded area the map had already rated high".
+- `sar_hit_rate_full_model` (100%): a consistency check only, because ΔVV is in both the score and the flood mask.
 - `sar_hit_rate_plots`: the plot-polygon version from the original spec.
 
 ## Limits
@@ -85,3 +86,26 @@ Share of SAR-flooded farmland cells that the map rated **high**.
 - The weights (0.45 / 0.35 / 0.20) and thresholds are expert-set, not fitted. Calibrating them against
   LGU damage reports is pilot work.
 - NASA POWER is a 0.5° grid cell, so rainfall is uniform across the 2 km strip.
+
+## LSTM soil-saturation outlook (`pipeline/soil_lstm.py`)
+
+Answers *"how long will the root zone stay waterlogged?"*
+
+- **Data:** NASA POWER daily, 2001–2026, at the pilot centre: rain, max/min temperature, humidity,
+  solar radiation, plus `GWETROOT` (root zone) and `GWETTOP` (surface) soil wetness from the MERRA-2 land model
+  (0 = dry, 1 = saturated).
+- **Model:** a single-layer LSTM (64 hidden units). Input is 30 days of weather and soil wetness plus the next
+  7 days of weather. Output is soil wetness for days +1…+7. Giving the model the coming week's rain is the
+  standard rainfall-response setup in hydrology.
+- **Split by time:** train 2001–2018, validate 2019–2021, **test 2022–2026, which includes Kristine and was
+  never seen in training**.
+- **Result (root zone, test years):** 60% lower RMSE than persistence, and 25% lower than a ridge regression
+  given the same inputs. In weeks with ≥100 mm of rain coming, it is 77% better than persistence and 53% better
+  than ridge. Ridge is slightly better for day +1 only; the LSTM's memory pays off from day 2 onward.
+- **Kristine hindcasts:** for the storm week, 7/7 waterlogged days were predicted correctly (MAE 0.002). After
+  the 2 Nov radar pass, 7/7 days were predicted to stay waterlogged, which matched what happened (MAE 0.004).
+- **Saturation classes:** waterlogged ≥ 0.97, wet ≥ 0.90, moist ≥ 0.70, dry < 0.70. At this site the
+  2001–2018 median is 0.94.
+- **Limits:** it learns NASA's regional soil model (a ~50 km cell), not a field sensor. Rain for the coming
+  week must be supplied as observations, a forecast or a scenario.
+

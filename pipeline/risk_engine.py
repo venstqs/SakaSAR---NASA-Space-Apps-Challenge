@@ -153,6 +153,26 @@ def farmer_text(p: dict, rain_mm: float) -> tuple[str, str]:
 
 
 LAYERS_DIR = C.DATA_DIR / "layers"
+OUTLOOK_PATH = C.DATA_DIR / "soil_outlook.json"
+
+
+def _soil_outlook_summary() -> dict | None:
+    """Headline numbers from the LSTM soil-saturation model (pipeline.soil_lstm), if it has been run."""
+    if not OUTLOOK_PATH.exists():
+        return None
+    o = json.loads(OUTLOOK_PATH.read_text(encoding="utf-8"))
+    after = o["hindcasts"][-1]
+    m = o["metrics"]["GWETROOT"]
+    return {
+        "model": o["model"]["type"],
+        "after_2_nov_pass": {"root_zone": after["root_zone_today"],
+                             "waterlogged_days_next_7_pred": after["days_waterlogged_pred"],
+                             "waterlogged_days_next_7_actual": after["days_waterlogged_actual"]},
+        "skill_vs_persistence_pct": m["skill_vs_persistence_pct"],
+        "skill_vs_ridge_pct": m["skill_vs_ridge_pct"],
+        "test_period": o["metrics"]["split"]["test"],
+        "details": "/api/soil-outlook",
+    }
 
 
 def export_layers(g_sar: dict, g_ter: dict, grids: dict, landcover) -> None:
@@ -282,7 +302,7 @@ def run(refresh: bool = False) -> dict:
         "grid_resolution": "30m Shared Grid",
         "licensing_cost": "₱0 (Open NASA & Copernicus Data)",
         "processing_time": f"{time.perf_counter() - t0:.1f} sec",
-        "sar_hit_rate": fmt(rate),
+        "sar_hit_rate": fmt(rate_terrain),
         "total_high_risk_ha": round(sum(p["hectares"] for p in high), 1),
         "high_risk_plots": len(high),
         "households_affected": sum(p["households"] for p in high),
@@ -316,10 +336,11 @@ def run(refresh: bool = False) -> dict:
         "pilot_area_landcover_ha": landcover_bbox,
         "sar_hit_rate_plots": fmt(plot_rate),
         "sar_hit_rate_terrain_only": fmt(rate_terrain),
-        "sar_hit_rate_note": ("sar_hit_rate = share of SAR-flooded 30 m cells in the pilot bbox that the full risk map "
-                              "rated high. It shares ΔVV with the flood mask, so it is a consistency check. "
-                              "sar_hit_rate_terrain_only uses a model without SAR (terrain + rain) and is the "
-                              "independent test. sar_hit_rate_plots uses whole-plot classes (CLAUDE.md §3D.3). "
+        "sar_hit_rate_full_model": fmt(rate),
+        "sar_hit_rate_note": ("sar_hit_rate = share of SAR-flooded farmland cells (2 Nov) that the terrain + rain "
+                              "model had ALREADY rated high without seeing the radar: an independent test. "
+                              "sar_hit_rate_full_model also uses ΔVV, the same signal as the flood mask, so it is "
+                              "circular (consistency check only). sar_hit_rate_plots uses whole-plot classes. "
                               "All are n/a when the SAR flood mask is empty."),
         "risk_class_thresholds": {"high": ">= 70", "watch": "40-69", "low": "< 40",
                                   "missing": "no valid SAR pixel (flagged, not scored)",
@@ -339,6 +360,7 @@ def run(refresh: bool = False) -> dict:
         "pilot_area_class_shares": bbox_shares,
         "barangay_ranking": barangay_ranking,
         "rainfall": {k: v for k, v in rain.items() if k != "daily_mm"},
+        "soil_moisture_outlook": _soil_outlook_summary(),
         "pending_inputs": ["bare_field_days_per_year", "households", "hectares", "current_crop"],
     }
 
@@ -361,7 +383,7 @@ def main() -> None:
     ap.add_argument("--refresh", action="store_true", help="ignore data/cache and re-download")
     out = run(refresh=ap.parse_args().refresh)
     pv = out["provenance"]
-    print(f"data_mode={pv['data_mode']}  hit_rate={pv['sar_hit_rate']} (terrain-only {pv['sar_hit_rate_terrain_only']}, "
+    print(f"data_mode={pv['data_mode']}  hit_rate={pv['sar_hit_rate']} (full model {pv['sar_hit_rate_full_model']}, "
           f"plots {pv['sar_hit_rate_plots']})  flood={pv['observed_flood_area_ha']} ha "
           f"(farmland {pv['flooded_farmland_ha']} ha)  pre-event Δ={pv['pre_event_change_db']} dB  "
           f"high={pv['high_risk_plots']} plots / {pv['total_high_risk_ha']} ha / {pv['households_affected']} households  "

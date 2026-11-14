@@ -57,3 +57,12 @@ def test_dashboard_served_and_repo_not_exposed():
     assert client.get("/mock-data.json").json() == json.loads((ROOT / "mock-data.json").read_text(encoding="utf-8"))
     for f in ("CLAUDE.md", "api.py", ".git/config", "requirements.txt"):
         assert client.get(f"/{f}").status_code == 404
+
+
+def test_soil_outlook_endpoint_and_panel_served():
+    o = client.get("/api/soil-outlook").json()
+    assert o["model"]["type"].startswith("LSTM")
+    assert len(o["hindcasts"]) == 2 and len(o["scenario_outlook"]["cases"]) == 3
+    for f in ("outlook.js", "outlook.css"):
+        assert client.get(f"/{f}").status_code == 200
+    assert client.post("/api/advisor/chat", json={"message": "hi"}).status_code in (404, 405)
