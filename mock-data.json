@@ -8,7 +8,7 @@
     "event_reference": "STS Kristine (Trami) — Oct 21-26, 2024 (Sentinel-1 Pass 2024-11-02)",
     "grid_resolution": "30m Shared Grid",
     "licensing_cost": "₱0 (Open NASA & Copernicus Data)",
-    "processing_time": "1.4 sec",
+    "processing_time": "0.9 sec",
     "sar_hit_rate": "100%",
     "total_high_risk_ha": 6.2,
     "high_risk_plots": 2,
@@ -147,6 +147,18 @@
       "peak_day": "20241022",
       "peak_day_mm": 230.9,
       "s_rain": 1.0
+    },
+    "soil_moisture_outlook": {
+      "model": "LSTM (1 layer, 64 hidden), PyTorch",
+      "after_2_nov_pass": {
+        "root_zone": 0.98,
+        "waterlogged_days_next_7_pred": 7,
+        "waterlogged_days_next_7_actual": 7
+      },
+      "skill_vs_persistence_pct": 60.4,
+      "skill_vs_ridge_pct": 24.5,
+      "test_period": "2022-01-01..2026-11-03",
+      "details": "/api/soil-outlook"
     },
     "pending_inputs": [
       "bare_field_days_per_year",

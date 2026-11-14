@@ -1,0 +1,320 @@
+{
+  "model": {
+    "type": "LSTM (1 layer, 64 hidden), PyTorch",
+    "target": "NASA POWER GWETROOT (root zone) and GWETTOP (surface) soil wetness, MERRA-2 land model",
+    "inputs": "30 days of rain, max/min temperature, humidity, solar radiation, season and soil wetness, plus the next 7 days of rain/weather",
+    "site": {
+      "lon": 123.2057,
+      "lat": 13.5416,
+      "cell": "NASA POWER ~0.5° x 0.625°"
+    },
+    "limits": "Learns NASA's regional soil-moisture model, not a field sensor; one value for the whole pilot strip. Rain for the coming week must be supplied (observed, forecast or scenario).",
+    "saturation_classes": [
+      {
+        "min": 0.97,
+        "class": "waterlogged",
+        "meaning": "root zone effectively full; roots short of oxygen"
+      },
+      {
+        "min": 0.9,
+        "class": "wet",
+        "meaning": "near field capacity; little room for more rain"
+      },
+      {
+        "min": 0.7,
+        "class": "moist",
+        "meaning": "normal growing conditions"
+      },
+      {
+        "min": 0.0,
+        "class": "dry",
+        "meaning": "below typical; watch for water stress"
+      }
+    ]
+  },
+  "metrics": {
+    "GWETROOT": {
+      "rmse_lstm_by_day": [
+        0.0075,
+        0.0078,
+        0.0082,
+        0.0086,
+        0.009,
+        0.0094,
+        0.0097
+      ],
+      "rmse_persistence_by_day": [
+        0.0091,
+        0.0145,
+        0.0189,
+        0.0225,
+        0.0259,
+        0.029,
+        0.0319
+      ],
+      "rmse_ridge_same_inputs_by_day": [
+        0.0061,
+        0.0081,
+        0.0101,
+        0.0118,
+        0.0132,
+        0.0146,
+        0.0158
+      ],
+      "skill_vs_persistence_pct": 60.4,
+      "skill_vs_ridge_pct": 24.5,
+      "skill_vs_ridge_wet_weeks_pct": 52.9,
+      "wet_weeks": 342,
+      "rmse_lstm_wet_weeks": 0.006,
+      "rmse_persistence_wet_weeks": 0.0262,
+      "skill_vs_persistence_wet_weeks_pct": 77.0
+    },
+    "GWETTOP": {
+      "rmse_lstm_by_day": [
+        0.0116,
+        0.0119,
+        0.0122,
+        0.0126,
+        0.013,
+        0.0133,
+        0.0135
+      ],
+      "rmse_persistence_by_day": [
+        0.0205,
+        0.0296,
+        0.0355,
+        0.0397,
+        0.0434,
+        0.0467,
+        0.0496
+      ],
+      "rmse_ridge_same_inputs_by_day": [
+        0.0138,
+        0.0186,
+        0.0212,
+        0.0227,
+        0.0239,
+        0.0249,
+        0.0261
+      ],
+      "skill_vs_persistence_pct": 66.8,
+      "skill_vs_ridge_pct": 41.7,
+      "skill_vs_ridge_wet_weeks_pct": 70.6,
+      "wet_weeks": 342,
+      "rmse_lstm_wet_weeks": 0.0078,
+      "rmse_persistence_wet_weeks": 0.0462,
+      "skill_vs_persistence_wet_weeks_pct": 83.2
+    },
+    "train_samples": 6544,
+    "val_samples": 1096,
+    "test_samples": 1768,
+    "epochs": 57,
+    "best_val_mse_normalised": 0.0058,
+    "split": {
+      "train": "2001-01-31..2018-12-31",
+      "val": "..2021-12-31",
+      "test": "2022-01-01..2026-11-03"
+    }
+  },
+  "hindcasts": [
+    {
+      "label": "Storm week: issued 21 Oct 2024 with Kristine's observed rain",
+      "issued": "2024-10-21",
+      "root_zone_today": 0.98,
+      "days_waterlogged_pred": 7,
+      "days_waterlogged_actual": 7,
+      "mean_abs_error_root": 0.002,
+      "days": [
+        {
+          "date": "2024-10-21",
+          "rain_mm": 53.3,
+          "gwetroot_pred": 0.992,
+          "gwetroot_actual": 0.99,
+          "gwettop_pred": 0.977,
+          "gwettop_actual": 0.97,
+          "class_pred": "waterlogged"
+        },
+        {
+          "date": "2024-10-22",
+          "rain_mm": 230.9,
+          "gwetroot_pred": 1.0,
+          "gwetroot_actual": 1.0,
+          "gwettop_pred": 1.0,
+          "gwettop_actual": 1.0,
+          "class_pred": "waterlogged"
+        },
+        {
+          "date": "2024-10-23",
+          "rain_mm": 123.4,
+          "gwetroot_pred": 1.0,
+          "gwetroot_actual": 1.0,
+          "gwettop_pred": 1.0,
+          "gwettop_actual": 0.99,
+          "class_pred": "waterlogged"
+        },
+        {
+          "date": "2024-10-24",
+          "rain_mm": 15.9,
+          "gwetroot_pred": 1.0,
+          "gwetroot_actual": 1.0,
+          "gwettop_pred": 0.986,
+          "gwettop_actual": 0.98,
+          "class_pred": "waterlogged"
+        },
+        {
+          "date": "2024-10-25",
+          "rain_mm": 6.1,
+          "gwetroot_pred": 1.0,
+          "gwetroot_actual": 1.0,
+          "gwettop_pred": 0.977,
+          "gwettop_actual": 0.97,
+          "class_pred": "waterlogged"
+        },
+        {
+          "date": "2024-10-26",
+          "rain_mm": 3.4,
+          "gwetroot_pred": 0.999,
+          "gwetroot_actual": 0.99,
+          "gwettop_pred": 0.971,
+          "gwettop_actual": 0.96,
+          "class_pred": "waterlogged"
+        },
+        {
+          "date": "2024-10-27",
+          "rain_mm": 3.1,
+          "gwetroot_pred": 0.996,
+          "gwetroot_actual": 0.99,
+          "gwettop_pred": 0.967,
+          "gwettop_actual": 0.96,
+          "class_pred": "waterlogged"
+        }
+      ]
+    },
+    {
+      "label": "After the 2 Nov Sentinel-1 pass: how long do roots stay waterlogged?",
+      "issued": "2024-11-03",
+      "root_zone_today": 0.98,
+      "days_waterlogged_pred": 7,
+      "days_waterlogged_actual": 7,
+      "mean_abs_error_root": 0.004,
+      "days": [
+        {
+          "date": "2024-11-03",
+          "rain_mm": 13.3,
+          "gwetroot_pred": 0.98,
+          "gwetroot_actual": 0.98,
+          "gwettop_pred": 0.951,
+          "gwettop_actual": 0.95,
+          "class_pred": "waterlogged"
+        },
+        {
+          "date": "2024-11-04",
+          "rain_mm": 16.0,
+          "gwetroot_pred": 0.986,
+          "gwetroot_actual": 0.98,
+          "gwettop_pred": 0.957,
+          "gwettop_actual": 0.96,
+          "class_pred": "waterlogged"
+        },
+        {
+          "date": "2024-11-05",
+          "rain_mm": 11.1,
+          "gwetroot_pred": 0.988,
+          "gwetroot_actual": 0.98,
+          "gwettop_pred": 0.956,
+          "gwettop_actual": 0.95,
+          "class_pred": "waterlogged"
+        },
+        {
+          "date": "2024-11-06",
+          "rain_mm": 15.6,
+          "gwetroot_pred": 0.99,
+          "gwetroot_actual": 0.99,
+          "gwettop_pred": 0.962,
+          "gwettop_actual": 0.96,
+          "class_pred": "waterlogged"
+        },
+        {
+          "date": "2024-11-07",
+          "rain_mm": 0.7,
+          "gwetroot_pred": 0.988,
+          "gwetroot_actual": 0.98,
+          "gwettop_pred": 0.949,
+          "gwettop_actual": 0.95,
+          "class_pred": "waterlogged"
+        },
+        {
+          "date": "2024-11-08",
+          "rain_mm": 0.3,
+          "gwetroot_pred": 0.981,
+          "gwetroot_actual": 0.98,
+          "gwettop_pred": 0.943,
+          "gwettop_actual": 0.94,
+          "class_pred": "waterlogged"
+        },
+        {
+          "date": "2024-11-09",
+          "rain_mm": 1.0,
+          "gwetroot_pred": 0.975,
+          "gwetroot_actual": 0.97,
+          "gwettop_pred": 0.937,
+          "gwettop_actual": 0.94,
+          "class_pred": "waterlogged"
+        }
+      ]
+    }
+  ],
+  "scenario_outlook": {
+    "issued_after": "2026-11-09",
+    "root_zone_today": 0.76,
+    "root_zone_class_today": "moist",
+    "cases": [
+      {
+        "scenario": "dry week (0 mm)",
+        "rain_total_mm": 0.0,
+        "days_waterlogged": 0,
+        "gwetroot_by_day": [
+          0.766,
+          0.759,
+          0.752,
+          0.746,
+          0.739,
+          0.736,
+          0.733
+        ],
+        "end_of_week_class": "moist"
+      },
+      {
+        "scenario": "typical week (climatology)",
+        "rain_total_mm": 52.4,
+        "days_waterlogged": 0,
+        "gwetroot_by_day": [
+          0.773,
+          0.774,
+          0.779,
+          0.786,
+          0.798,
+          0.814,
+          0.822
+        ],
+        "end_of_week_class": "moist"
+      },
+      {
+        "scenario": "Kristine-like week (Oct 21–27 2024 rain)",
+        "rain_total_mm": 436.1,
+        "days_waterlogged": 0,
+        "gwetroot_by_day": [
+          0.797,
+          0.864,
+          0.922,
+          0.945,
+          0.952,
+          0.953,
+          0.951
+        ],
+        "end_of_week_class": "wet"
+      }
+    ]
+  },
+  "training_time_sec": 30.8
+}

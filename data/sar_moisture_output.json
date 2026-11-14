@@ -102,7 +102,7 @@
     "bbox_mean_pre_event_change_db": 0.31,
     "bbox_flooded_fraction": 0.27,
     "label": "Surface wetness from C-band backscatter change — not measured root-zone soil moisture",
-    "processing_time_sec": 0.36
+    "processing_time_sec": 0.21
   },
   "plots": [
     {

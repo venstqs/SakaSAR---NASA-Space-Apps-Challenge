@@ -153,6 +153,26 @@ def farmer_text(p: dict, rain_mm: float) -> tuple[str, str]:
 
 
 LAYERS_DIR = C.DATA_DIR / "layers"
+OUTLOOK_PATH = C.DATA_DIR / "soil_outlook.json"
+
+
+def _soil_outlook_summary() -> dict | None:
+    """Headline numbers from the LSTM soil-saturation model (pipeline.soil_lstm), if it has been run."""
+    if not OUTLOOK_PATH.exists():
+        return None
+    o = json.loads(OUTLOOK_PATH.read_text(encoding="utf-8"))
+    after = o["hindcasts"][-1]
+    m = o["metrics"]["GWETROOT"]
+    return {
+        "model": o["model"]["type"],
+        "after_2_nov_pass": {"root_zone": after["root_zone_today"],
+                             "waterlogged_days_next_7_pred": after["days_waterlogged_pred"],
+                             "waterlogged_days_next_7_actual": after["days_waterlogged_actual"]},
+        "skill_vs_persistence_pct": m["skill_vs_persistence_pct"],
+        "skill_vs_ridge_pct": m["skill_vs_ridge_pct"],
+        "test_period": o["metrics"]["split"]["test"],
+        "details": "/api/soil-outlook",
+    }
 
 
 def export_layers(g_sar: dict, g_ter: dict, grids: dict, landcover) -> None:
@@ -339,6 +359,7 @@ def run(refresh: bool = False) -> dict:
         "pilot_area_class_shares": bbox_shares,
         "barangay_ranking": barangay_ranking,
         "rainfall": {k: v for k, v in rain.items() if k != "daily_mm"},
+        "soil_moisture_outlook": _soil_outlook_summary(),
         "pending_inputs": ["bare_field_days_per_year", "households", "hectares", "current_crop"],
     }
 
