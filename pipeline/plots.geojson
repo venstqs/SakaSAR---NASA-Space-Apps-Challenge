@@ -1,0 +1,200 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "plot_id": "PL-01",
+        "name": "Bagongbong Parcel A",
+        "barangay": "Brgy. Bagongbong",
+        "hectares": 3.4,
+        "households": 10,
+        "current_crop": "Irrigated Lowland Rice",
+        "bare_field_days_per_year": 72
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              123.199134,
+              13.54086
+            ],
+            [
+              123.199135,
+              13.542351
+            ],
+            [
+              123.19723,
+              13.542353
+            ],
+            [
+              123.197229,
+              13.540861
+            ],
+            [
+              123.199134,
+              13.54086
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "plot_id": "PL-02",
+        "name": "Taban Parcel B",
+        "barangay": "Brgy. Taban",
+        "hectares": 2.8,
+        "households": 8,
+        "current_crop": "Irrigated Lowland Rice",
+        "bare_field_days_per_year": 66
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              123.202805,
+              13.540926
+            ],
+            [
+              123.202806,
+              13.542279
+            ],
+            [
+              123.201077,
+              13.542281
+            ],
+            [
+              123.201076,
+              13.540927
+            ],
+            [
+              123.202805,
+              13.540926
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "plot_id": "PL-03",
+        "name": "Taban Parcel C",
+        "barangay": "Brgy. Taban",
+        "hectares": 2.1,
+        "households": 5,
+        "current_crop": "White Corn",
+        "bare_field_days_per_year": 81
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              123.206448,
+              13.541014
+            ],
+            [
+              123.206449,
+              13.542186
+            ],
+            [
+              123.204952,
+              13.542187
+            ],
+            [
+              123.204951,
+              13.541015
+            ],
+            [
+              123.206448,
+              13.541014
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "plot_id": "PL-04",
+        "name": "Catanusan Parcel D",
+        "barangay": "Brgy. Catanusan",
+        "hectares": 1.9,
+        "households": 4,
+        "current_crop": "Yellow Corn",
+        "bare_field_days_per_year": 64
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              123.21017,
+              13.541039
+            ],
+            [
+              123.210171,
+              13.542154
+            ],
+            [
+              123.208747,
+              13.542155
+            ],
+            [
+              123.208746,
+              13.54104
+            ],
+            [
+              123.21017,
+              13.541039
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "plot_id": "PL-05",
+        "name": "Catanusan Parcel E",
+        "barangay": "Brgy. Catanusan",
+        "hectares": 3.5,
+        "households": 6,
+        "current_crop": "Upland Rice",
+        "bare_field_days_per_year": 55
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              123.214184,
+              13.540837
+            ],
+            [
+              123.214185,
+              13.54235
+            ],
+            [
+              123.212252,
+              13.542351
+            ],
+            [
+              123.21225,
+              13.540838
+            ],
+            [
+              123.214184,
+              13.540837
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

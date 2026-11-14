@@ -1,0 +1,91 @@
+import numpy as np
+from shapely.geometry import box
+
+from pipeline import common as C
+from pipeline import risk_engine as R
+from pipeline import sar_moisture as S
+from pipeline import terrain_rain as T
+
+
+def test_score_normalisations_match_spec():
+    approx = lambda a, b: abs(a - b) < 1e-9  # noqa: E731
+    assert approx(S.s_sar(-3.6), 0.9) and S.s_sar(1.0) == 0.0 and S.s_sar(-6) == 1.0
+    assert approx(T.s_twi(14.2), 0.92) and T.s_twi(3) == 0.0 and T.s_twi(20) == 1.0
+    assert approx(T.s_rain(150), 0.5) and T.s_rain(900) == 1.0
+
+
+def test_risk_score_and_classes():
+    assert R.risk_score(0.9, 0.92, 1.0) == 93
+    assert R.risk_score(0, 0, 0) == 0 and R.risk_score(1, 1, 1) == 100
+    assert [R.risk_class(s) for s in (70, 69, 40, 39)] == ["high", "watch", "watch", "low"]
+
+
+def test_hit_rate_geometry():
+    flood = [box(123.192, 13.616, 123.194, 13.618)]
+    half = [box(123.192, 13.616, 123.193, 13.618)]
+    rate, ha = R.hit_rate(flood, half)
+    assert abs(rate - 50) < 0.5 and ha > 0
+    assert R.hit_rate(flood, [])[0] == 0
+    assert R.hit_rate([], half) == (None, 0.0)
+
+
+def test_lee_filter_reduces_speckle_and_keeps_mean():
+    rng = np.random.default_rng(0)
+    img = rng.gamma(4, 0.25, (80, 80))
+    out = C.lee_filter(img, 5, 4)
+    assert out.std() < img.std() * 0.7
+    assert abs(out.mean() - img.mean()) < 0.02
+
+
+def test_d8_accumulation_on_tilted_plane():
+    # Plane draining toward column 0: every row is a chain, so the leftmost interior cell collects the rest.
+    dem = np.tile(np.arange(10, dtype=float), (5, 1))
+    filled = T.priority_flood(dem)
+    rec = T.d8_receivers(filled)
+    acc = T.flow_accumulation(filled, rec)
+    assert acc[2, 0] >= 9
+    assert acc[2, 9] == 0
+
+
+def test_priority_flood_removes_pit():
+    dem = np.full((5, 5), 10.0)
+    dem[2, 2] = 1.0
+    dem[0, :] = 5.0
+    filled = T.priority_flood(dem)
+    rec = T.d8_receivers(filled)
+    assert rec[2, 2] >= 0  # pit now drains
+
+
+def test_pipeline_outputs_real_data_from_cache():
+    out = R.run()
+    pv = out["provenance"]
+    assert pv["data_mode"] == "real"
+    assert len(out["plots"]["features"]) == 5
+
+
+def test_pixel_classes_hit_rate_and_shares():
+    score = np.array([[80.0, 69.6, 50.0], [39.4, np.nan, 10.0]])
+    cls = R.classify_grid(score)
+    assert cls.tolist() == [[2, 2, 1], [0, -1, 0]]
+    flood = np.array([[True, False, True], [True, True, False]])
+    region = np.ones_like(flood)
+    assert abs(R.pixel_hit_rate(flood, cls, region) - 25.0) < 1e-9  # 1 of 4 flooded cells is high
+    assert R.pixel_hit_rate(np.zeros_like(flood), cls, region) is None
+    sh = R.class_shares(cls, region)
+    assert sh["high_ha"] == round(2 * 0.09, 2) and sh["missing_share"] == round(1 / 6, 3)
+
+
+def test_terrain_only_model_ignores_sar():
+    twi = np.full((2, 2), 12.0)
+    g1 = R.risk_grids(np.full((2, 2), -4.0), twi, 1.0)
+    g2 = R.risk_grids(np.full((2, 2), +2.0), twi, 1.0)
+    assert np.allclose(g1["terrain_score"], g2["terrain_score"])
+    assert (g1["score"] > g2["score"]).all()
+
+
+def test_non_farmland_excluded_from_scoring():
+    cls = np.array([[2, 1], [0, 2]], dtype=np.int8)
+    lc = np.array([[C.WC_CROP, C.WC_BUILT], [C.WC_WATER, C.WC_CROP]], dtype=np.uint8)
+    out = R.exclude_non_farmland(cls, lc)
+    assert out.tolist() == [[2, -2], [-2, 2]]
+    assert R.exclude_non_farmland(cls, None) is cls

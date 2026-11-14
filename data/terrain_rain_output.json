@@ -1,0 +1,164 @@
+{
+  "provenance": {
+    "dem": {
+      "data_mode": "live",
+      "source": "Microsoft Planetary Computer / nasadem",
+      "item_id": "NASADEM_HGT_n13e123"
+    },
+    "grid": {
+      "crs": "EPSG:32651",
+      "cell_m": 30.0,
+      "shape": [
+        158,
+        202
+      ],
+      "pad_m": 2000.0
+    },
+    "bbox_twi_range": [
+      7.0,
+      9.2,
+      14.1
+    ],
+    "processing_time_sec": 0.13
+  },
+  "rainfall": {
+    "data_mode": "cached_live",
+    "source": "NASA POWER daily PRECTOTCORR (point query at map centre)",
+    "antecedent_window": [
+      "20241014",
+      "20241020"
+    ],
+    "event_window": [
+      "20241021",
+      "20241026"
+    ],
+    "r_antecedent_mm": 77.1,
+    "r_event_mm": 433.0,
+    "r_total_mm": 510.1,
+    "peak_day": "20241022",
+    "peak_day_mm": 230.9,
+    "s_rain": 1.0,
+    "daily_mm": {
+      "20241001": 0.81,
+      "20241002": 0.49,
+      "20241003": 1.14,
+      "20241004": 3.26,
+      "20241005": 17.21,
+      "20241006": 12.93,
+      "20241007": 12.11,
+      "20241008": 17.78,
+      "20241009": 1.03,
+      "20241010": 30.02,
+      "20241011": 11.71,
+      "20241012": 7.14,
+      "20241013": 8.62,
+      "20241014": 7.6,
+      "20241015": 4.29,
+      "20241016": 1.14,
+      "20241017": 2.26,
+      "20241018": 5.22,
+      "20241019": 7.33,
+      "20241020": 49.24,
+      "20241021": 53.34,
+      "20241022": 230.89,
+      "20241023": 123.37,
+      "20241024": 15.89,
+      "20241025": 6.09,
+      "20241026": 3.43,
+      "20241027": 3.13,
+      "20241028": 0.73,
+      "20241029": 0.57,
+      "20241030": 1.19,
+      "20241031": 2.66
+    }
+  },
+  "plots": [
+    {
+      "plot_id": "PL-01",
+      "twi_value": 8.7,
+      "twi_p90": 11.3,
+      "s_twi": 0.375,
+      "mean_slope_deg": 2.12,
+      "mean_elevation_m": 0.6,
+      "max_upslope_cells": 154
+    },
+    {
+      "plot_id": "PL-02",
+      "twi_value": 10.5,
+      "twi_p90": 11.2,
+      "s_twi": 0.548,
+      "mean_slope_deg": 0.66,
+      "mean_elevation_m": 2.6,
+      "max_upslope_cells": 19
+    },
+    {
+      "plot_id": "PL-03",
+      "twi_value": 9.9,
+      "twi_p90": 11.3,
+      "s_twi": 0.485,
+      "mean_slope_deg": 0.71,
+      "mean_elevation_m": 3.4,
+      "max_upslope_cells": 49
+    },
+    {
+      "plot_id": "PL-04",
+      "twi_value": 10.7,
+      "twi_p90": 16.4,
+      "s_twi": 0.572,
+      "mean_slope_deg": 0.94,
+      "mean_elevation_m": 3.6,
+      "max_upslope_cells": 4853
+    },
+    {
+      "plot_id": "PL-05",
+      "twi_value": 8.7,
+      "twi_p90": 9.9,
+      "s_twi": 0.367,
+      "mean_slope_deg": 0.94,
+      "mean_elevation_m": 5.1,
+      "max_upslope_cells": 41
+    }
+  ],
+  "drainage_corridor": {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "properties": {
+          "name": "NASADEM Flow Accumulation Channel",
+          "max_upslope_cells": 7805,
+          "length_m": 795
+        },
+        "geometry": {
+          "type": "LineString",
+          "coordinates": [
+            [
+              123.209843,
+              13.544898
+            ],
+            [
+              123.209839,
+              13.540829
+            ],
+            [
+              123.208729,
+              13.539745
+            ],
+            [
+              123.208729,
+              13.539474
+            ],
+            [
+              123.208174,
+              13.538932
+            ],
+            [
+              123.208173,
+              13.538389
+            ]
+          ]
+        }
+      }
+    ]
+  }
+}
