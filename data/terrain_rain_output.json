@@ -19,11 +19,11 @@
       9.2,
       14.1
     ],
-    "processing_time_sec": 0.09
+    "processing_time_sec": 0.16
   },
   "rainfall": {
     "data_mode": "cached_live",
-    "source": "NASA POWER daily PRECTOTCORR (point query at map centre)",
+    "source": "GPM IMERG V07 Final (event + prior 7 days, Guian's GEE export); NASA POWER for daily series",
     "antecedent_window": [
       "20241014",
       "20241020"
@@ -32,9 +32,9 @@
       "20241021",
       "20241026"
     ],
-    "r_antecedent_mm": 77.1,
-    "r_event_mm": 433.0,
-    "r_total_mm": 510.1,
+    "r_antecedent_mm": 27.5,
+    "r_event_mm": 469.3,
+    "r_total_mm": 496.8,
     "peak_day": "20241022",
     "peak_day_mm": 230.9,
     "s_rain": 1.0,
@@ -70,6 +70,24 @@
       "20241029": 0.57,
       "20241030": 1.19,
       "20241031": 2.66
+    },
+    "power_check": {
+      "r_antecedent_mm": 77.1,
+      "r_event_mm": 433.0,
+      "r_total_mm": 510.1
+    },
+    "imerg": {
+      "event_mm": 469.3,
+      "prior7d_mm": 27.5,
+      "event_window_utc": [
+        "2024-10-21",
+        "2024-10-26"
+      ],
+      "prior7d_window_utc": [
+        "2024-10-14",
+        "2024-10-21"
+      ],
+      "pixel": "0.1° (~11 km)"
     }
   },
   "plots": [

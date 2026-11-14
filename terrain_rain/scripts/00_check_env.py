@@ -10,8 +10,12 @@ import pandas as pd
 import pytest
 import rasterio
 import scipy
-import whitebox
-from whitebox import WhiteboxTools
+try:  # optional: the terrain step falls back to the offline NumPy/SciPy engine
+    import whitebox
+    from whitebox import WhiteboxTools
+except ImportError:
+    whitebox = None
+    WhiteboxTools = None
 import yaml
 
 
@@ -19,6 +23,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def _wbt_binary_cached() -> bool:
+    if whitebox is None:
+        return False
     wbt_dir = Path(whitebox.__file__).resolve().parent / "WBT"
     for exe_name in ("whitebox_tools.exe", "whitebox_tools"):
         exe_path = wbt_dir / exe_name
@@ -38,6 +44,8 @@ def main() -> None:
 
     # 2. Verify WhiteboxTools binary executes (or fall back to offline NumPy/SciPy D8 engine)
     try:
+        if WhiteboxTools is None:
+            raise ImportError("whitebox package not installed")
         if not _wbt_binary_cached():
             wbt = WhiteboxTools()
         else:

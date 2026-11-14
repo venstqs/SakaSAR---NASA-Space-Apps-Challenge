@@ -1546,3 +1546,11 @@ button svg,
 .lgu-score { font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); white-space: nowrap; }
 .lgu-note { margin: 10px 0 0; font-size: 0.75rem; color: var(--text-sub); line-height: 1.45; }
 .simulate-pill-btn[aria-pressed="true"] { background: var(--risk-watch); }
+
+/* ---- rotation fit for the selected plot ---- */
+.rot-baseline { font-size: 0.78rem; color: var(--text-secondary); background: var(--surface-muted);
+  border-radius: var(--radius-sm); padding: 8px 10px; margin-bottom: 8px; line-height: 1.45; }
+.rot-fit { font-size: 0.75rem; border-radius: var(--radius-sm); padding: 6px 8px; margin: 4px 0 6px; line-height: 1.4; }
+.rot-fit.fit-good { background: rgba(5, 150, 105, 0.1); color: #065f46; }
+.rot-fit.fit-neutral { background: var(--surface-muted); color: var(--text-secondary); }
+.rot-fit.fit-caution { background: rgba(217, 119, 6, 0.12); color: #92400e; }

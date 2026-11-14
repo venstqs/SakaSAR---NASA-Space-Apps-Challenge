@@ -22,6 +22,7 @@ from shapely.geometry import shape
 from shapely.ops import unary_union
 
 from . import common as C
+from . import rotation_engine as RO
 from . import sar_moisture as S
 from . import terrain_rain as T
 
@@ -205,6 +206,7 @@ def run(refresh: bool = False) -> dict:
     bbox_mask = C.plot_mask(C.bbox_polygon_wgs())
     cell_ha = C.CELL * C.CELL / 10_000
 
+    soils, soil_meta = RO.soil_profiles(refresh)
     features, high_geoms = [], []
     for f in C.load_plots():
         meta = f["properties"]
@@ -240,6 +242,9 @@ def run(refresh: bool = False) -> dict:
         p["missing_data_fraction"] = shares["missing_share"]
         if landcover is not None:
             p["cropland_fraction"] = round(float((landcover[pmask] == C.WC_CROP).mean()), 3)
+        p["baseline_crop"] = p["current_crop"]
+        p["soil_0_30cm"] = soils.get(pid)
+        p["rotation_fit"] = RO.plot_fit(p["risk_class"], soils.get(pid))
         ordered = {k: p[k] for k in ("plot_id", "name", "barangay", "hectares", "households", "risk_class",
                                      "risk_score", "sar_wetness_change_db", "twi_value", "current_crop",
                                      "bare_field_days_per_year", "plain_language_action", "sms_alert")}
@@ -294,6 +299,7 @@ def run(refresh: bool = False) -> dict:
                        for k, v in zip(*np.unique(landcover[bbox_mask], return_counts=True))}
                       if landcover is not None else None)
     export_layers(g_sar, g_ter, grids, landcover)
+    smap = T.smap_anomaly()
 
     provenance = {
         "pilot_area": C.PILOT_AREA,
@@ -311,12 +317,14 @@ def run(refresh: bool = False) -> dict:
             (f"Sentinel-1 (ESA/Copernicus C-Band SAR VV/VH) — RTC, orbit 134; baseline median of "
              f"{len(base_dates)} passes ({base_dates[0]} to {base_dates[-1]}), just-before {jbdate}, after {adate}"),
             "NASADEM (30m Slope, Flow Accumulation & TWI)",
-            f"NASA POWER (Daily PRECTOTCORR Rainfall — {rain['r_total_mm']:.0f} mm antecedent + event)",
+            *([f"GPM IMERG V07 (Event {rain['imerg']['event_mm']:.0f} mm + 7-Day Prior {rain['imerg']['prior7d_mm']:.0f} mm "
+               f"— rainfall score)"] if rain.get("imerg") else ["GPM IMERG — not available in this run"]),
+            *([f"SMAP L4 Root-Zone Soil Moisture (event anomaly {smap['z_vs_30day_baseline']:+.1f}σ vs 30-day baseline, "
+               f"native ~11 km)"] if smap else ["SMAP — not available in this run"]),
+            "NASA POWER (Daily Rainfall & Weather — cross-check and 2001–2026 LSTM training)",
+            "SoilGrids 250m (Sand, Silt, Clay & Organic Carbon per plot — rotation fit)",
             "ESA WorldCover 2021 (10m Land Cover — cropland / built-up / permanent-water mask)",
-            "GPM IMERG — pending (feature/terrain-rain)",
-            "SMAP Soil-Moisture Anomaly — pending (feature/terrain-rain)",
-            "Landsat 8-9 / MODIS NDVI — pending (feature/rotation-engine; bare-field days are placeholders)",
-            "SoilGrids Soil Texture — pending (feature/rotation-engine)",
+            "MODIS NDVI 250m (checked: too coarse for field bare windows — bare-field days remain placeholders)",
         ],
         "future_work_datasets": ["NISAR (L-Band)", "ECOSTRESS", "GRACE / GRACE-FO"],
         "scientific_limit": ("Surface wetness layers are derived from C-band Sentinel-1 SAR backscatter, not direct "
@@ -361,6 +369,10 @@ def run(refresh: bool = False) -> dict:
         "barangay_ranking": barangay_ranking,
         "rainfall": {k: v for k, v in rain.items() if k != "daily_mm"},
         "soil_moisture_outlook": _soil_outlook_summary(),
+        "smap_rootzone_anomaly": smap,
+        "soil_source": soil_meta,
+        "bare_field_check": RO.modis_bare_field_check(),
+        "rotation_rules": RO.RULES_TEXT,
         "pending_inputs": ["bare_field_days_per_year", "households", "hectares", "current_crop"],
     }
 

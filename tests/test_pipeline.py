@@ -89,3 +89,24 @@ def test_non_farmland_excluded_from_scoring():
     out = R.exclude_non_farmland(cls, lc)
     assert out.tolist() == [[2, -2], [-2, 2]]
     assert R.exclude_non_farmland(cls, None) is cls
+
+
+def test_rotation_fit_rules():
+    from pipeline import rotation_engine as RO
+    clay = {"clay_pct": 36.0, "sand_pct": 32.0, "silt_pct": 32.0, "soc_g_per_kg": 45.0, "texture": "clay loam"}
+    hi = RO.plot_fit("high", clay)
+    assert hi["legume"]["fit"] == "caution" and hi["biotillage"]["fit"] == "good" and hi["shortcycle"]["fit"] == "caution"
+    lo = RO.plot_fit("low", {**clay, "clay_pct": 20.0})
+    assert lo["legume"]["fit"] == "good" and lo["biotillage"]["fit"] == "neutral" and lo["shortcycle"]["fit"] == "good"
+    assert RO._texture(32, 36) == "clay loam" and RO._texture(20, 45) == "clay"
+
+
+def test_integrated_outputs_present():
+    out = R.run()
+    pv = out["provenance"]
+    assert pv["rainfall"]["imerg"]["event_mm"] > 400            # GPM IMERG drives S_Rain
+    assert abs(pv["rainfall"]["r_total_mm"] - pv["rainfall"]["power_check"]["r_total_mm"]) < 60
+    assert pv["smap_rootzone_anomaly"]["z_vs_30day_baseline"] > 1
+    assert pv["bare_field_check"]["status"] == "not_used"
+    for f in out["plots"]["features"]:
+        assert set(f["properties"]["rotation_fit"]) == {"legume", "biotillage", "shortcycle"}

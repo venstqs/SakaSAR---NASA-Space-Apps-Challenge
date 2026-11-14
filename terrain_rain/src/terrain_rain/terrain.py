@@ -5,14 +5,20 @@ import numpy as np
 import rasterio
 from rasterio.enums import Resampling
 from scipy import ndimage
-import whitebox
-from whitebox import WhiteboxTools
+try:  # optional: without the whitebox package the offline NumPy/SciPy engine below is used
+    import whitebox
+    from whitebox import WhiteboxTools
+except ImportError:
+    whitebox = None
+    WhiteboxTools = None
 from .grid import GridSpec
 from .io import reproject_to_grid, write_layer
 
 
 def _wbt_binary_exists() -> bool:
     """Checks whether the WhiteboxTools binary is already present in whitebox/WBT."""
+    if whitebox is None:
+        return False
     wbt_dir = Path(whitebox.__file__).resolve().parent / "WBT"
     for exe_name in ("whitebox_tools.exe", "whitebox_tools"):
         exe_path = wbt_dir / exe_name
@@ -21,12 +27,14 @@ def _wbt_binary_exists() -> bool:
     return False
 
 
-def _get_wbt(work_dir: Path, max_retries: int = 2) -> Optional[WhiteboxTools]:
+def _get_wbt(work_dir: Path, max_retries: int = 2) -> Optional["WhiteboxTools"]:
     """
     Returns an initialized WhiteboxTools instance if the binary exists or downloads cleanly
     within max_retries; otherwise returns None so the caller can fall back to the offline
     NumPy/SciPy terrain engine.
     """
+    if WhiteboxTools is None:
+        return None
     attempts = 1 if _wbt_binary_exists() else max_retries
     for _ in range(attempts):
         try:

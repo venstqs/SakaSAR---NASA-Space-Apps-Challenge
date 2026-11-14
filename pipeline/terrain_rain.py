@@ -172,7 +172,7 @@ def rainfall_summary(refresh: bool = False) -> dict:
     r_evt = sum(rain[d] for d in event)
     peak_day = max(event, key=lambda d: rain[d])
     total = r_ant + r_evt
-    return {
+    out = {
         "data_mode": "live" if mode == "live" else "cached_live",
         "source": "NASA POWER daily PRECTOTCORR (point query at map centre)",
         "antecedent_window": [antecedent[0], antecedent[-1]],
@@ -184,6 +184,75 @@ def rainfall_summary(refresh: bool = False) -> dict:
         "peak_day_mm": round(rain[peak_day], 1),
         "s_rain": round(s_rain(total), 3),
         "daily_mm": {d: round(rain[d], 2) for d in days},
+    }
+    # Prefer GPM IMERG (0.1°, satellite precipitation) when Guian's export is present;
+    # NASA POWER stays as the daily series and a cross-check.
+    imerg = imerg_totals()
+    if imerg:
+        out["power_check"] = {k: out[k] for k in ("r_antecedent_mm", "r_event_mm", "r_total_mm")}
+        out.update({
+            "source": "GPM IMERG V07 Final (event + prior 7 days, Guian's GEE export); NASA POWER for daily series",
+            "r_antecedent_mm": imerg["prior7d_mm"], "r_event_mm": imerg["event_mm"],
+            "r_total_mm": round(imerg["prior7d_mm"] + imerg["event_mm"], 1),
+            "s_rain": round(s_rain(imerg["prior7d_mm"] + imerg["event_mm"]), 3),
+            "imerg": imerg,
+        })
+    return out
+
+
+RAW_DIR = C.ROOT / "data" / "raw" / "bicol_kristine_2024"
+
+
+def _sample_raster(path, lon: float, lat: float) -> list[float] | None:
+    import rasterio
+
+    if not path.exists():
+        return None
+    with rasterio.open(path) as src:
+        b = src.bounds
+        if not (b.left <= lon <= b.right and b.bottom <= lat <= b.top):
+            return None
+        vals = [float(v) for v in next(src.sample([(lon, lat)]))]
+    if any(not np.isfinite(v) or v <= -9999 for v in vals):
+        return None
+    return vals
+
+
+def imerg_totals() -> dict | None:
+    """IMERG event (21–26 Oct UTC) and prior-7-day totals at the pilot centre, from Guian's raster."""
+    v = _sample_raster(RAW_DIR / "rain" / "imerg_buffered_mm.tif", *C.CENTER)
+    if not v or len(v) < 2:
+        return None
+    return {"event_mm": round(v[0], 1), "prior7d_mm": round(v[1], 1),
+            "event_window_utc": ["2024-10-21", "2024-10-26"], "prior7d_window_utc": ["2024-10-14", "2024-10-21"],
+            "pixel": "0.1° (~11 km)"}
+
+
+def smap_anomaly() -> dict | None:
+    """SMAP L4 root-zone soil-moisture anomaly for the event at its native ~11 km cell (Guian's export)."""
+    v = _sample_raster(RAW_DIR / "smap" / "smap_rootzone_buffered.tif", *C.CENTER)
+    if not v or len(v) < 3:
+        return None
+    event, base, base_sd = v[:3]
+    if len(v) >= 5:  # older 5-band export
+        clim, clim_sd = v[3], v[4]
+    else:  # current export: October climatology lives in the summary CSV
+        import csv
+
+        clim = clim_sd = None
+        summary = RAW_DIR / "smap" / "smap_rootzone_summary.csv"
+        if summary.exists():
+            rows = {r["metric"]: float(r["value"]) for r in csv.DictReader(open(summary, encoding="utf-8"))}
+            clim, clim_sd = rows.get("smap_oct_clim_mean"), rows.get("smap_oct_clim_std")
+        if clim is None or not clim_sd:
+            clim, clim_sd = float("nan"), 0.0
+    return {
+        "source": "SMAP L4 SPL4SMGP root-zone soil moisture (0–100 cm), Guian's GEE export",
+        "event_mean_m3m3": round(event, 3), "base30d_mean_m3m3": round(base, 3),
+        "oct_climatology_m3m3": round(clim, 3),
+        "z_vs_30day_baseline": round((event - base) / base_sd, 2) if base_sd > 0 else None,
+        "z_vs_october_climatology": round((event - clim) / clim_sd, 2) if clim_sd > 0 else None,
+        "resolution": "native ~11 km cell (context only, not in the 30 m risk score)",
     }
 
 

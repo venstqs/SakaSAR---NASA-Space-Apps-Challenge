@@ -5,3 +5,5 @@ __pycache__/
 .env
 .env.*
 !.env.example
+terrain_rain/outputs/
+terrain_rain/data_interim/

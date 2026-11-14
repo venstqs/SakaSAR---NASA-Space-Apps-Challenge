@@ -1218,6 +1218,12 @@ function populateLeftPanel() {
   document.getElementById("kpi-households").textContent = prov.households_affected;
   document.getElementById("kpi-hitrate").textContent = prov.sar_hit_rate;
   document.getElementById("kpi-baredays").textContent = `${prov.avg_bare_field_days} d/yr`;
+  if ((prov.pending_inputs || []).includes("bare_field_days_per_year")) {
+    // honest label: MODIS 250 m could not resolve field bare windows (see provenance.bare_field_check)
+    const tile = document.getElementById("kpi-baredays").closest(".kpi-item");
+    const label = tile && tile.querySelector(".kpi-label");
+    if (label && !/placeholder/i.test(label.textContent)) label.textContent += " (placeholder)";
+  }
 
   // Populate 5-node Corridor Stepper
   const stepper = document.getElementById("plot-stepper");
@@ -1326,6 +1332,7 @@ function selectPlot(feat, fly = true) {
   badge.innerHTML = `<span class="risk-dot" aria-hidden="true"></span><span>${p.risk_class.toUpperCase()} DROWNING RISK · ${p.risk_score}/100</span>`;
 
   document.getElementById("inspect-twi").textContent = `TWI: ${p.twi_value}`;
+  if (appData.rotation_strategies) renderRotations(); // rotation fit follows the selected plot
   document.getElementById("inspect-action").textContent = p.plain_language_action;
 
   const sms = p.sms_alert.slice(0, 160);
@@ -1350,17 +1357,32 @@ function selectPlot(feat, fly = true) {
   }
 }
 
-function renderRotations(priorityKey) {
+let currentPriority = "nitrogen";
+const FIT_LABEL = { good: "Good fit", neutral: "Possible", caution: "Caution" };
+
+function renderRotations(priorityKey = currentPriority) {
+  currentPriority = priorityKey;
   const sorted = [...appData.rotation_strategies].sort(
     (a, b) => a.priorities[priorityKey] - b.priorities[priorityKey]
   );
+  const plotFeat = appData.plots.features.find((f) => f.properties.plot_id === selectedPlotId);
+  const plot = plotFeat ? plotFeat.properties : null;
+  const fit = (plot && plot.rotation_fit) || {};
+  const soil = plot && plot.soil_0_30cm;
 
   const container = document.getElementById("rotation-cards-container");
-  container.innerHTML = sorted
+  const baseline = plot
+    ? `<div class="rot-baseline">For <strong>${escapeHtml(plot.plot_id)}</strong> · now growing
+         <strong>${escapeHtml(plot.baseline_crop || plot.current_crop)}</strong>${
+           soil ? ` · ${escapeHtml(soil.texture)}, ${soil.clay_pct}% clay` : ""
+         } · ${escapeHtml(plot.risk_class)} drowning risk</div>`
+    : "";
+  container.innerHTML = baseline + sorted
     .map(
       (s, idx) => `
       <div class="rot-card">
         <h4>#${idx + 1} ${s.name}</h4>
+        ${fit[s.id] ? `<div class="rot-fit fit-${fit[s.id].fit}"><strong>${FIT_LABEL[fit[s.id].fit] || fit[s.id].fit}:</strong> ${escapeHtml(fit[s.id].why)}</div>` : ""}
         <div class="rot-crops"><strong>Crops:</strong> ${s.crops}</div>
         <div class="rot-benefit"><strong>Benefits:</strong> ${s.benefits}</div>
         <div class="rot-gap" style="display:flex;align-items:flex-start;gap:6px;">

@@ -8,7 +8,7 @@
     "event_reference": "STS Kristine (Trami) — Oct 21-26, 2024 (Sentinel-1 Pass 2024-11-02)",
     "grid_resolution": "30m Shared Grid",
     "licensing_cost": "₱0 (Open NASA & Copernicus Data)",
-    "processing_time": "0.7 sec",
+    "processing_time": "1.5 sec",
     "sar_hit_rate": "31%",
     "total_high_risk_ha": 6.2,
     "high_risk_plots": 2,
@@ -17,12 +17,12 @@
     "datasets_used": [
       "Sentinel-1 (ESA/Copernicus C-Band SAR VV/VH) — RTC, orbit 134; baseline median of 4 passes (2024-08-10 to 2024-09-27), just-before 2024-10-09, after 2024-11-02",
       "NASADEM (30m Slope, Flow Accumulation & TWI)",
-      "NASA POWER (Daily PRECTOTCORR Rainfall — 510 mm antecedent + event)",
+      "GPM IMERG V07 (Event 469 mm + 7-Day Prior 28 mm — rainfall score)",
+      "SMAP L4 Root-Zone Soil Moisture (event anomaly +2.2σ vs 30-day baseline, native ~11 km)",
+      "NASA POWER (Daily Rainfall & Weather — cross-check and 2001–2026 LSTM training)",
+      "SoilGrids 250m (Sand, Silt, Clay & Organic Carbon per plot — rotation fit)",
       "ESA WorldCover 2021 (10m Land Cover — cropland / built-up / permanent-water mask)",
-      "GPM IMERG — pending (feature/terrain-rain)",
-      "SMAP Soil-Moisture Anomaly — pending (feature/terrain-rain)",
-      "Landsat 8-9 / MODIS NDVI — pending (feature/rotation-engine; bare-field days are placeholders)",
-      "SoilGrids Soil Texture — pending (feature/rotation-engine)"
+      "MODIS NDVI 250m (checked: too coarse for field bare windows — bare-field days remain placeholders)"
     ],
     "future_work_datasets": [
       "NISAR (L-Band)",
@@ -133,7 +133,7 @@
     ],
     "rainfall": {
       "data_mode": "cached_live",
-      "source": "NASA POWER daily PRECTOTCORR (point query at map centre)",
+      "source": "GPM IMERG V07 Final (event + prior 7 days, Guian's GEE export); NASA POWER for daily series",
       "antecedent_window": [
         "20241014",
         "20241020"
@@ -142,12 +142,30 @@
         "20241021",
         "20241026"
       ],
-      "r_antecedent_mm": 77.1,
-      "r_event_mm": 433.0,
-      "r_total_mm": 510.1,
+      "r_antecedent_mm": 27.5,
+      "r_event_mm": 469.3,
+      "r_total_mm": 496.8,
       "peak_day": "20241022",
       "peak_day_mm": 230.9,
-      "s_rain": 1.0
+      "s_rain": 1.0,
+      "power_check": {
+        "r_antecedent_mm": 77.1,
+        "r_event_mm": 433.0,
+        "r_total_mm": 510.1
+      },
+      "imerg": {
+        "event_mm": 469.3,
+        "prior7d_mm": 27.5,
+        "event_window_utc": [
+          "2024-10-21",
+          "2024-10-26"
+        ],
+        "prior7d_window_utc": [
+          "2024-10-14",
+          "2024-10-21"
+        ],
+        "pixel": "0.1° (~11 km)"
+      }
     },
     "soil_moisture_outlook": {
       "model": "LSTM (1 layer, 64 hidden), PyTorch",
@@ -161,6 +179,34 @@
       "test_period": "2022-01-01..2026-11-03",
       "details": "/api/soil-outlook"
     },
+    "smap_rootzone_anomaly": {
+      "source": "SMAP L4 SPL4SMGP root-zone soil moisture (0–100 cm), Guian's GEE export",
+      "event_mean_m3m3": 0.525,
+      "base30d_mean_m3m3": 0.477,
+      "oct_climatology_m3m3": 0.469,
+      "z_vs_30day_baseline": 2.22,
+      "z_vs_october_climatology": 1.58,
+      "resolution": "native ~11 km cell (context only, not in the 30 m risk score)"
+    },
+    "soil_source": {
+      "source": "ISRIC SoilGrids 250 m v2.0 (REST point query at plot centres), 0–30 cm weighted",
+      "data_mode": "cached_live"
+    },
+    "bare_field_check": {
+      "source": "MODIS MOD13Q1 250 m NDVI, cropland mask, cloud-masked (GEE export)",
+      "period": "2020-01-01..2026-10-16",
+      "bare_ndvi_range": [
+        0.1,
+        0.25
+      ],
+      "ndvi_p50_bare_days_per_year": 0.0,
+      "ndvi_p50_min": 0.48,
+      "ndvi_p10_bare_days_per_year": 5.3,
+      "ndvi_p10_min": 0.18,
+      "status": "not_used",
+      "why": "At 250 m each pixel mixes many paddies planted on different dates, so the median cropland pixel never looks bare. Field-level bare windows need 30 m Landsat/Sentinel-2 NDVI or the MAO cropping calendar; bare_field_days_per_year stays a placeholder until then."
+    },
+    "rotation_rules": "Per-plot fit: legume = caution on high drowning risk (waterlogging-intolerant); biotillage = good where clay ≥ 30% or risk high/watch; shortcycle = caution on high risk, good on low risk. Ranking within a priority stays as in rotation_strategies.priorities. Rules of thumb to verify with the Municipal Agriculture Office.",
     "pending_inputs": [
       "bare_field_days_per_year",
       "households",
@@ -212,7 +258,29 @@
             "high_share": 0.8
           },
           "missing_data_fraction": 0.0,
-          "cropland_fraction": 1.0
+          "cropland_fraction": 1.0,
+          "baseline_crop": "Irrigated Lowland Rice",
+          "soil_0_30cm": {
+            "sand_pct": 31.8,
+            "silt_pct": 32.1,
+            "clay_pct": 36.1,
+            "soc_g_per_kg": 53.0,
+            "texture": "clay loam"
+          },
+          "rotation_fit": {
+            "legume": {
+              "fit": "caution",
+              "why": "high drowning risk — mungbean/cowpea do not tolerate waterlogging; plant only after drainage or on raised beds"
+            },
+            "biotillage": {
+              "fit": "good",
+              "why": "36% clay drains slowly and high drowning risk — deep roots open drainage pores"
+            },
+            "shortcycle": {
+              "fit": "caution",
+              "why": "millet/sesame need drained soil; fix drainage first"
+            }
+          }
         },
         "geometry": {
           "type": "Polygon",
@@ -283,7 +351,29 @@
             "high_share": 0.867
           },
           "missing_data_fraction": 0.0,
-          "cropland_fraction": 0.933
+          "cropland_fraction": 0.933,
+          "baseline_crop": "Irrigated Lowland Rice",
+          "soil_0_30cm": {
+            "sand_pct": 32.9,
+            "silt_pct": 30.3,
+            "clay_pct": 36.8,
+            "soc_g_per_kg": 45.2,
+            "texture": "clay loam"
+          },
+          "rotation_fit": {
+            "legume": {
+              "fit": "caution",
+              "why": "high drowning risk — mungbean/cowpea do not tolerate waterlogging; plant only after drainage or on raised beds"
+            },
+            "biotillage": {
+              "fit": "good",
+              "why": "37% clay drains slowly and high drowning risk — deep roots open drainage pores"
+            },
+            "shortcycle": {
+              "fit": "caution",
+              "why": "millet/sesame need drained soil; fix drainage first"
+            }
+          }
         },
         "geometry": {
           "type": "Polygon",
@@ -354,7 +444,29 @@
             "high_share": 0.45
           },
           "missing_data_fraction": 0.0,
-          "cropland_fraction": 1.0
+          "cropland_fraction": 1.0,
+          "baseline_crop": "White Corn",
+          "soil_0_30cm": {
+            "sand_pct": 33.4,
+            "silt_pct": 30.4,
+            "clay_pct": 36.2,
+            "soc_g_per_kg": 46.5,
+            "texture": "clay loam"
+          },
+          "rotation_fit": {
+            "legume": {
+              "fit": "good",
+              "why": "drainage risk is manageable for a post-harvest legume"
+            },
+            "biotillage": {
+              "fit": "good",
+              "why": "36% clay drains slowly and watch drowning risk — deep roots open drainage pores"
+            },
+            "shortcycle": {
+              "fit": "neutral",
+              "why": "workable once furrows are kept clear"
+            }
+          }
         },
         "geometry": {
           "type": "Polygon",
@@ -425,7 +537,29 @@
             "high_share": 0.0
           },
           "missing_data_fraction": 0.0,
-          "cropland_fraction": 1.0
+          "cropland_fraction": 1.0,
+          "baseline_crop": "Yellow Corn",
+          "soil_0_30cm": {
+            "sand_pct": 33.0,
+            "silt_pct": 30.1,
+            "clay_pct": 36.9,
+            "soc_g_per_kg": 44.0,
+            "texture": "clay loam"
+          },
+          "rotation_fit": {
+            "legume": {
+              "fit": "good",
+              "why": "drainage risk is manageable for a post-harvest legume"
+            },
+            "biotillage": {
+              "fit": "good",
+              "why": "37% clay drains slowly and watch drowning risk — deep roots open drainage pores"
+            },
+            "shortcycle": {
+              "fit": "neutral",
+              "why": "workable once furrows are kept clear"
+            }
+          }
         },
         "geometry": {
           "type": "Polygon",
@@ -496,7 +630,29 @@
             "high_share": 0.0
           },
           "missing_data_fraction": 0.0,
-          "cropland_fraction": 1.0
+          "cropland_fraction": 1.0,
+          "baseline_crop": "Upland Rice",
+          "soil_0_30cm": {
+            "sand_pct": 32.0,
+            "silt_pct": 31.6,
+            "clay_pct": 36.4,
+            "soc_g_per_kg": 44.7,
+            "texture": "clay loam"
+          },
+          "rotation_fit": {
+            "legume": {
+              "fit": "good",
+              "why": "drainage risk is manageable for a post-harvest legume"
+            },
+            "biotillage": {
+              "fit": "good",
+              "why": "36% clay drains slowly — deep roots open drainage pores"
+            },
+            "shortcycle": {
+              "fit": "good",
+              "why": "well-drained plot suits low-water short-cycle crops"
+            }
+          }
         },
         "geometry": {
           "type": "Polygon",
