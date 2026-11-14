@@ -1,0 +1,188 @@
+{
+ "built": "2026-11-15 07:45",
+ "machine": "Windows 10, Python 3.11.9, Intel64 Family 6 Model 186 Stepping 2, GenuineIntel",
+ "field_risk": {
+  "independent_hit_rate": "31%",
+  "plot_level_hit_rate": "10%",
+  "full_model_hit_rate_circular": "100%",
+  "observed_flood_ha": 38.08,
+  "flooded_farmland_ha": 35.1,
+  "class_shares": {
+   "high_share": 0.406,
+   "watch_share": 0.271,
+   "low_share": 0.322
+  },
+  "flood_threshold_db": -15.0,
+  "pre_event_change_db": 0.31
+ },
+ "runoff": {
+  "flooded_pixels_checked": 2568,
+  "share_rated_high": 0.948,
+  "farmland_share_high": 0.661,
+  "land_share_high": 0.268,
+  "lift_over_farmland": 1.43,
+  "lift_over_land": 3.54,
+  "streams": 826
+ },
+ "forecast": {
+  "model": "LSTM (1 layer, 64 hidden), PyTorch",
+  "split": {
+   "train": "2001-01-31..2018-12-31",
+   "val": "..2021-12-31",
+   "test": "2022-01-01..2026-11-03"
+  },
+  "samples": {
+   "train": 6544,
+   "val": 1096,
+   "test": 1768
+  },
+  "epochs": 57,
+  "training_time_sec": 30.8,
+  "root_zone": {
+   "rmse_lstm_by_day": [
+    0.0075,
+    0.0078,
+    0.0082,
+    0.0086,
+    0.009,
+    0.0094,
+    0.0097
+   ],
+   "rmse_persistence_by_day": [
+    0.0091,
+    0.0145,
+    0.0189,
+    0.0225,
+    0.0259,
+    0.029,
+    0.0319
+   ],
+   "rmse_ridge_same_inputs_by_day": [
+    0.0061,
+    0.0081,
+    0.0101,
+    0.0118,
+    0.0132,
+    0.0146,
+    0.0158
+   ],
+   "skill_vs_persistence_pct": 60.4,
+   "skill_vs_ridge_pct": 24.5,
+   "skill_vs_ridge_wet_weeks_pct": 52.9,
+   "wet_weeks": 342,
+   "rmse_lstm_wet_weeks": 0.006,
+   "rmse_persistence_wet_weeks": 0.0262,
+   "skill_vs_persistence_wet_weeks_pct": 77.0
+  },
+  "surface": {
+   "rmse_lstm_by_day": [
+    0.0116,
+    0.0119,
+    0.0122,
+    0.0126,
+    0.013,
+    0.0133,
+    0.0135
+   ],
+   "rmse_persistence_by_day": [
+    0.0205,
+    0.0296,
+    0.0355,
+    0.0397,
+    0.0434,
+    0.0467,
+    0.0496
+   ],
+   "rmse_ridge_same_inputs_by_day": [
+    0.0138,
+    0.0186,
+    0.0212,
+    0.0227,
+    0.0239,
+    0.0249,
+    0.0261
+   ],
+   "skill_vs_persistence_pct": 66.8,
+   "skill_vs_ridge_pct": 41.7,
+   "skill_vs_ridge_wet_weeks_pct": 70.6,
+   "wet_weeks": 342,
+   "rmse_lstm_wet_weeks": 0.0078,
+   "rmse_persistence_wet_weeks": 0.0462,
+   "skill_vs_persistence_wet_weeks_pct": 83.2
+  },
+  "kristine_hindcasts": [
+   {
+    "label": "Storm week: issued 21 Oct 2024 with Kristine's observed rain",
+    "issued": "2024-10-21",
+    "days_pred": 7,
+    "days_actual": 7,
+    "mae_root": 0.002
+   },
+   {
+    "label": "After the 2 Nov Sentinel-1 pass: how long do roots stay waterlogged?",
+    "issued": "2024-11-03",
+    "days_pred": 7,
+    "days_actual": 7,
+    "mae_root": 0.004
+   }
+  ]
+ },
+ "forecast_regional": {
+  "cells": 31,
+  "within_1_day": 28,
+  "exact": 26,
+  "mae_waterlogged_days": 0.42,
+  "mae_root_zone": 0.0102
+ },
+ "rain_interpolation": {
+  "hidden_cells": 15,
+  "cell_days": 195,
+  "mae_bilinear_mm": 6.4,
+  "mae_nearest_mm": 6.9,
+  "mean_daily_rain_mm": 24.9
+ },
+ "flood_mapping": {
+  "orbits": {
+   "134": {
+    "tau": -15.0,
+    "otsu": -11.83,
+    "after": "2024-11-02",
+    "baseline": [
+     "2024-09-15",
+     "2024-09-27",
+     "2024-10-09"
+    ]
+   },
+   "61": {
+    "tau": -15.0,
+    "otsu": -11.42,
+    "after": "2024-10-28",
+    "baseline": [
+     "2024-09-10",
+     "2024-10-04",
+     "2024-10-16"
+    ]
+   }
+  },
+  "radar_coverage": 1.0,
+  "flooded_farmland_ha": 3137,
+  "farmland_ha": 131745,
+  "municipalities": 114,
+  "processing_time_sec": 650.0
+ },
+ "storm_geometry": {
+  "nearest_fix_km": 262.9,
+  "track_line_km": 259.0,
+  "fixes": 29
+ },
+ "speed": {
+  "hydrology_cells": 1815050,
+  "priority_flood_sec": 5.06,
+  "d8_sec": 0.36,
+  "flow_accumulation_sec": 2.1,
+  "risk_engine_rebuild": "0.7 sec",
+  "bicol_flood_screening_sec": 650.0,
+  "forecast_inference_35_cells_ms": 1.08,
+  "forecast_parameters": 19586
+ }
+}

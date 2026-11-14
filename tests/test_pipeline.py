@@ -146,3 +146,16 @@ def test_bicol_runoff_outputs():
     streams = json.loads((region / "bicol_streams.geojson").read_text(encoding="utf-8"))
     assert len(streams["features"]) > 100
     assert all(f["properties"]["up_km2"] >= doc["stream_threshold_km2"] for f in streams["features"])
+
+
+def test_benchmarks_file():
+    """docs/BENCHMARKS.md is generated from data/region/benchmarks.json; key metrics must be present and sane."""
+    import json
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent
+    b = json.loads((root / "data" / "region" / "benchmarks.json").read_text(encoding="utf-8"))
+    assert b["field_risk"]["independent_hit_rate"].endswith("%")
+    assert 0 < b["forecast"]["root_zone"]["skill_vs_persistence_pct"] < 100
+    assert b["forecast_regional"]["within_1_day"] <= b["forecast_regional"]["cells"]
+    assert b["rain_interpolation"]["cell_days"] > 0
+    assert (root / "docs" / "BENCHMARKS.md").read_text(encoding="utf-8").startswith("# SakaSAR benchmarks")
