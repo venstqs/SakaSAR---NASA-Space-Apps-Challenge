@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FieldShift 3D | SAR Root-Zone Hydrology &amp; Crop Rotation GIS</title>
+  <title>SakaSAR — Field Shift: Agro-Hydrological Decision Support</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
@@ -13,20 +13,21 @@
 <body>
   <!-- Full-Screen Map Canvas -->
   <div id="map" role="region" aria-label="Interactive SAR hydrology and farm plot map"></div>
+  <canvas id="fx-overlay" aria-hidden="true"></canvas>
 
   <!-- 1. LEFT FLOATING COMMAND CARD -->
-  <aside class="floating-card left-panel" id="left-panel" aria-label="FieldShift SAR command panel">
+  <aside class="floating-card left-panel" id="left-panel" aria-label="SakaSAR — Field Shift: Agro-Hydrological Decision Support command panel">
     <div class="drag-handle" aria-hidden="true"><span class="drag-handle-bar"></span></div>
     <div class="brand-header">
       <button class="icon-btn" id="btn-collapse-left" title="Toggle Panel" aria-label="Toggle command panel" type="button">
         <i data-lucide="menu" width="18" height="18" stroke-width="2"></i>
       </button>
-      <div class="brand-logo" aria-hidden="true">
-        <i data-lucide="satellite" width="18" height="18" stroke-width="2"></i>
+      <div class="brand-logo">
+        <img src="assets/sakasar-logo.png" alt="SakaSAR logo" class="brand-logo-img" />
       </div>
       <div class="brand-title-wrap">
-        <span class="brand-title">FieldShift SAR</span>
-        <span class="brand-sub">NASA Space Apps · 30m Grid</span>
+        <span class="brand-title">SakaSAR — Field Shift</span>
+        <span class="brand-sub">Agro-Hydrological Decision Support</span>
       </div>
       <button class="icon-btn chevron-btn" id="btn-chevron-left" title="Minimize" aria-label="Collapse panel body" aria-expanded="true" type="button">
         <i data-lucide="chevron-up" width="18" height="18" stroke-width="2"></i>
@@ -205,7 +206,7 @@
         <div class="symbology-header">
           <span class="sym-dot" aria-hidden="true"></span>
           <strong>FIELD DROWNING RISK SYMBOLOGY</strong>
-          <span class="sym-scale">30m SAR + NASADEM TWI Rule Score</span>
+          <span class="sym-scale">30m SAR + TWI</span>
         </div>
         <div class="sym-pills">
           <div class="sym-pill low">
@@ -231,7 +232,7 @@
           </div>
         </div>
         <div class="sym-footnote">
-          <i data-lucide="info" width="13" height="13" stroke-width="2" aria-hidden="true"></i>
+          <i data-lucide="info" width="14" height="14" stroke-width="2" aria-hidden="true"></i>
           <span>C-band Sentinel-1 surface wetness + NASADEM TWI + GPM 7-day rain · Dashed blue = Observed SAR flood extent</span>
         </div>
       </div>
@@ -254,31 +255,46 @@
   <section class="floating-card inspect-card" id="inspect-card" aria-label="Selected plot inspection">
     <div class="drag-handle" aria-hidden="true"><span class="drag-handle-bar"></span></div>
     <div class="inspect-header">
-      <div>
+      <div class="inspect-title-group">
         <h3 id="inspect-title">PL-01 · Brgy. San Isidro</h3>
-        <span class="inspect-sub" id="inspect-meta">3.4 ha · Irrigated Lowland Rice · ΔSAR -3.6 dB</span>
+        <div class="inspect-meta-row" id="inspect-meta">
+          <span>3.4 ha</span>
+          <span class="meta-dot" aria-hidden="true">·</span>
+          <span>Irrigated Lowland Rice</span>
+          <span class="meta-dot" aria-hidden="true">·</span>
+          <span>ΔSAR -3.6 dB</span>
+        </div>
       </div>
       <button class="icon-btn" id="btn-close-inspect" title="Close" aria-label="Close plot inspection card" type="button">
-        <i data-lucide="x" width="16" height="16" stroke-width="2"></i>
+        <i data-lucide="x" width="18" height="18" stroke-width="2"></i>
       </button>
     </div>
 
     <div class="inspect-badge-row">
-      <span class="risk-tag high" id="inspect-risk-badge">HIGH DROWNING RISK (88/100)</span>
+      <span class="risk-tag high" id="inspect-risk-badge">
+        <span class="risk-dot" aria-hidden="true"></span>
+        <span>HIGH DROWNING RISK · 88/100</span>
+      </span>
       <span class="twi-tag" id="inspect-twi">TWI: 14.2</span>
     </div>
 
-    <p class="inspect-action-text" id="inspect-action">
-      Loading plot salvage instructions...
-    </p>
+    <div class="inspect-action-box">
+      <div class="inspect-section-label">
+        <i data-lucide="clipboard-list" width="16" height="16" stroke-width="2" aria-hidden="true"></i>
+        <span>RECOMMENDED FIELD ACTION</span>
+      </div>
+      <p class="inspect-action-text" id="inspect-action">
+        Loading plot salvage instructions...
+      </p>
+    </div>
 
     <div class="sms-preview-box" id="sms-box">
       <div class="sms-box-header">
         <span class="sms-title-inline">
-          <i data-lucide="smartphone" width="13" height="13" stroke-width="2"></i>
-          <span>Sample Farmer SMS Alert</span>
+          <i data-lucide="smartphone" width="16" height="16" stroke-width="2" aria-hidden="true"></i>
+          <span>SAMPLE FARMER SMS ALERT</span>
         </span>
-        <span id="sms-counter" class="sms-count">0 / 160 chars</span>
+        <span id="sms-counter" class="sms-count">0/160 CHARS</span>
       </div>
       <p id="inspect-sms-text"></p>
     </div>
@@ -339,6 +355,7 @@
   </footer>
 
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script>
     if (window.lucide) {
