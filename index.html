@@ -171,17 +171,17 @@
       <label for="time-slider" class="sr-only">Overpass timeline stage</label>
       <input type="range" id="time-slider" min="0" max="4" step="1" value="2" />
       <div class="scrubber-labels">
-        <span data-step="0">-7d Dry</span>
+        <span data-step="0">Baseline</span>
         <span data-step="1">Pre-Storm</span>
         <span data-step="2" class="active">Post-Storm SAR</span>
-        <span data-step="3">+48h Drain</span>
+        <span data-step="3">Field Action</span>
         <span data-step="4">Next Season</span>
       </div>
     </div>
 
     <div class="time-readout">
-      <strong id="stage-clock">Overpass +6h</strong>
-      <span id="stage-sub">Sentinel-1 C-Band</span>
+      <strong id="stage-clock">2 Nov 2024 · post-storm</strong>
+      <span id="stage-sub">Sentinel-1 sees standing water</span>
     </div>
   </header>
 
@@ -190,9 +190,9 @@
     <button class="circle-action-btn" id="btn-bell" title="View Sample SMS Alert" aria-label="Toggle sample SMS alert card" type="button">
       <i data-lucide="bell" width="18" height="18" stroke-width="2"></i>
     </button>
-    <button class="simulate-pill-btn" id="btn-role-switch" type="button">
+    <button class="simulate-pill-btn" id="btn-role-switch" type="button" aria-pressed="false" title="Switch between the farmer plot view and the LGU barangay priority list">
       <i data-lucide="user-check" width="16" height="16" stroke-width="2"></i>
-      <span>View: Farmer / LGU</span>
+      <span id="role-label">View: Farmer</span>
       <i data-lucide="chevron-down" width="14" height="14" stroke-width="2"></i>
     </button>
   </div>
@@ -244,6 +244,22 @@
       </div>
       <p id="inspect-sms-text"></p>
     </div>
+  </section>
+
+  <!-- 4b. LGU VIEW: BARANGAY PRIORITY LIST (from provenance.barangay_ranking) -->
+  <section class="floating-card inspect-card hidden" id="lgu-card" aria-label="Barangay priority list for the Municipal Agriculture Office and MDRRMO">
+    <div class="drag-handle" aria-hidden="true"><span class="drag-handle-bar"></span></div>
+    <div class="inspect-header">
+      <div class="inspect-title-group">
+        <h3>Barangay priority list</h3>
+        <div class="inspect-meta-row"><span>Visit order for MAO field teams &amp; MDRRMO</span></div>
+      </div>
+      <button class="icon-btn" id="btn-close-lgu" title="Close" aria-label="Close barangay priority list" type="button">
+        <i data-lucide="x" width="18" height="18" stroke-width="2"></i>
+      </button>
+    </div>
+    <ol class="lgu-list" id="lgu-list"></ol>
+    <p class="lgu-note" id="lgu-note"></p>
   </section>
 
   <!-- 5. RIGHT VERTICAL MAP TOOL DOCK -->

@@ -21,10 +21,21 @@
   const fab = root.querySelector(".fs-outlook-fab");
   const panel = root.querySelector(".fs-outlook-panel");
   const body = root.querySelector(".fs-outlook-body");
-  const toggle = (open) => { panel.hidden = !open; fab.setAttribute("aria-expanded", String(open)); };
+  const toggle = (open) => {
+    panel.hidden = !open;
+    fab.setAttribute("aria-expanded", String(open));
+    if (open) {
+      // one right-side card at a time: close the plot card / LGU list
+      document.getElementById("inspect-card")?.classList.add("hidden");
+      document.getElementById("lgu-card")?.classList.add("hidden");
+    }
+  };
   fab.addEventListener("click", () => toggle(panel.hidden));
   root.querySelector(".fs-outlook-close").addEventListener("click", () => toggle(false));
   if (location.hash === "#outlook") toggle(true); // deep link for demos
+  window.addEventListener("hashchange", () => {
+    if (location.hash === "#outlook") toggle(true);
+  });
 
   const el = (tag, cls, text) => {
     const n = document.createElement(tag);

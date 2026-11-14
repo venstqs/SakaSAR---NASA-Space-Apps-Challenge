@@ -3,6 +3,7 @@ const DATA_SOURCE_URL = "mock-data.json";
 const DEFAULT_CENTER = [123.2057, 13.5416];
 let mapCenter = DEFAULT_CENTER;
 let pilotBounds = null; // [minLng, minLat, maxLng, maxLat] from the plots + SAR flood mask
+const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 let appData = null;
 let map = null;
@@ -1116,8 +1117,103 @@ function getPolygonCenter(ring) {
   return [lng / len, lat / len];
 }
 
+// ---- small helpers ----------------------------------------------------------
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+// Sentinel-1 item ids embed the acquisition date: S1A_IW_GRDH_1SDV_20241102T213901_...
+function sceneDate(id, withYear = true) {
+  const m = /_(\d{4})(\d{2})(\d{2})T/.exec(id || "");
+  if (!m) return null;
+  return `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]}${withYear ? ` ${m[1]}` : ""}`;
+}
+
+function sarScenes() {
+  return (appData && appData.provenance && appData.provenance.sar_scenes) || {};
+}
+
+function signedDb(v) {
+  if (typeof v !== "number" || Number.isNaN(v)) return "n/a";
+  return `${v > 0 ? "+" : ""}${v.toFixed(1)}`;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+let toastTimer = null;
+function showToast(message, ms = 3200) {
+  const toast = document.getElementById("sms-toast");
+  if (!toast) return;
+  toast.textContent = message;
+  toast.classList.remove("hidden");
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.add("hidden"), ms);
+}
+
+function closeOutlook() {
+  const panel = document.getElementById("fs-outlook-panel");
+  if (panel && !panel.hidden) {
+    panel.hidden = true;
+    document.querySelector(".fs-outlook-fab")?.setAttribute("aria-expanded", "false");
+  }
+}
+
+// ---- Farmer / LGU view ------------------------------------------------------
+let viewRole = "farmer";
+function setRole(role) {
+  viewRole = role;
+  const isLgu = role === "lgu";
+  const label = document.getElementById("role-label");
+  if (label) label.textContent = isLgu ? "View: LGU / MDRRMO" : "View: Farmer";
+  document.getElementById("btn-role-switch")?.setAttribute("aria-pressed", String(isLgu));
+  document.getElementById("lgu-card")?.classList.toggle("hidden", !isLgu);
+  document.getElementById("inspect-card")?.classList.toggle("hidden", isLgu);
+  closeOutlook();
+}
+
+function renderBarangayRanking() {
+  const list = document.getElementById("lgu-list");
+  if (!list) return;
+  const ranking = (appData.provenance && appData.provenance.barangay_ranking) || [];
+  list.innerHTML = ranking
+    .map((r) => {
+      const cls = r.high_risk_ha > 0 ? "high" : r.watch_ha > 0 ? "watch" : "low";
+      const hh = r.high_risk_households ? ` · ${r.high_risk_households} households` : "";
+      return `
+        <li><button type="button" class="lgu-row" data-brgy="${escapeHtml(r.barangay)}"
+            aria-label="Rank ${r.rank}: ${escapeHtml(r.barangay)}, ${r.high_risk_ha} hectares high risk">
+          <span class="lgu-rank ${cls}">${r.rank}</span>
+          <span><strong>${escapeHtml(r.barangay)}</strong>
+            <small>${r.high_risk_ha} ha high · ${r.watch_ha} ha watch${hh}</small></span>
+          <span class="lgu-score">max ${r.max_risk_score}/100</span>
+        </button></li>`;
+    })
+    .join("");
+  list.querySelectorAll(".lgu-row").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      // jump to the highest-risk plot in that barangay
+      const plots = appData.plots.features.filter((f) => f.properties.barangay === btn.dataset.brgy);
+      const top = plots.sort((a, b) => b.properties.risk_score - a.properties.risk_score)[0];
+      if (top) selectPlot(top, true);
+    });
+  });
+  const note = document.getElementById("lgu-note");
+  if (note) {
+    note.textContent =
+      "Ranked by hectares rated high on the 30 m risk grid inside the sample plots. " +
+      "Household counts are placeholders until LGU parcel and census data are added.";
+  }
+}
+
 function populateLeftPanel() {
   const prov = appData.provenance;
+  const nHigh = prov.high_risk_plots;
+  document.getElementById("headline-status").textContent =
+    nHigh === 0 ? "No plots at high drowning risk" : `${nHigh} plot${nHigh === 1 ? "" : "s"} at high drowning risk`;
+  const afterDate = sceneDate(sarScenes().after);
+  document.getElementById("headline-sub").textContent =
+    `${afterDate ? `Sentinel-1 pass ${afterDate}` : "Post-storm Sentinel-1 pass"} · C-band surface wetness`;
+  renderBarangayRanking();
   document.getElementById("kpi-ha").textContent = `${prov.total_high_risk_ha} ha`;
   document.getElementById("kpi-households").textContent = prov.households_affected;
   document.getElementById("kpi-hitrate").textContent = prov.sar_hit_rate;
@@ -1172,20 +1268,22 @@ function closeRiskPopover() {
   }
 }
 
+// Only measured values: change vs the Aug–Sep baseline median on each real Sentinel-1 pass.
 function formatDeltaSarLabel(p) {
   const normalizedMode = sarMode === "before" ? "pre" : sarMode === "after" ? "post" : sarMode;
+  const sc = sarScenes();
+  const pre = sceneDate(sc.just_before, false) || "pre-storm";
+  const post = sceneDate(sc.after, false) || "post-storm";
   if (normalizedMode === "pre") {
-    const preDb = (p.sar_wetness_change_db * 0.22).toFixed(1);
-    return `ΔSAR ${preDb} dB (Pre-Storm)`;
+    return `ΔSAR ${signedDb(p.pre_event_change_db)} dB (${pre} pass)`;
   }
   if (normalizedMode === "post") {
-    return `ΔSAR ${p.sar_wetness_change_db} dB`;
+    return `ΔSAR ${signedDb(p.sar_wetness_change_db)} dB (${post} pass)`;
   }
-  if (timelineStage === 3) {
-    const drainDb = (p.sar_wetness_change_db * 0.39).toFixed(1);
-    return `ΔSAR ${drainDb} dB (Draining)`;
+  if (timelineStage === 0) {
+    return "ΔSAR 0.0 dB (baseline reference)";
   }
-  return "ΔSAR 0.0 dB (Baseline)";
+  return `ΔSAR ${signedDb(p.sar_wetness_change_db)} dB (last pass, ${post})`;
 }
 
 function updateInspectSarReadout() {
@@ -1209,6 +1307,11 @@ function selectPlot(feat, fly = true) {
   const p = feat.properties;
   selectedPlotId = p.plot_id;
   closeRiskPopover();
+  if (fly) {
+    // a user picked a plot: show its card, close the other right-side panels
+    if (viewRole === "lgu") setRole("farmer");
+    closeOutlook();
+  }
 
   updateThreeSelectedPlot(selectedPlotId);
 
@@ -1298,30 +1401,40 @@ function bindUIEvents() {
     document.querySelector('[data-drawer="rotations"]').click();
   });
 
-  let smsToastTimer = null;
   document.getElementById("btn-open-sms").addEventListener("click", () => {
     closeRiskPopover();
-    document.getElementById("inspect-card").classList.remove("hidden");
-    const toast = document.getElementById("sms-toast");
-    if (toast) {
-      const counter = document.getElementById("sms-counter")?.textContent || "160/160 CHARS";
-      toast.textContent = `Simulated SMS alert queued for ${selectedPlotId} (${counter.toLowerCase()}) — no external gateway`;
-      toast.classList.remove("hidden");
-      if (smsToastTimer) clearTimeout(smsToastTimer);
-      smsToastTimer = setTimeout(() => toast.classList.add("hidden"), 3200);
-    }
+    setRole("farmer"); // shows the plot card with the SMS preview
+    const counter = document.getElementById("sms-counter")?.textContent || "160/160 CHARS";
+    showToast(`Simulated SMS alert queued for ${selectedPlotId} (${counter.toLowerCase()}) — no external gateway`);
   });
 
   document.getElementById("btn-bell").addEventListener("click", (e) => {
     e.stopPropagation();
     const inspect = document.getElementById("inspect-card");
-    const willOpen = inspect.classList.contains("hidden");
-    if (willOpen) closeRiskPopover();
-    inspect.classList.toggle("hidden", !willOpen);
+    if (inspect.classList.contains("hidden")) {
+      closeRiskPopover();
+      setRole("farmer");
+    } else {
+      inspect.classList.add("hidden");
+    }
   });
 
   document.getElementById("btn-close-inspect").addEventListener("click", () => {
     document.getElementById("inspect-card").classList.add("hidden");
+  });
+
+  // Farmer <-> LGU view (barangay priority list for MAO / MDRRMO)
+  document.getElementById("btn-role-switch").addEventListener("click", () => {
+    setRole(viewRole === "lgu" ? "farmer" : "lgu");
+  });
+  document.getElementById("btn-close-lgu")?.addEventListener("click", () => setRole("farmer"));
+
+  // Escape closes whichever right-side card is open
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    document.getElementById("inspect-card")?.classList.add("hidden");
+    document.getElementById("lgu-card")?.classList.add("hidden");
+    closeOutlook();
   });
 
   document.getElementById("btn-reset-bounds").addEventListener("click", () => fitPilot(true));
@@ -1374,8 +1487,8 @@ function bindUIEvents() {
     }
     if (!checked && sarMode !== "off") {
       setSarMode("off", false);
-    } else if (checked && sarMode === "off") {
-      setSarMode(timelineStage === 1 ? "pre" : "post", false);
+    } else if (checked && sarMode !== "post") {
+      setSarMode("post", false); // the flood mask is a post-storm product
     }
   });
 
@@ -1397,13 +1510,23 @@ function bindUIEvents() {
 
   // Timeline Scrubber
   const slider = document.getElementById("time-slider");
+  // Stage labels use the real Sentinel-1 acquisition dates from the pipeline.
+  const sc = sarScenes();
+  const base = sc.baseline || [];
   const stages = [
-    { clock: "-7d Baseline", sub: "Dry C-Band SAR", sar: "off" },
-    { clock: "Storm Hits", sub: "Optical Blocked by Clouds", sar: "pre" },
-    { clock: "Overpass +6h", sub: "Sentinel-1 Surface Wetness", sar: "post" },
-    { clock: "+48h Salvage", sub: "Trench & Early Harvest", sar: "off" },
-    { clock: "Next Season", sub: "Legume / Bio-Tillage Shift", sar: "off" }
+    {
+      clock: base.length ? `${sceneDate(base[0], false)} – ${sceneDate(base[base.length - 1], false)} baseline` : "Baseline",
+      sub: base.length ? `Median of ${base.length} calm Sentinel-1 passes` : "Pre-storm reference",
+      sar: "off"
+    },
+    { clock: `${sceneDate(sc.just_before) || "Pre-storm"} · pre-storm`, sub: "Last calm pass before Kristine", sar: "pre" },
+    { clock: `${sceneDate(sc.after) || "Post-storm"} · post-storm`, sub: "Sentinel-1 sees standing water", sar: "post" },
+    { clock: "Field action", sub: "Trench & early harvest (advice)", sar: "off" },
+    { clock: "Next season", sub: "Legume / bio-tillage rotation", sar: "off" }
   ];
+  const initialStage = stages[Number(slider.value)] || stages[2];
+  document.getElementById("stage-clock").textContent = initialStage.clock;
+  document.getElementById("stage-sub").textContent = initialStage.sub;
 
   slider.addEventListener("input", (e) => {
     const idx = Number(e.target.value);
@@ -1511,19 +1634,29 @@ function setSarMode(mode, syncFloodCheckbox = true) {
   }
 
   if (syncFloodCheckbox) {
-    const isSarActive = normalized !== "off";
+    // The observed flood mask comes from the post-storm pass, so it only shows in "post".
+    const showWater = normalized === "post";
     const chkFlood = document.getElementById("chk-flood");
     if (chkFlood) {
-      chkFlood.checked = isSarActive;
+      chkFlood.checked = showWater;
     }
-    threeState.showFlood = isSarActive;
+    threeState.showFlood = showWater;
     if (threeState.waterMesh) {
-      threeState.waterMesh.visible = isSarActive;
+      threeState.waterMesh.visible = showWater;
     }
     const dockFlood = document.getElementById("dock-flood");
     if (dockFlood) {
-      dockFlood.classList.toggle("active", isSarActive);
-      dockFlood.setAttribute("aria-pressed", String(isSarActive));
+      dockFlood.classList.toggle("active", showWater);
+      dockFlood.setAttribute("aria-pressed", String(showWater));
+    }
+  }
+
+  // Explain an empty pre-storm layer instead of leaving the user guessing
+  if (normalized === "pre" && appData) {
+    const before = appData.sar_backscatter_comparison?.before_event?.features || [];
+    if (!before.length) {
+      const d = sceneDate(sarScenes().just_before) || "Pre-storm pass";
+      showToast(`${d}: no standing water detected before the storm — fields were normal`);
     }
   }
 
@@ -1629,8 +1762,8 @@ function startMapAnimations() {
     if (ctx && cssWidth > 0 && cssHeight > 0) {
       ctx.clearRect(0, 0, cssWidth, cssHeight);
 
-      // Rain streaks only on Post-Storm SAR (timelineStage === 2)
-      if (timelineStage === 2) {
+      // Rain streaks only on Post-Storm SAR (timelineStage === 2); skipped for reduced-motion users
+      if (timelineStage === 2 && !prefersReducedMotion) {
         ctx.strokeStyle = "rgba(224, 242, 254, 0.22)";
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -1654,7 +1787,7 @@ function startMapAnimations() {
       }
 
       // Soft feathered SAR radar beam confined to pilot bounding box
-      if (sarSweepProgress > 0 && map && pilotBounds) {
+      if (sarSweepProgress > 0 && map && pilotBounds && !prefersReducedMotion) {
         const pNW = map.project([pilotBounds[0], pilotBounds[3]]);
         const pSE = map.project([pilotBounds[2], pilotBounds[1]]);
         const minX = Math.max(0, Math.min(pNW.x, pSE.x) - 24);

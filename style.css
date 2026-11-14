@@ -1530,3 +1530,19 @@ button svg,
     overflow-y: auto;
   }
 }
+
+/* ---- LGU view: barangay priority list ---- */
+.lgu-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.lgu-row { display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 10px; padding: 10px 12px;
+  border: 1px solid var(--card-border); border-radius: var(--radius-md); background: var(--surface-subtle);
+  cursor: pointer; text-align: left; width: 100%; font: inherit; color: var(--text-main); }
+.lgu-row:hover, .lgu-row:focus-visible { background: var(--brand-blue-light); border-color: var(--brand-blue); outline: none; }
+.lgu-rank { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 700;
+  font-size: 0.8125rem; color: #fff; background: var(--risk-low); }
+.lgu-rank.high { background: var(--risk-high); }
+.lgu-rank.watch { background: var(--risk-watch); }
+.lgu-row strong { display: block; font-size: 0.875rem; }
+.lgu-row small { display: block; font-size: 0.75rem; color: var(--text-sub); margin-top: 2px; }
+.lgu-score { font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); white-space: nowrap; }
+.lgu-note { margin: 10px 0 0; font-size: 0.75rem; color: var(--text-sub); line-height: 1.45; }
+.simulate-pill-btn[aria-pressed="true"] { background: var(--risk-watch); }
