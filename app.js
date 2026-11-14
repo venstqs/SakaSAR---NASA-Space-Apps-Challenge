@@ -45,7 +45,7 @@ const S = {
   t: 23, playing: false, speed: 1, last: 0, dayShown: -1,
   field: "rainsum", fieldOpacity: 0.8, basemap: "sat", gibs: "none", view3d: true,
   layers: { hotspots: true, flood: true, towns: true, storm: true, terrain: true, hillshade: true, pilot: true, sarchange: false },
-  pilot: null, plot: "PL-02", priority: "water", story: 0,
+  pilot: null, plot: "PL-02", priority: "water", story: 0, pgrid: null, pgLayer: "none",
   aiMode: "hind", events: [], townCenters: [], charts: {}, ready: false, inspect: null,
 };
 let map, stormMarker, pinMarker, hoverPopup;
@@ -97,10 +97,12 @@ function nearestCell(lon, lat) {
 
 // ---------------- boot ----------------
 async function init() {
+  if ($("splash")) $("brand-logo").style.opacity = 0;
   const [tl, munis, summary, overlay, pilot] = await Promise.all([
     fetchJSON("data/region/bicol_timeline.json"), fetchJSON("data/region/bicol_municipalities.geojson"),
     fetchJSON("data/region/bicol_summary.json"), fetchJSON("data/region/bicol_flood.json"), fetchJSON("mock-data.json"),
   ]);
+  fetchJSON("data/region/pilot_grids.json").then((g) => { S.pgrid = g; renderPilotGrid(); });
   S.pilot = pilot && pilot.plots ? pilot : null;
   if (!tl || !munis) { toast("Could not load the Bicol data files. Run the API from the project folder."); return; }
   Object.assign(S, { tl, munis, summary, overlay });
@@ -113,7 +115,6 @@ async function init() {
   });
   prepareGrid();
   if (window.Chart) { Chart.defaults.font.family = "Geist, system-ui, sans-serif"; Chart.defaults.color = "#5f7468"; }
-  if (window.innerWidth <= 760) togglePanel(false);
   buildEvents();
   bindChrome();
   renderLayers();
@@ -122,6 +123,7 @@ async function init() {
   renderFields();
   renderData();
   bindStory();
+  buildWindows();
   buildTimeline();
   initMap();
   icons();
@@ -315,11 +317,12 @@ function initMap() {
       terrain: { source: "dem", exaggeration: 1.8 },
       sky: { "sky-color": "#bcdcf0", "horizon-color": "#eef3f0", "fog-color": "#eef3f0", "sky-horizon-blend": 0.5, "horizon-fog-blend": 0.5, "fog-ground-blend": 0.2 },
     },
-    bounds: [[R.w, R.s], [R.e, R.n]], fitBoundsOptions: { padding: chromePadding() }, pitch: 30,
+    ...(location.hash.includes("view=") ? {} : { center: [124.6, 12.6], zoom: 4.3, pitch: 0, bearing: 0 }),
   });
   map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
   map.addControl(new maplibregl.ScaleControl({ unit: "metric", maxWidth: 110 }), "bottom-right");
-  map.once("style.load", () => { map.setPadding(chromePadding()); addLayers(); S.ready = true; applyLayers(); setTime(S.t, true); });
+  map.once("style.load", () => { map.setPadding(chromePadding()); addLayers(); S.ready = true; applyLayers(); setTime(S.t, true); renderPilotGrid(); finishIntro(); });
+  setTimeout(finishIntro, 5000); // never keep the intro up if tiles are slow
   loadFloodPixels();
   // when our browser-made tiles arrive, the 3D terrain must re-drape them (it caches each tile's layers)
   let rttQueued = false;
@@ -443,7 +446,7 @@ function onHover(e) {
     const v = sample(cellValues(S.field, Math.floor(S.t)), lng, lat);
     val = ` <span>|</span> ${f.name}: <b>${S.field === "soil" ? fmt(v, 2) : fmt(v, S.field === "lstm" ? 1 : 0)}${f.unit ? " " + f.unit : ""}</b>`;
   }
-  $("readout").innerHTML = `${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E${t ? ` <span>|</span> <b>${esc(t.name)}</b>, ${esc(t.province)}` : ""}${val}`;
+  $("readout").innerHTML = `${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E${t ? ` <span>|</span> <b>${esc(t.name)}</b>, ${esc(t.province)}` : ""}${val}${pgReadout(lng, lat)}`;
 }
 function inspect(lon, lat) {
   S.inspect = { lon, lat };
@@ -482,6 +485,7 @@ function inspect(lon, lat) {
       <dt>Forecast after 2 Nov</dt><dd>${h ? `${h.days_pred} of 7 days waterlogged` : "n/a"}</dd>
       <dt>What happened</dt><dd>${h ? `${h.days_actual} of 7 days` : "n/a"}</dd>
       <dt>If Kristine came again</dt><dd>${g ? `${g.days_waterlogged} of 7 days` : "n/a"}</dd>
+      ${pgInspectHTML(lon, lat)}
     </dl>
     ${h ? `<div class="insp-chart"><canvas id="ch-insp"></canvas></div>` : ""}
     ${acts.length ? `<div class="kv"><div class="sec">What to do</div></div><ul class="actions">${acts.map((a, i) => `<li class="${i === 0 && share >= 0.15 ? "warn" : ""}">${esc(a)}</li>`).join("")}</ul>` : ""}`;
@@ -494,6 +498,7 @@ function inspect(lon, lat) {
     box.style.setProperty("--oy", `${Math.max(0, Math.min(100, ((pt.y + r.top - br.top) / br.height) * 100))}%`);
     box.classList.remove("pop"); void box.offsetWidth; box.classList.add("pop");
   }
+  aiOnInspect();
   if (h && window.Chart) {
     S.charts.insp?.destroy();
     const start = new Date(tl.lstm_hindcast.issued + "T00:00:00");
@@ -507,11 +512,11 @@ function inspect(lon, lat) {
   icons();
 }
 function openTown(name, province) {
+  if (WM.ws && !(WM.ws === "ai")) backToMap();
   const c = S.townCenters.find((x) => x.name === name && x.province === province); if (!c) return;
   document.querySelectorAll(".town").forEach((b) => b.classList.toggle("active", b.dataset.n === name && b.dataset.p === province));
   map.flyTo({ center: [c.lon, c.lat], zoom: 10.8, pitch: S.view3d ? 50 : 0, duration: 1500 });
   inspect(c.lon, c.lat);
-  if (window.innerWidth <= 760) togglePanel(false);
 }
 
 // ---------------- simulation clock ----------------
@@ -716,7 +721,6 @@ function bindChrome() {
     if (window.innerWidth <= 760) togglePanel(true);
     S.charts.ai?.resize();
   }));
-  $("btn-panel").addEventListener("click", () => togglePanel());
   document.querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () => {
     S.view3d = b.dataset.view === "3d";
     document.querySelectorAll("[data-view]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
@@ -755,8 +759,7 @@ function bindChrome() {
   window.addEventListener("resize", () => map?.resize());
 }
 function chromePadding() {
-  const phone = window.innerWidth <= 760, open = !$("app").classList.contains("no-panel");
-  return phone ? { top: 60, bottom: 100, left: 10, right: 10 } : { top: 70, bottom: 130, left: open ? 370 : 20, right: 60 };
+  return window.innerWidth <= 760 ? { top: 60, bottom: 150, left: 10, right: 10 } : { top: 70, bottom: 130, left: 80, right: 60 };
 }
 function togglePanel(force) {
   const app = $("app"), show = force ?? app.classList.contains("no-panel");
@@ -790,6 +793,11 @@ function renderLayers() {
     <p class="h">Field Drowning Risk, 30 m (sample fields)</p>
     ${toggle("pilot", "Risk zones and fields", "High, watch and low cells; field outlines, flood edge and drainage channel. From zoom 11")}
     ${toggle("sarchange", "Radar wetness change", "Cells where Sentinel-1 VV dropped by 1 dB or more after the storm")}
+    <p class="note chip-note" style="margin:8px 6px 6px">30 m detail layer (exact cell values on hover)</p>
+    <div class="chips" role="group" aria-label="30 m detail layer">
+      <button type="button" class="chip" data-pg="none" aria-pressed="${S.pgLayer === "none"}">Risk classes</button>
+      ${Object.entries(PG_STYLE).map(([k, v]) => `<button type="button" class="chip" data-pg="${k}" aria-pressed="${S.pgLayer === k}">${v.name}</button>`).join("")}
+    </div>
     <p class="h">Storm</p>
     ${toggle("storm", "Kristine's track", "NASA EONET every 6 hours, PAGASA colours")}
     <p class="callout"><i data-lucide="info"></i><span>Kristine's centre crossed northern Luzon, ${fmt(closest)} km north of Naga at its closest. Bicol flooded from the storm's southern rain bands: pick <b>Rain that day</b> and press play.</span></p>
@@ -807,6 +815,10 @@ function renderLayers() {
     ${toggle("hillshade", "Hillshade", "Shaded relief")}`;
   const tab = $("tab-layers");
   tab.querySelectorAll(".field-opt").forEach((b) => b.addEventListener("click", () => setField(b.dataset.field)));
+  tab.querySelectorAll("[data-pg]").forEach((b) => b.addEventListener("click", () => {
+    S.pgLayer = b.dataset.pg; tab.querySelectorAll("[data-pg]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    renderPilotGrid(); if (S.ready && map.getZoom() < 11) flyToPilot();
+  }));
   tab.querySelectorAll("[data-gibs]").forEach((b) => b.addEventListener("click", () => {
     S.gibs = b.dataset.gibs;
     tab.querySelectorAll("[data-gibs]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
@@ -840,6 +852,10 @@ function renderLegend() {
   const after = dayISO(S.t) >= "2024-11-02";
   if (after && z < 12 && (S.layers.flood || S.layers.hotspots || S.layers.towns)) {
     parts.push(`<div><b>Flood, Sentinel-1 2 Nov</b><div class="sw">${S.layers.hotspots ? `<span><i style="background:linear-gradient(90deg,#ffe882,#ffb000,#ff5a1f,#be0028)"></i>Hotspot density</span>` : ""}${S.layers.flood ? `<span><i style="background:#4ec4de"></i>Flooded farmland</span><span><i style="background:#e9e4c9"></i>Farmland</span>` : ""}${S.layers.towns ? `<span><i style="background:rgba(27,95,168,0.5)"></i>Town share flooded</span>` : ""}</div></div>`);
+  }
+  if (S.pgLayer !== "none" && S.pgrid && S.layers.pilot && z >= 10.5) {
+    const st = PG_STYLE[S.pgLayer], a = st.stops[0][0], b = st.stops[st.stops.length - 1][0];
+    parts.unshift(`<div><b>${st.name}, 30 m</b><small>risk engine grid, ${S.pgrid.width}×${S.pgrid.height} cells</small><div class="ramp" style="background:linear-gradient(90deg,${st.stops.map((q) => `rgba(${q[1][0]},${q[1][1]},${q[1][2]},${Math.max(0.2, q[1][3] / 255)}) ${((q[0] - a) / (b - a)) * 100}%`).join(",")})"></div><div class="ticks-row"><span>${st.fmt(a)}</span><span>${st.fmt(b)}</span></div></div>`);
   }
   if (S.pilot && S.layers.pilot && S.ready && map.getZoom() >= 10.5) parts.unshift(`<div><b>Field Drowning Risk, 30 m</b><div class="sw">${["high", "watch", "low"].map((k) => `<span><i style="background:${RISK_C[k]}"></i>${RISK_W[k]}</span>`).join("")}<span><i style="background:none;box-shadow:inset 0 0 0 2px #4ec4de"></i>Radar flood edge</span><span><i style="background:#7fe0ff"></i>Drainage channel</span></div></div>`);
   if (S.layers.storm && z < 10) parts.push(`<div><b>Kristine, PAGASA category</b><div class="sw">${CATS.map((c) => `<span><i style="background:${c.c}"></i>${c.short}</span>`).join("")}</div></div>`);
@@ -965,7 +981,8 @@ function addPilotLayers() {
 }
 function applyPilotLayers() {
   if (!S.ready || !S.pilot) return;
-  ["risk-zones", "plots-fill", "plots-line", "obs-flood", "drain"].forEach((id) => vis(id, S.layers.pilot));
+  ["plots-fill", "plots-line", "obs-flood", "drain"].forEach((id) => vis(id, S.layers.pilot));
+  vis("risk-zones", S.layers.pilot && S.pgLayer === "none"); vis("pgrid", S.layers.pilot && S.pgLayer !== "none");
   vis("sar-change", S.layers.pilot && S.layers.sarchange);
   (S.plotLabels || []).forEach((m) => (m.getElement().style.display = S.layers.pilot && map.getZoom() >= 11.2 ? "" : "none"));
 }
@@ -977,8 +994,7 @@ function selectPlot(id, openTab) {
   if (openTab) showTab("fields");
 }
 function showTab(name) {
-  const b = document.querySelector(`.tabs button[data-tab="${name}"]`); if (b && b.getAttribute("aria-selected") !== "true") b.click();
-  if ($("app").classList.contains("no-panel")) togglePanel(true);
+  openApp(name);
 }
 
 function rankRotations(p) {
@@ -1048,7 +1064,7 @@ function renderFields() {
     selectPlot(b.dataset.plot);
     if (S.ready && map.getZoom() >= 11) map.easeTo({ center: plotCenter(plotFeat(b.dataset.plot)), duration: 700 });
   }));
-  $("btn-fly-pilot").addEventListener("click", flyToPilot);
+  $("btn-fly-pilot").addEventListener("click", () => { if (WM.ws) backToMap(); flyToPilot(); });
   $("btn-sms").addEventListener("click", async () => { try { await navigator.clipboard.writeText(p.sms_alert); toast("SMS text copied."); } catch (_) { toast("Select the SMS text to copy it."); } });
   box.querySelectorAll("[data-prio]").forEach((b) => b.addEventListener("click", () => { S.priority = b.dataset.prio; const y = box.scrollTop; renderFields(); box.scrollTop = y; }));
   initSegs(box);
@@ -1129,6 +1145,391 @@ function bindStory() {
   $("story-prev").addEventListener("click", () => storyGo(S.story - 1));
   $("story-close").addEventListener("click", () => ($("story").hidden = true));
   document.addEventListener("keydown", (e) => { if ($("story").hidden || e.target.closest("input, textarea")) return; if (e.key === "Escape") $("story").hidden = true; });
+}
+
+
+// ================= Windows, launcher rail and workspace =================
+// Home is the 3D map. Each panel is a window: drag by the header, resize from the corner, minimise to the rail,
+// close, or maximise to "teleport" it into the full-screen workspace.
+const APPS = [
+  { id: "ai", title: "SakaSAR AI", icon: "sparkles", ai: true },
+  { id: "layers", title: "Layers", icon: "layers" },
+  { id: "towns", title: "Towns", icon: "map-pin" },
+  { id: "fields", title: "Field risk", icon: "sprout" },
+  { id: "forecast", title: "LSTM forecast", icon: "brain-circuit" },
+  { id: "events", title: "Events", icon: "list" },
+  { id: "data", title: "Data & method", icon: "database" },
+];
+const WM = { z: 30, ws: null, wsFromWin: false, state: {} };
+const phone = () => window.innerWidth <= 760;
+const ease = "cubic-bezier(0.2, 0.8, 0.2, 1)";
+
+function buildWindows() {
+  if (!$("tab-ai")) { const s = document.createElement("section"); s.className = "tab-body"; s.id = "tab-ai"; $("sections").prepend(s); }
+  const dock = $("dock");
+  dock.innerHTML = "";
+  APPS.forEach((a, i) => {
+    const sec = $(`tab-${a.id}`); sec.hidden = false;
+    const w = document.createElement("section");
+    w.className = "win"; w.id = `win-${a.id}`; w.hidden = true; w.setAttribute("role", "dialog"); w.setAttribute("aria-label", a.title);
+    w.innerHTML = `<header class="win-head"><span class="win-title"><i data-lucide="${a.icon}"></i>${a.title}</span><span class="win-ctl">
+      <button type="button" class="wbtn" data-act="min" aria-label="Minimise ${a.title}" data-tip="Minimise"><i data-lucide="minus"></i></button>
+      <button type="button" class="wbtn" data-act="max" aria-label="Open ${a.title} full screen" data-tip="Full screen"><i data-lucide="maximize-2"></i></button>
+      <button type="button" class="wbtn" data-act="close" aria-label="Close ${a.title}" data-tip="Close"><i data-lucide="x"></i></button></span></header><div class="win-body"></div>`;
+    w.querySelector(".win-body").appendChild(sec);
+    $("app").appendChild(w);
+    w.style.left = `${76 + i * 24}px`; w.style.top = `${74 + i * 18}px`;
+    if (a.id === "ai") { w.style.width = "400px"; }
+    w.querySelector('[data-act="min"]').addEventListener("click", () => minimiseWin(a.id));
+    w.querySelector('[data-act="max"]').addEventListener("click", () => teleport(a.id, w.getBoundingClientRect(), true));
+    w.querySelector('[data-act="close"]').addEventListener("click", () => closeWin(a.id));
+    w.addEventListener("pointerdown", () => focusWin(a.id));
+    w.querySelector(".win-body").addEventListener("scroll", (e) => w.classList.toggle("scrolled", e.target.scrollTop > 4));
+    dragWin(w, a.id);
+    const b = document.createElement("button");
+    b.type = "button"; b.className = `dock-btn${a.ai ? " ai" : ""}`; b.dataset.app = a.id; b.dataset.tip = a.title; b.setAttribute("aria-label", a.title);
+    b.innerHTML = `<i data-lucide="${a.icon}"></i><span class="dot"></span>`;
+    b.addEventListener("click", () => dockClick(a.id));
+    dock.appendChild(b);
+    if (a.ai) { const sep = document.createElement("span"); sep.className = "dock-sep"; dock.appendChild(sep); }
+    WM.state[a.id] = "closed";
+  });
+  const sep = document.createElement("span"); sep.className = "dock-sep"; dock.appendChild(sep);
+  const ws = document.createElement("button");
+  ws.type = "button"; ws.className = "dock-btn"; ws.dataset.tip = "Open the full workspace"; ws.setAttribute("aria-label", "Open the full workspace");
+  ws.innerHTML = `<i data-lucide="layout-dashboard"></i>`;
+  ws.addEventListener("click", () => teleport(WM.lastApp || "towns", ws.getBoundingClientRect(), false));
+  dock.appendChild(ws);
+  $("ws-back").addEventListener("click", backToMap);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && WM.ws && !e.target.closest("input")) backToMap(); });
+  icons();
+}
+function dockBtn(id) { return document.querySelector(`.dock-btn[data-app="${id}"]`); }
+function syncDock() {
+  APPS.forEach((a) => { const b = dockBtn(a.id); if (!b) return; b.classList.toggle("open", WM.state[a.id] === "open"); b.classList.toggle("min", WM.state[a.id] === "min"); });
+}
+function dockClick(id) {
+  const w = $(`win-${id}`);
+  if (WM.state[id] === "open" && w.classList.contains("focused")) minimiseWin(id);
+  else openApp(id);
+}
+function openApp(id) {
+  WM.lastApp = id;
+  if (WM.ws) { wsShow(id); return; }
+  if (phone()) { teleport(id, dockBtn(id)?.getBoundingClientRect(), false); return; }
+  const w = $(`win-${id}`), was = WM.state[id];
+  if (was === "open") { focusWin(id); w.animate([{ transform: "scale(1)" }, { transform: "scale(1.015)" }, { transform: "scale(1)" }], { duration: 260, easing: ease }); return; }
+  w.hidden = false;
+  if (!w.dataset.placed) placeWin(w);
+  clampWin(w); focusWin(id);
+  const from = dockBtn(id).getBoundingClientRect(), r = w.getBoundingClientRect();
+  const dx = from.left + from.width / 2 - (r.left + r.width / 2), dy = from.top + from.height / 2 - (r.top + r.height / 2);
+  w.animate([{ transform: `translate(${dx}px, ${dy}px) scale(0.12)`, opacity: 0 }, { transform: "none", opacity: 1 }], { duration: 380, easing: ease });
+  WM.state[id] = "open"; syncDock();
+  refreshCharts();
+  if (id === "ai") aiWelcome();
+}
+// open new windows in the first free slot (left, middle, right) so they never bury each other
+function placeWin(w) {
+  w.dataset.placed = "1";
+  const W = window.innerWidth, ww = w.offsetWidth, top = 74;
+  const slots = [84, 84 + 392, W - ww - 64, Math.max(84, (W - ww) / 2)];
+  const open = [...document.querySelectorAll(".win:not([hidden])")].filter((x) => x !== w).map((x) => x.getBoundingClientRect());
+  const free = slots.find((x) => !open.some((r) => x < r.right - 40 && x + ww > r.left + 40)) ?? slots[0] + open.length * 26;
+  w.style.left = `${Math.min(free, W - ww - 12)}px`; w.style.top = `${top + (free === slots[0] + open.length * 26 ? open.length * 22 : 0)}px`;
+}
+function minimiseWin(id) {
+  const w = $(`win-${id}`), to = dockBtn(id).getBoundingClientRect(), r = w.getBoundingClientRect();
+  const dx = to.left + to.width / 2 - (r.left + r.width / 2), dy = to.top + to.height / 2 - (r.top + r.height / 2);
+  w.animate([{ transform: "none", opacity: 1 }, { transform: `translate(${dx}px, ${dy}px) scale(0.1)`, opacity: 0 }], { duration: 300, easing: "cubic-bezier(0.5, 0, 0.75, 0)" }).onfinish = () => { w.hidden = true; };
+  WM.state[id] = "min"; w.classList.remove("focused"); syncDock();
+}
+function closeWin(id) {
+  const w = $(`win-${id}`);
+  w.animate([{ transform: "none", opacity: 1 }, { transform: "scale(0.96)", opacity: 0 }], { duration: 180, easing: "ease-in" }).onfinish = () => { w.hidden = true; };
+  WM.state[id] = "closed"; w.classList.remove("focused"); syncDock();
+}
+function focusWin(id) {
+  document.querySelectorAll(".win.focused").forEach((x) => x.classList.remove("focused"));
+  const w = $(`win-${id}`); w.classList.add("focused"); w.style.zIndex = String(++WM.z);
+}
+function clampWin(w) {
+  const r = w.getBoundingClientRect();
+  w.style.left = `${Math.max(70, Math.min(window.innerWidth - Math.min(r.width, 160), r.left))}px`;
+  w.style.top = `${Math.max(8, Math.min(window.innerHeight - 60, r.top))}px`;
+}
+function dragWin(w, id) {
+  const head = w.querySelector(".win-head");
+  let sx, sy, ox, oy, on = false;
+  head.addEventListener("pointerdown", (e) => {
+    if (e.target.closest("button")) return;
+    on = true; w.classList.add("dragging"); head.setPointerCapture(e.pointerId);
+    sx = e.clientX; sy = e.clientY; ox = w.offsetLeft; oy = w.offsetTop;
+  });
+  head.addEventListener("pointermove", (e) => {
+    if (!on) return;
+    w.style.left = `${Math.max(-w.offsetWidth + 120, Math.min(window.innerWidth - 120, ox + e.clientX - sx))}px`;
+    w.style.top = `${Math.max(0, Math.min(window.innerHeight - 44, oy + e.clientY - sy))}px`;
+  });
+  const end = () => { on = false; w.classList.remove("dragging"); };
+  head.addEventListener("pointerup", end); head.addEventListener("pointercancel", end);
+  head.addEventListener("dblclick", (e) => { if (!e.target.closest("button")) teleport(id, w.getBoundingClientRect(), true); });
+}
+function refreshCharts() { requestAnimationFrame(() => Object.values(S.charts).forEach((c) => c?.resize?.())); }
+
+// --- workspace: the teleport target ---
+function renderWsNav() {
+  $("ws-nav").innerHTML = APPS.map((a) => `<button type="button" data-ws="${a.id}" aria-pressed="${a.id === WM.ws}"><i data-lucide="${a.icon}"></i><span>${a.title}</span></button>`).join("");
+  $("ws-nav").querySelectorAll("[data-ws]").forEach((b) => b.addEventListener("click", () => wsShow(b.dataset.ws)));
+  $("ws-nav").querySelector(".seg-pill")?.remove();
+  initSegs($("ws-nav").parentElement);
+  icons();
+}
+function wsShow(id) {
+  const body = $("ws-body");
+  if (WM.ws && WM.ws !== id) $(`win-${WM.ws}`).querySelector(".win-body").appendChild($(`tab-${WM.ws}`));
+  WM.ws = id; WM.lastApp = id;
+  body.innerHTML = ""; body.appendChild($(`tab-${id}`)); body.scrollTop = 0;
+  body.classList.remove("ws-enter"); void body.offsetWidth; body.classList.add("ws-enter");
+  $("ws-nav").querySelectorAll("[data-ws]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.ws === id)));
+  refreshCharts();
+  if (id === "ai") aiWelcome();
+}
+function teleport(id, from, fromWin) {
+  const ws = $("workspace"), first = !WM.ws;
+  if (first) { ws.hidden = false; renderWsNav(); }
+  wsShow(id);
+  WM.wsFromWin = fromWin ? id : null;
+  if (fromWin) { $(`win-${id}`).hidden = true; }
+  if (first && from) {
+    const W = window.innerWidth, H = window.innerHeight;
+    ws.animate([{ clipPath: `inset(${from.top}px ${W - from.right}px ${H - from.bottom}px ${from.left}px round 18px)` }, { clipPath: "inset(0px 0px 0px 0px round 0px)" }], { duration: 520, easing: ease });
+  }
+  pause();
+}
+function backToMap() {
+  const ws = $("workspace"), id = WM.ws; if (!id) return;
+  const target = WM.wsFromWin && !phone() ? null : dockBtn(id)?.getBoundingClientRect();
+  const W = window.innerWidth, H = window.innerHeight;
+  const done = () => {
+    ws.hidden = true;
+    $(`win-${id}`).querySelector(".win-body").appendChild($(`tab-${id}`));
+    if (WM.wsFromWin && !phone()) { const w = $(`win-${id}`); w.hidden = false; WM.state[id] = "open"; focusWin(id); w.animate([{ transform: "scale(1.04)", opacity: 0.4 }, { transform: "none", opacity: 1 }], { duration: 300, easing: ease }); }
+    WM.ws = null; syncDock(); refreshCharts(); map?.resize();
+  };
+  if (target) ws.animate([{ clipPath: "inset(0px 0px 0px 0px round 0px)" }, { clipPath: `inset(${target.top}px ${W - target.right}px ${H - target.bottom}px ${target.left}px round 14px)` }], { duration: 420, easing: ease }).onfinish = done;
+  else ws.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260 }).onfinish = done;
+}
+
+// ================= Intro: the logo's radar pulses, then flies into the brand chip =================
+const intro = { t0: performance.now(), done: false, hadView: location.hash.includes("view=") };
+function finishIntro() {
+  if (intro.done) return; intro.done = true;
+  const wait = Math.max(0, 2300 - (performance.now() - intro.t0));
+  setTimeout(() => {
+    const sp = $("splash"), from = $("splash-logo").getBoundingClientRect(), brand = $("brand-logo"), to = brand.getBoundingClientRect();
+    const fly = document.createElement("img"); fly.src = $("splash-logo").src; fly.className = "fly-logo";
+    Object.assign(fly.style, { left: `${from.left}px`, top: `${from.top}px`, width: `${from.width}px`, height: `${from.height}px` });
+    document.body.appendChild(fly);
+    sp.classList.add("out");
+    const s = to.width / from.width;
+    fly.animate([{ transform: "none" }, { transform: `translate(${to.left - from.left}px, ${to.top - from.top}px) scale(${s})` }], { duration: reduceMotion ? 1 : 850, easing: ease, fill: "forwards" })
+      .onfinish = () => { brand.style.opacity = 1; fly.remove(); setTimeout(() => sp.remove(), 300); };
+    if (!intro.hadView && map) map.fitBounds([[R.w, R.s], [R.e, R.n]], { padding: chromePadding(), pitch: 42, bearing: -8, duration: reduceMotion ? 0 : 2600, essential: true });
+  }, wait);
+}
+
+// ================= 30 m detail layers from the pilot GeoTIFFs =================
+const PG_STYLE = {
+  score: { name: "Risk score", stops: [[23, [124, 198, 154, 150]], [40, [238, 159, 39, 170]], [70, [226, 83, 60, 190]], [100, [150, 25, 20, 210]]], fmt: (v) => `${Math.round(v)}/100` },
+  twi: { name: "Terrain wetness (TWI)", stops: [[5, [240, 248, 250, 40]], [8, [150, 210, 235, 150]], [11, [47, 159, 211, 190]], [15, [20, 60, 140, 215]]], fmt: (v) => v.toFixed(1) },
+  dvv: { name: "Radar change ΔVV", stops: [[-8, [16, 60, 150, 220]], [-4, [47, 159, 211, 190]], [-1, [200, 230, 245, 90]], [0, [255, 255, 255, 30]], [3, [201, 166, 107, 170]], [6, [140, 100, 50, 210]]], fmt: (v) => `${v.toFixed(1)} dB` },
+  slope: { name: "Slope", stops: [[0, [255, 255, 255, 20]], [2, [210, 200, 235, 120]], [5, [140, 110, 200, 180]], [8, [80, 40, 150, 215]]], fmt: (v) => `${v.toFixed(1)}°` },
+};
+function pgValue(layer, lon, lat) {
+  const G = S.pgrid; if (!G) return null;
+  const [w, s, e, n] = G.bounds;
+  if (lon < w || lon > e || lat < s || lat > n) return null;
+  const x = Math.floor(((lon - w) / (e - w)) * G.width), y = Math.floor(((mercY(n) - mercY(lat)) / (mercY(n) - mercY(s))) * G.height);
+  const L = G.layers[layer]; const v = L.values[y * G.width + x];
+  return v === G.missing ? null : v / L.scale;
+}
+function renderPilotGrid() {
+  const G = S.pgrid; if (!G || !S.ready) return;
+  const k = S.pgLayer;
+  if (k === "none") { vis("pgrid", false); return; }
+  const st = PG_STYLE[k], vals = G.layers[k].values, sc = G.layers[k].scale, cls = G.layers.cls.values;
+  const c = document.createElement("canvas"); c.width = G.width; c.height = G.height;
+  const ctx = c.getContext("2d"), img = ctx.createImageData(G.width, G.height), d = img.data;
+  const col = (v) => {
+    const sp = st.stops; if (v <= sp[0][0]) return sp[0][1]; if (v >= sp[sp.length - 1][0]) return sp[sp.length - 1][1];
+    const j = sp.findIndex((q) => q[0] >= v), a = sp[j - 1], b = sp[j], t = (v - a[0]) / (b[0] - a[0]);
+    return a[1].map((x, i) => x + (b[1][i] - x) * t);
+  };
+  for (let i = 0; i < vals.length; i++) {
+    if (vals[i] === G.missing || cls[i] === -2) continue; // not farmland: leave clear
+    const q = col(vals[i] / sc); d[i * 4] = q[0]; d[i * 4 + 1] = q[1]; d[i * 4 + 2] = q[2]; d[i * 4 + 3] = q[3];
+  }
+  ctx.putImageData(img, 0, 0);
+  const [w, s, e, n] = G.bounds;
+  registerRaster("pgrid", c, w, e, n, s, false);
+  const src = map.getSource("pgrid"), key = `${k}-${Date.now()}`;
+  if (!src) {
+    map.addSource("pgrid", { type: "raster", tiles: [`saka://pgrid/${key}/{z}/{x}/{y}`], tileSize: 256, minzoom: 10, maxzoom: 17, bounds: [w, s, e, n] });
+    map.addLayer({ id: "pgrid", type: "raster", source: "pgrid", minzoom: 10.5, paint: { "raster-opacity": 0.85, "raster-resampling": "nearest", "raster-fade-duration": 0 } }, map.getLayer("plots-fill") ? "plots-fill" : undefined);
+  } else src.setTiles([`saka://pgrid/${key}/{z}/{x}/{y}`]);
+  vis("pgrid", S.layers.pilot);
+  vis("risk-zones", S.layers.pilot && k === "none");
+  renderLegend();
+}
+function pgReadout(lon, lat) {
+  if (!S.pgrid || !S.layers.pilot) return "";
+  const sc = pgValue("score", lon, lat); if (sc == null) return "";
+  const parts = [`score <b>${Math.round(sc)}</b>`, `TWI <b>${pgValue("twi", lon, lat)?.toFixed(1)}</b>`, `ΔVV <b>${pgValue("dvv", lon, lat)?.toFixed(1)} dB</b>`, `slope <b>${pgValue("slope", lon, lat)?.toFixed(1)}°</b>`];
+  return ` <span>|</span> 30 m cell: ${parts.join(", ")}`;
+}
+function pgInspectHTML(lon, lat) {
+  if (!S.pgrid) return "";
+  const sc = pgValue("score", lon, lat); if (sc == null) return "";
+  const cls = pgValue("cls", lon, lat), lc = pgValue("lc", lon, lat), fl = pgValue("flood", lon, lat);
+  const clsName = { 2: "High", 1: "Watch", 0: "Low", "-1": "No radar data", "-2": "Not farmland" }[cls] ?? "n/a";
+  return `<div class="sec">30 m cell (risk engine grid)</div>
+    <dt>Field Drowning Risk</dt><dd>${Math.round(sc)}/100, ${clsName}</dd>
+    <dt>Radar change ΔVV</dt><dd>${pgValue("dvv", lon, lat)?.toFixed(1)} dB</dd>
+    <dt>Terrain wetness index</dt><dd>${pgValue("twi", lon, lat)?.toFixed(1)}</dd>
+    <dt>Slope</dt><dd>${pgValue("slope", lon, lat)?.toFixed(1)}°</dd>
+    <dt>Radar flood mask, 2 Nov</dt><dd>${fl === 1 ? "Water" : "Dry"}</dd>
+    <dt>Land cover (WorldCover)</dt><dd>${esc(S.pgrid.worldcover[String(lc)] || "n/a")}</dd>`;
+}
+
+// ================= SakaSAR AI: answers grounded in this project's data =================
+// Rule-based on purpose: every sentence is built from a dataset value, so nothing is invented.
+const AI = { msgs: [], greeted: false, town: null };
+function aiContext() {
+  const iso = dayISO(S.t), ctx = { iso, day: Math.floor(S.t) };
+  if (S.inspect) { ctx.lon = S.inspect.lon; ctx.lat = S.inspect.lat; ctx.town = townAt(ctx.lon, ctx.lat); }
+  if (AI.town) ctx.town = AI.town;
+  if (!ctx.town && S.inspect) { const n = nearestTown(ctx.lon, ctx.lat); ctx.town = n && S.munis.features.find((f) => f.properties.name === n.name)?.properties; }
+  if (ctx.town && ctx.lon == null) { const c = S.townCenters.find((x) => x.name === ctx.town.name && x.province === ctx.town.province); if (c) { ctx.lon = c.lon; ctx.lat = c.lat; } }
+  if (ctx.lon != null) ctx.cell = nearestCell(ctx.lon, ctx.lat);
+  ctx.plot = S.pilot ? plotFeat(S.plot)?.properties : null;
+  return ctx;
+}
+function renderAIPane() {
+  const c = aiContext();
+  $("tab-ai").innerHTML = `
+    <div class="ai-ctx">
+      <span><i data-lucide="calendar"></i>${short(c.iso)}</span>
+      <span><i data-lucide="map-pin"></i>${c.town ? esc(c.town.name) : "All of Bicol"}</span>
+      ${S.storm?.active ? `<span><i data-lucide="tornado"></i>Kristine ${S.storm.wind} kt</span>` : ""}
+    </div>
+    <div class="chat" id="chat">${AI.msgs.map(msgHTML).join("")}</div>
+    <div class="suggest" id="suggest">${aiSuggestions(c).map((q) => `<button type="button">${esc(q)}</button>`).join("")}</div>
+    <form class="ask" id="ask"><input id="ask-in" placeholder="Ask about a town, a field, rain, soil or what to do" autocomplete="off" aria-label="Ask SakaSAR AI" /><button class="btn" aria-label="Send"><i data-lucide="send"></i></button></form>
+    <p class="ai-note">SakaSAR AI builds every answer from this project's data (Sentinel-1, NASA POWER, EONET, NASADEM, the LSTM and the risk engine) with fixed rules. It is not a chat model.</p>`;
+  $("suggest").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => aiAsk(b.textContent)));
+  $("ask").addEventListener("submit", (e) => { e.preventDefault(); const v = $("ask-in").value.trim(); if (v) { $("ask-in").value = ""; aiAsk(v); } });
+  icons();
+  const body = $("tab-ai").parentElement; body.scrollTop = body.scrollHeight;
+}
+function msgHTML(m) {
+  if (m.who === "user") return `<div class="msg user">${esc(m.text)}</div>`;
+  if (m.typing) return `<div class="msg bot typing"><i></i><i></i><i></i></div>`;
+  return `<div class="msg bot"><div class="who"><img src="assets/sakasar-logo.png" alt="" />SakaSAR AI</div>${m.html}${m.src ? `<div class="srcs">${m.src.map((x) => `<span class="src">${esc(x)}</span>`).join("")}</div>` : ""}</div>`;
+}
+function aiSuggestions(c) {
+  const t = c.town ? c.town.name : null;
+  return [
+    t ? `What should farmers in ${t} do?` : "Which towns need help first?",
+    t ? `How bad is the flooding in ${t}?` : "How much farmland flooded?",
+    "Will the soil drain this week?",
+    S.pilot ? `Explain the risk for ${S.plot}` : "Where was the storm?",
+    "What should farmers plant next season?",
+    "How accurate is this?",
+  ];
+}
+function aiWelcome() {
+  if (!AI.greeted) {
+    AI.greeted = true;
+    AI.msgs.push({ who: "bot", html: `<p>Hi, I'm SakaSAR AI. Click any place on the map or move the timeline, then ask me about it: flooding, rain, soil, the storm, field risk or what to plant next.</p>` });
+  }
+  renderAIPane();
+}
+function aiAsk(q) {
+  AI.msgs.push({ who: "user", text: q });
+  const tn = S.munis.features.map((f) => f.properties).find((t) => q.toLowerCase().includes(t.name.toLowerCase()));
+  if (tn) AI.town = tn;
+  const pm = q.match(/PL-0?(\d)/i); if (pm && S.pilot) S.plot = `PL-0${pm[1]}`;
+  AI.msgs.push({ who: "bot", typing: true });
+  renderAIPane();
+  setTimeout(() => { AI.msgs.pop(); AI.msgs.push(aiAnswer(q, aiContext())); renderAIPane(); if (tn && !WM.ws) openTown(tn.name, tn.province); }, reduceMotion ? 0 : 520);
+}
+function aiAnswer(q, c) {
+  const s = q.toLowerCase(), tl = S.tl, sm = S.summary;
+  const has = (...w) => w.some((x) => s.includes(x));
+  const rainAt = (field) => (c.lon != null ? sample(cellValues(field, c.day), c.lon, c.lat) : null);
+  if (has("accura", "hit rate", "trust", "how does", "method", "source", "data")) {
+    const pv = S.pilot?.provenance;
+    return { who: "bot", src: ["Risk engine", "Sentinel-1", "LSTM"], html: `<p>Two honest checks:</p><ul>
+      ${pv ? `<li>Of the farmland the radar saw flooded on 2 Nov, <b>${esc(pv.sar_hit_rate)}</b> had already been rated high by the terrain + rain model, which never saw the radar.</li>` : ""}
+      ${tl.lstm_hindcast ? `<li>The LSTM's 7-day soil forecast issued 3 Nov was right within 1 day in <b>${tl.lstm_hindcast.cells.filter((x) => x && Math.abs(x.days_pred - x.days_actual) <= 1).length} of ${tl.lstm_hindcast.cells.filter(Boolean).length}</b> Bicol grid cells.</li>` : ""}
+      <li>Limits: C-band radar sees surface water, not root-zone moisture; NASA POWER cells are about 50 km.</li></ul>` };
+  }
+  if (has("storm", "kristine", "typhoon", "wind", "track")) {
+    const st = tl.storm, ci = S.closest?.i ?? 0;
+    return { who: "bot", src: ["NASA EONET"], html: `<p>${S.storm?.active ? `On ${short(c.iso)} Kristine is at ${S.storm.lat.toFixed(1)}°N ${S.storm.lon.toFixed(1)}°E with ${S.storm.wind} kt winds (${S.storm.cat.name}).` : `On ${short(c.iso)} Kristine is not over the region.`} Its closest pass was ${fmt(S.closest?.km)} km north of Naga on ${short(st[ci].t.slice(0, 10))}. The centre crossed northern Luzon, so Bicol's flooding came from the storm's southern rain bands, not a direct hit.</p>` };
+  }
+  if (has("plant", "rotation", "crop", "next season", "legume", "season")) {
+    const p = c.plot; if (!p) return { who: "bot", html: "<p>Rotation advice needs a field's soil data; it is available for the sample fields in the Field risk window.</p>" };
+    const r = rankRotations(p);
+    return { who: "bot", src: ["SoilGrids", "Risk engine"], html: `<p>For ${p.plot_id} (${esc(p.soil_0_30cm?.texture || "")}, risk ${p.risk_score}/100), ranked for <b>${PRIORITIES[S.priority].toLowerCase()}</b>:</p><ul>${r.map((x) => `<li><b>${esc(x.crops)}</b>: ${x.fit ? esc(x.fit.why) : esc(x.benefits)}</li>`).join("")}</ul><p>Confirm seed supply and labour with the Municipal Agriculture Office.</p>` };
+  }
+  if (has("risk", "score", "pl-", "field")) {
+    const p = c.plot; if (!p) return { who: "bot", html: "<p>The field risk file did not load.</p>" };
+    return { who: "bot", src: ["Sentinel-1", "NASADEM", "GPM IMERG"], html: `<p><b>${p.plot_id}</b> (${esc(p.barangay)}) scores <b>${p.risk_score}/100, ${RISK_W[p.risk_class].toLowerCase()}</b>.</p><ul>
+      <li>Radar: VV dropped ${Math.abs(p.sar_wetness_change_db)} dB after the storm, so the surface got much wetter (+${Math.round(45 * p.s_sar)} points).</li>
+      <li>Terrain: wetness index ${p.twi_value}, ground where runoff collects (+${Math.round(35 * p.s_twi)}).</li>
+      <li>Rain: ${fmt(S.pilot.provenance.rainfall?.r_total_mm)} mm in the storm window (+${Math.round(20 * p.s_rain)}).</li></ul><p>${esc(p.plain_language_action)}</p>` };
+  }
+  if (has("soil", "drain", "waterlog", "forecast", "lstm", "week")) {
+    const ci = c.cell ?? null, h = ci != null ? tl.lstm_hindcast?.cells?.[ci] : null, g = ci != null ? tl.lstm_kristine_again?.cells?.[ci] : null;
+    const where = c.town ? `near ${esc(c.town.name)}` : "across Bicol";
+    if (!h) { const v = tl.lstm_hindcast.cells.filter(Boolean), wet = v.filter((x) => x.days_pred >= 5).length; return { who: "bot", src: ["LSTM (NASA POWER)"], html: `<p>After the 2 Nov radar pass the LSTM forecast roots waterlogged on 5+ of the next 7 days in <b>${wet} of ${v.length}</b> grid cells. Click a place on the map for its own forecast.</p>` }; }
+    return { who: "bot", src: ["LSTM (NASA POWER)"], html: `<p>Soil ${where}: from 3 Nov the LSTM forecast <b>${h.days_pred} of 7 days</b> waterlogged; ${h.days_actual} of 7 actually were. ${h.days_pred >= 5 ? "Keep outlets open all week and hold fertiliser." : h.days_pred >= 2 ? "The root zone should start draining mid-week; reopen outlets after each rain." : "The soil drains this week; field work can resume."}</p>${g ? `<p>If Kristine's rain came again on today's soil (${esc(tl.lstm_kristine_again.soil_as_of)}): ${g.days_waterlogged} of 7 days waterlogged.</p>` : ""}` };
+  }
+  if (has("rain", "rainfall", "mm")) {
+    const today = rainAt("rain"), tot = rainAt("rainsum");
+    const rd = regionDaily(), peak = rd.reduce((m, d, i) => (d.max > rd[m].max ? i : m), 0);
+    return { who: "bot", src: ["NASA POWER"], html: `<p>${c.lon != null ? `${c.town ? esc(c.town.name) : "Here"} on ${short(c.iso)}: <b>${fmt(today)} mm</b> that day, ${fmt(tot)} mm since 10 Oct.` : `Bicol averaged ${fmt(rd[c.day].mean)} mm on ${short(c.iso)}.`} The wettest day was ${short(tl.days[peak])}, with ${fmt(rd[peak].max)} mm in one grid cell.</p>` };
+  }
+  if (has("flood", "water", "bad", "damage", "how much")) {
+    const t = c.town;
+    if (t) return { who: "bot", src: ["Sentinel-1, 2 Nov"], html: `<p><b>${esc(t.name)}, ${esc(t.province)}</b>: ${fmt(t.flooded_farmland_ha)} ha of ${fmt(t.farmland_ha)} ha farmland under water on 2 Nov (${pct(t.flooded_share)}), rank ${t.rank} of ${S.munis.features.length} towns.</p>` };
+    return { who: "bot", src: ["Sentinel-1, 2 Nov"], html: `<p>${fmt(sm.flooded_farmland_ha)} ha of Bicol farmland was still under water on 2 Nov, ${pct(sm.flooded_farmland_ha / sm.farmland_ha)} of all farmland. Camarines Sur carried most of it.</p>` };
+  }
+  if (has("first", "priority", "help", "where", "worst", "which town")) {
+    const top = sm.top_municipalities.slice(0, 5);
+    return { who: "bot", src: ["Sentinel-1, 2 Nov"], html: `<p>Send teams first to the towns with the most flooded farmland:</p><ul>${top.map((t) => `<li><b>${esc(t.name)}</b>: ${fmt(t.flooded_farmland_ha)} ha</li>`).join("")}</ul>` };
+  }
+  if (has("do", "tip", "advice", "should", "help")) {
+    const t = c.town, share = t?.flooded_share ?? 0, ci = c.cell, h = ci != null ? tl.lstm_hindcast?.cells?.[ci] : null;
+    const tips = !t ? ["Open field outlets and drains after each heavy rain.", "Check the Towns window for where the radar saw water."]
+      : share >= 0.15 ? ["Open main drains and canals now; clear debris at bridges.", "Harvest mature rice early instead of risking root rot.", "Hold off fertiliser while water stands.", "Report damage from the radar map instead of waiting for a field survey."]
+        : share >= 0.03 ? ["Check low fields near rivers first.", "Open field outlets and dig a shallow trench along the lowest bund.", "Re-check after the next Sentinel-1 pass in 12 days."]
+          : ["Little flooding was seen by radar here. Keep routine checks.", "Radar can miss water under tall crops; confirm with barangay reports."];
+    return { who: "bot", src: ["Sentinel-1", "LSTM", "NASA POWER"], html: `<p>${t ? `For <b>${esc(t.name)}</b> (${pct(share)} of farmland flooded${h ? `, soil forecast waterlogged ${h.days_pred} of 7 days` : ""}):` : "For Bicol farms right now:"}</p><ul>${tips.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` };
+  }
+  if (has("hi", "hello", "hey")) return { who: "bot", html: "<p>Hello. Pick a place on the map and ask me about it.</p>" };
+  return { who: "bot", html: `<p>I answer from SakaSAR's data, so try one of the questions below, or name a Bicol town (for example "flooding in Bula").</p>` };
+}
+// proactive tip when a place is clicked while the AI window is open
+function aiOnInspect() {
+  if (WM.state.ai !== "open" && WM.ws !== "ai") return;
+  AI.town = null;
+  const c = aiContext();
+  if (!c.town) return;
+  AI.msgs.push(aiAnswer(`what should farmers do in ${c.town.name}`, c));
+  renderAIPane();
 }
 
 init();

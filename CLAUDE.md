@@ -99,38 +99,23 @@ API: `/api/data`, `/api/plots`, `/api/risk-map`, `/api/rotations?priority=water|
 `/api/provenance`, `/api/soil-outlook`, plus whitelisted dashboard files and `/assets/<image>`.
 Never mount the repo root as static files.
 
-## 6. Dashboard (GIS workstation, 15 Nov 2026)
+## 6. Dashboard (windowed 3D app, 15 Nov 2026) — agent brief: docs/ANTIGRAVITY.md
 
-- Layout: top bar (2D/3D, fit Bicol, fit storm track, save map PNG, copy link with view in the URL hash) · left panel with
-  tabs **Layers / Towns / Forecast / Events** (collapsible; bottom sheet on phones) · full map · bottom **timeline**
-  (rain bars = Bicol daily mean, event ticks, drag/arrow-key scrubber, play 1/2/4×, live stats). Bicol Region only.
-- **Heatmaps** are rasters rendered in the browser (`renderField` in app.js): the ~0.5° NASA POWER grid from
-  `data/region/bicol_timeline.json`, bilinear-interpolated in Web Mercator, masked to the town polygons, drawn to a
-  MapLibre canvas source. Fields: rain that day, rain since 10 Oct, root-zone wetness, LSTM waterlogged days. They fade
-  out above zoom 9 because the data are ~50 km.
-- **Flood**: hotspot heatmap = density of Sentinel-1 flooded pixels read from `bicol_flood.png` (binned ~1 km, warm ramp);
-  the 100 m raster from zoom 8.5; towns shaded by share flooded (fades at field zoom). All appear from the 2 Nov pass.
-- **Storm**: NASA EONET track coloured by PAGASA category, daily 00Z labels, live marker interpolated between fixes, and a
-  measured closest-pass line to Naga (≈263 km on 22 Oct). Kristine's centre crossed northern Luzon; Bicol's rain came from
-  its southern bands. Say this; do not imply a direct hit.
-- **Inspector** (click anywhere, draggable): Sentinel-1 pixel class at that point, town stats, NASA POWER values interpolated
-  to the point, distance to the storm, LSTM forecast vs actual for the nearest cell, actions. Hover readout shows coordinates,
-  town and the active heatmap value. Towns tab: provinces, ranking, search, CSV export.
-- NASA GIBS image of the day (MODIS, VIIRS, IMERG, SMAP) and basemaps (Esri satellite, CARTO map) are radio choices.
-- Panel tabs: Layers · Towns · **Fields** · Forecast · Events · **Data**.
-  - **Fields** = the 30 m Field Drowning Risk check from `mock-data.json` (risk engine contract): pilot metrics with the
-    independent 31% hit rate, barangay ranking, five sample fields (PL-01…05) with score bar, what drives the score
-    (0.45 radar / 0.35 terrain / 0.20 rain contributions), soil texture, timeline of actions with sources, the SMS
-    (≤160 chars, copy), and three rotations ranked by field fit then by farmer priority (water / nitrogen / cash).
-    Pending inputs (hectares, households, crop, bare-field days) carry a "sample" tag. On the map from zoom 10.5:
-    risk zones, field outlines with score labels, radar flood edge, drainage channel, optional radar-change cells.
-    The 100 m Bicol flood raster hides above zoom 12.2 so it does not cover the 30 m data.
-  - **Data** = sources and limits panel the brief requires: formula, honest hit rate (100% full model labelled circular),
-    datasets used vs future work, ₱0 licensing and processing times, plain limits, team.
-- **Story** button (toolbar): 5-step demo path matching the brief's storyboard: storm rain → MODIS sees only cloud
-  (23 Oct) → Sentinel-1 flood hotspots (2 Nov) → field drowning risk + SMS (PL-02) → ranked rotations.
-- GIBS date changes and our tile loads call `terrain.sourceCache.freeRtt()`; without it 3D shows stale tiles.
-- The map background is sea-coloured so tiles still loading never flash white.
+- **Home = the 3D map** with a brand chip (logo + "SakaSAR" only), toolbar (2D/3D, Story, Bicol, Storm track, save, link),
+  a launcher **rail** on the left, the timeline and the legend. A splash intro pulses the logo's radar rings, then the
+  logo flies into the brand chip and the camera flies onto Bicol.
+- **Windows** (rail buttons): SakaSAR AI, Layers, Towns, Field risk, LSTM forecast, Events, Data & method. Drag by the
+  header, resize from the corner, minimise to the rail, close, or maximise/double-click to **teleport** into the
+  full-screen **workspace** (section switcher, "Back to 3D map", Esc). Phones open panels straight in the workspace.
+- **SakaSAR AI**: rule-based assistant that answers from the datasets for the clicked place, timeline day and selected
+  field (flooding, rain, soil/LSTM, storm, field risk, rotations, accuracy). Labelled "not a chat model". When open,
+  it posts a tip for each place you click.
+- **30 m detail layers** (`data/region/pilot_grids.json`, `python -m pipeline.web_layers`): risk score, TWI, ΔVV,
+  slope drawn from the risk engine GeoTIFFs; hover readout and inspector show exact cell values.
+- Heatmaps: NASA POWER grid, bilinear in Web Mercator, masked to town polygons; fade above zoom 9.
+- Flood: Sentinel-1 hotspot heatmap + 100 m raster (hidden above zoom 12.2) + town shading, from 2 Nov.
+- Storm: EONET track in PAGASA colours, daily labels, live marker, measured closest pass to Naga (≈263 km). Never imply a
+  direct hit.
 - Rasters (heatmap, flood) are served as `saka://` tiles from a `maplibregl.addProtocol` handler that crops the
   in-browser canvas. Do NOT go back to image/canvas sources: with 3D terrain MapLibre 4 drapes them only on some
   tiles (Sorsogon, Masbate, Catanduanes went blank). After our tiles load we call `terrain.sourceCache.freeRtt()`.

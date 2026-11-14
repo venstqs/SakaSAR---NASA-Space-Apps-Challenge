@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SakaSAR — Typhoon flood monitor for Bicol farms</title>
+  <title>SakaSAR</title>
   <meta name="description" content="GIS replay of Typhoon Kristine over the Bicol Region: NASA rain and soil heatmaps, the storm track, Sentinel-1 flood hotspots by town, and an LSTM forecast of waterlogged soil." />
   <link rel="icon" type="image/x-icon" href="favicon.ico" />
   <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png" />
@@ -28,11 +28,10 @@
   <div class="app" id="app">
     <!-- ===== Top bar ===== -->
     <header class="topbar">
-      <div class="brandchip">
-        <button type="button" class="icon-btn" id="btn-panel" aria-label="Show or hide the side panel" aria-expanded="true" data-tip="Panel"><i data-lucide="panel-left"></i></button>
-        <img src="assets/sakasar-logo.png" alt="" width="28" height="28" class="logo" />
-        <div class="brand"><h1>SakaSAR</h1><p>Typhoon Kristine, Bicol Region</p></div>
-      </div>
+      <a class="brandchip" href="./" aria-label="SakaSAR home">
+        <img src="assets/sakasar-logo.png" alt="" width="40" height="40" class="logo" id="brand-logo" />
+        <span class="wordmark">SakaSAR</span>
+      </a>
       <div class="toolbar" role="toolbar" aria-label="Map tools">
         <div class="seg" role="group" aria-label="View">
           <button type="button" data-view="2d">2D</button><button type="button" data-view="3d" aria-pressed="true">3D</button>
@@ -49,16 +48,11 @@
     </header>
 
     <!-- ===== Side panel ===== -->
-    <aside class="panel" id="panel">
-      <nav class="tabs" role="tablist" aria-label="Panel"><span class="tab-ind" aria-hidden="true"></span>
-        <button type="button" role="tab" data-tab="layers" aria-selected="true"><i data-lucide="layers"></i>Layers</button>
-        <button type="button" role="tab" data-tab="towns" aria-selected="false"><i data-lucide="map-pin"></i>Towns</button>
-        <button type="button" role="tab" data-tab="fields" aria-selected="false"><i data-lucide="sprout"></i>Fields</button>
-        <button type="button" role="tab" data-tab="forecast" aria-selected="false"><i data-lucide="brain-circuit"></i>Forecast</button>
-        <button type="button" role="tab" data-tab="events" aria-selected="false"><i data-lucide="list"></i>Events</button>
-        <button type="button" role="tab" data-tab="data" aria-selected="false"><i data-lucide="database"></i>Data</button>
-      </nav>
+    <!-- Launcher rail: each button opens a window; maximise teleports it to the workspace -->
+    <nav class="dock" id="dock" aria-label="Panels"></nav>
 
+    <!-- Section content. JS moves each section into its own window -->
+    <div class="sections" id="sections">
       <section class="tab-body" id="tab-layers" role="tabpanel"></section>
 
       <section class="tab-body" id="tab-towns" role="tabpanel" hidden>
@@ -91,7 +85,7 @@
         <p class="note">Generated from the data. Click an event to jump to it.</p>
         <ol class="events" id="events"></ol>
       </section>
-    </aside>
+    </div>
 
     <!-- ===== Map ===== -->
     <main class="stage">
@@ -134,6 +128,22 @@
       </div>
       <div class="tl-stats" id="sim-stats"></div>
     </footer>
+  </div>
+
+  <!-- Workspace: full-screen frame a window teleports into -->
+  <div class="workspace" id="workspace" hidden>
+    <header class="ws-head">
+      <span class="ws-brand"><img src="assets/sakasar-logo.png" alt="" width="34" height="34" /><span class="wordmark">SakaSAR</span></span>
+      <nav class="seg ws-nav" id="ws-nav" aria-label="Workspace sections"></nav>
+      <button type="button" class="btn" id="ws-back"><i data-lucide="globe-2"></i><span>Back to 3D map</span></button>
+    </header>
+    <main class="ws-body" id="ws-body"></main>
+  </div>
+
+  <!-- Intro -->
+  <div class="splash" id="splash" aria-hidden="true">
+    <div class="splash-mark"><span class="ring"></span><span class="ring"></span><span class="ring"></span><img src="assets/sakasar-logo.png" alt="" width="148" height="148" id="splash-logo" /></div>
+    <p class="splash-word">SakaSAR</p>
   </div>
 
   <div class="toast" id="toast" role="status" hidden></div>
