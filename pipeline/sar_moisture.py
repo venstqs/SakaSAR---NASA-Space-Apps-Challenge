@@ -1,6 +1,6 @@
-"""Task 1 — Sentinel-1 C-band wetness change and observed flood extent (feature/sar-moisture).
+"""Sentinel-1 C-band wetness change and observed flood extent.
 
-Implements CLAUDE.md §3A:
+Implements the SAR processing stage (docs/METHODS.md):
   σ⁰ (dB) → Lee speckle filter → Δσ⁰_VV = after − baseline → S_SAR, observed flood mask.
 
 Scenes (all Sentinel-1A, relative orbit 134 descending, so viewing geometry is identical):
@@ -154,7 +154,7 @@ def process(baseline: list[dict], just_before: dict, after: dict, slope: np.ndar
 
 
 def s_sar(delta_vv_db: float) -> float:
-    """CLAUDE.md §3A.4: S_SAR = clip(−Δσ⁰_VV / 4, 0, 1)."""
+    """Normalized SAR wetness score (docs/METHODS.md): S_SAR = clip(−Δσ⁰_VV / 4, 0, 1)."""
     return float(np.clip(-delta_vv_db / 4.0, 0.0, 1.0))
 
 

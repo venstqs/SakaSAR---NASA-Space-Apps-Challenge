@@ -1,4 +1,4 @@
-"""Terrain hydrology (NASADEM) and storm rainfall (NASA POWER) — CLAUDE.md §3B and §3C.
+"""Terrain hydrology (NASADEM) and storm rainfall (NASA POWER) — see docs/METHODS.md.
 
   slope β → priority-flood depression filling → D8 flow direction → flow accumulation
   → specific catchment area a = (N_up + 1)·Δx → TWI = ln(a / tan β) → S_TWI
@@ -104,7 +104,7 @@ def twi(acc: np.ndarray, tan_b: np.ndarray) -> np.ndarray:
 
 
 def s_twi(twi_value: float) -> float:
-    """CLAUDE.md §3B.3: S_TWI = clip((TWI − 5) / 10, 0, 1)."""
+    """Normalized terrain wetness score (docs/METHODS.md): S_TWI = clip((TWI − 5) / 10, 0, 1)."""
     return float(np.clip((twi_value - 5.0) / 10.0, 0.0, 1.0))
 
 
@@ -257,7 +257,7 @@ def smap_anomaly() -> dict | None:
 
 
 def s_rain(total_mm: float) -> float:
-    """CLAUDE.md §3C.2: S_Rain = clip(R / 300, 0, 1)."""
+    """Normalized rainfall score (docs/METHODS.md): S_Rain = clip(R / 300, 0, 1)."""
     return float(np.clip(total_mm / RAIN_SATURATION_MM, 0.0, 1.0))
 
 

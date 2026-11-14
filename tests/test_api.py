@@ -54,8 +54,10 @@ def test_rotations_ranked_by_priority():
 
 def test_dashboard_served_and_repo_not_exposed():
     assert client.get("/").status_code == 200
+    assert "sitemap.xml" in client.get("/robots.txt").text
+    assert "https://sakasar.earth/" in client.get("/sitemap.xml").text
     assert client.get("/mock-data.json").json() == json.loads((ROOT / "mock-data.json").read_text(encoding="utf-8"))
-    for f in ("CLAUDE.md", "api.py", ".git/config", "requirements.txt"):
+    for f in ("pyproject.toml", "api.py", ".git/config", "requirements.txt"):
         assert client.get(f"/{f}").status_code == 404
 
 
@@ -80,7 +82,7 @@ def test_region_files_served_and_locked_down():
 
 def test_logo_served_and_assets_locked_down():
     assert client.get("/assets/sakasar-logo.png").status_code == 200
-    for bad in ("/assets/..%2Fapi.py", "/assets/../CLAUDE.md", "/assets/missing.png"):
+    for bad in ("/assets/..%2Fapi.py", "/assets/../pyproject.toml", "/assets/missing.png"):
         assert client.get(bad).status_code == 404
 
 

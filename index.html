@@ -3,21 +3,40 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SakaSAR</title>
-  <meta name="description" content="GIS replay of Typhoon Kristine over the Bicol Region: NASA rain and soil heatmaps, the storm track, Sentinel-1 flood hotspots by town, and an LSTM forecast of waterlogged soil." />
+  <title>SakaSAR — Bicol Typhoon Flood Monitor &amp; Field Drowning Risk</title>
+  <meta name="description" content="3D GIS replay of Typhoon Kristine over the Bicol Region: NASA rain and soil heatmaps, the EONET storm track, Sentinel-1 flood hotspots across 114 towns, 30 m field drowning risk and an LSTM soil-saturation forecast." />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://sakasar.earth/" />
   <link rel="icon" type="image/x-icon" href="favicon.ico" />
   <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png" />
   <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="SakaSAR" />
   <meta property="og:title" content="SakaSAR — Agro-Hydrological Decision Support" />
   <meta property="og:description" content="Radar-based field drowning risk and crop-rotation guidance for typhoon-hit farms. Built for NASA Space Apps Challenge 2026." />
   <meta property="og:image" content="https://sakasar.earth/assets/logo.png" />
-  <meta property="og:url" content="https://sakasar.earth" />
+  <meta property="og:url" content="https://sakasar.earth/" />
   <meta name="twitter:card" content="summary" />
   <meta name="twitter:title" content="SakaSAR — Agro-Hydrological Decision Support" />
   <meta name="twitter:description" content="Radar-based field drowning risk and crop-rotation guidance for typhoon-hit farms." />
   <meta name="twitter:image" content="https://sakasar.earth/assets/logo.png" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "SakaSAR",
+    "url": "https://sakasar.earth/",
+    "applicationCategory": "EnvironmentalApplication",
+    "operatingSystem": "Web",
+    "description": "SAR-based field drowning risk, Sentinel-1 Bicol Region typhoon flood mapping, crop-rotation guidance and LSTM root-zone soil wetness forecasting using open NASA and Copernicus Earth observation data.",
+    "isAccessibleForFree": true,
+    "sourceOrganization": {
+      "@type": "Organization",
+      "name": "SakaSAR Team — NASA Space Apps Challenge 2026 (Field Shift)"
+    }
+  }
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&display=swap" rel="stylesheet" />
@@ -159,5 +178,11 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
   <script src="app.js"></script>
+  <noscript>
+    <main style="max-width:720px;margin:48px auto;padding:0 20px;font-family:system-ui,sans-serif;color:#0f1f17;background:#fff">
+      <h1>SakaSAR — Bicol Typhoon Flood Monitor &amp; Field Drowning Risk</h1>
+      <p>SakaSAR maps post-typhoon flooded farmland and field drowning risk across the Bicol Region, Philippines using Copernicus Sentinel-1 radar, NASADEM 30 m terrain, GPM IMERG rainfall, NASA POWER weather, SMAP root-zone moisture, SoilGrids and an LSTM soil-saturation forecast. JavaScript is required for the interactive 3D MapLibre dashboard.</p>
+    </main>
+  </noscript>
 </body>
 </html>

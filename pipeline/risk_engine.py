@@ -1,6 +1,6 @@
-"""Task 2 — Field Drowning Risk fusion and dashboard export (feature/risk-engine).
+"""Field Drowning Risk fusion and dashboard export.
 
-Runs the SAR (§3A) and terrain/rain (§3B–C) stages, then CLAUDE.md §3D:
+Runs the SAR and terrain/rain stages, then computes composite risk (docs/METHODS.md):
   RiskScore = round(100 × (0.45·S_SAR + 0.35·S_TWI + 0.20·S_Rain))
   high ≥ 70 · watch 40–69 · low < 40
   SAR hit rate = area(flood ∩ ⋃ high plots) / area(flood)

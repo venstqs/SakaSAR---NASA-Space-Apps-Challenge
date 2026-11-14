@@ -342,7 +342,7 @@ function initMap() {
   // when our browser-made tiles arrive, the 3D terrain must re-drape them (it caches each tile's layers)
   let rttQueued = false;
   map.on("sourcedata", (e) => {
-    if ((e.sourceId === "field" || e.sourceId === "flood" || e.sourceId === "base" || String(e.sourceId).startsWith("gibs-")) && e.tile && !rttQueued) {
+    if ((e.sourceId === "field" || e.sourceId === "flood" || e.sourceId === "pgrid" || e.sourceId === "base" || String(e.sourceId).startsWith("gibs-")) && e.tile && !rttQueued) {
       rttQueued = true;
       requestAnimationFrame(() => { rttQueued = false; map.terrain?.sourceCache?.freeRtt?.(); map.triggerRepaint(); });
     }

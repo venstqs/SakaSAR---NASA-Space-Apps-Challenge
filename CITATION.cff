@@ -10,8 +10,9 @@ authors:
   - family-names: Pelagio
     given-names: Marqus Szymon
 repository-code: "https://github.com/venstqs/SakaSAR---NASA-Space-Apps-Challenge"
+url: "https://sakasar.earth"
 license: MIT
-date-released: "2026-11-14"
+date-released: "2026-11-15"
 keywords:
   - Sentinel-1
   - SAR

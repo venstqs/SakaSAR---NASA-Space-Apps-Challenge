@@ -5,7 +5,7 @@
     → http://localhost:8000/docs      interactive API docs
 
 Only the four dashboard files are exposed as static content. Mounting the repo root with
-StaticFiles would also publish .git/, CLAUDE.md and the pipeline source.
+StaticFiles would also publish .git/, .env and the pipeline source.
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse
 ROOT = Path(__file__).resolve().parent
 DATA_PATH = ROOT / "mock-data.json"
 OUTLOOK_PATH = ROOT / "data" / "soil_outlook.json"
-DASHBOARD_FILES = {"index.html", "app.js", "style.css", "mock-data.json", "favicon.ico"}
+DASHBOARD_FILES = {"index.html", "app.js", "style.css", "mock-data.json", "favicon.ico", "robots.txt", "sitemap.xml"}
 
 app = FastAPI(title="SakaSAR API", version="1.1.0",
               description="SAR root-zone hydrology and drowning-risk data for the Camarines Sur pilot.")

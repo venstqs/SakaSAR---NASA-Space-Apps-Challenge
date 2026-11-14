@@ -170,7 +170,7 @@ def to_db(linear: np.ndarray) -> np.ndarray:
 
 
 def lee_filter(intensity: np.ndarray, size: int = 5, looks: float = 18.0) -> np.ndarray:
-    """Lee speckle filter on linear intensity (CLAUDE.md §3A.2). NaNs are preserved."""
+    """Lee speckle filter on linear intensity (docs/METHODS.md). NaNs are preserved."""
     from scipy.ndimage import uniform_filter
 
     nan = ~np.isfinite(intensity)
@@ -186,7 +186,7 @@ def lee_filter(intensity: np.ndarray, size: int = 5, looks: float = 18.0) -> np.
 
 
 def slope_deg(dem: np.ndarray, cell: float = CELL, smooth: int = 3) -> tuple[np.ndarray, np.ndarray]:
-    """Central-difference slope (CLAUDE.md §3B.1). Returns (tan_beta floored at 0.001, beta_deg).
+    """Central-difference slope (docs/METHODS.md). Returns (tan_beta floored at 0.001, beta_deg).
 
     NASADEM heights are integer metres, so a light 3x3 mean is applied first to stop the
     1 m quantisation steps from producing a noisy 0 / 1.9 degree checkerboard on flat ground.
