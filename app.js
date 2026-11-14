@@ -43,8 +43,8 @@ const FIELDS = {
 const S = {
   tl: null, munis: null, summary: null, overlay: null,
   t: 23, playing: false, speed: 1, last: 0, dayShown: -1,
-  field: "rainsum", fieldOpacity: 0.8, basemap: "sat", gibs: "none", view3d: true,
-  layers: { hotspots: true, flood: true, towns: true, storm: true, terrain: true, hillshade: true, pilot: true, sarchange: false },
+  field: "none", fieldOpacity: 0.8, basemap: "sat", gibs: "none", view3d: true,
+  layers: { hotspots: true, flood: true, towns: true, storm: true, terrain: true, hillshade: true, pilot: true, sarchange: false, runoff: true, streams: true },
   pilot: null, plot: "PL-02", priority: "water", story: 0, pgrid: null, pgLayer: "none",
   aiMode: "hind", events: [], townCenters: [], charts: {}, ready: false, inspect: null,
 };
@@ -117,6 +117,7 @@ async function init() {
     fetchJSON("data/region/bicol_summary.json"), fetchJSON("data/region/bicol_flood.json"), fetchJSON("mock-data.json"),
   ]);
   fetchJSON("data/region/pilot_grids.json").then((g) => { S.pgrid = g; renderPilotGrid(); });
+  fetchJSON("data/region/bicol_runoff.json").then((r) => { S.runoff = r; loadRunoff(); renderData(); });
   S.pilot = pilot && pilot.plots ? pilot : null;
   if (!tl || !munis) { toast("Could not load the Bicol data files. Run the API from the project folder."); return; }
   Object.assign(S, { tl, munis, summary, overlay });
@@ -342,7 +343,7 @@ function initMap() {
   // when our browser-made tiles arrive, the 3D terrain must re-drape them (it caches each tile's layers)
   let rttQueued = false;
   map.on("sourcedata", (e) => {
-    if ((e.sourceId === "field" || e.sourceId === "flood" || e.sourceId === "pgrid" || e.sourceId === "base" || String(e.sourceId).startsWith("gibs-")) && e.tile && !rttQueued) {
+    if ((e.sourceId === "field" || e.sourceId === "flood" || e.sourceId === "pgrid" || e.sourceId === "runoff" || e.sourceId === "base" || String(e.sourceId).startsWith("gibs-")) && e.tile && !rttQueued) {
       rttQueued = true;
       requestAnimationFrame(() => { rttQueued = false; map.terrain?.sourceCache?.freeRtt?.(); map.triggerRepaint(); });
     }
@@ -430,6 +431,7 @@ function addLayers() {
     hoverPopup.setLngLat(e.lngLat).setHTML(`<b>${esc(p.name)}</b>, ${esc(p.province)}<br>${fmt(p.flooded_farmland_ha)} ha flooded farmland (${pct(p.flooded_share)})<br><small>Sentinel-1 ${esc(p.sentinel1)}</small>`).addTo(map);
   });
   map.on("mouseleave", "towns-fill", () => hoverPopup.remove());
+  map.on("movestart", () => hoverPopup.remove()); // never leave a stale card behind while the camera flies
   map.on("mouseleave", "towns-fill", () => { if (hovered !== null) map.setFeatureState({ source: "munis", id: hovered }, { hover: false }); hovered = null; map.getCanvas().style.cursor = ""; });
 }
 
@@ -449,6 +451,7 @@ function applyLayers() {
   Object.keys(GIBS).forEach((k) => vis(`gibs-${k}`, S.gibs === k));
   map.setTerrain(L.terrain && S.view3d ? { source: "dem", exaggeration: Number($("exag")?.value || 1.8) } : null);
   applyPilotLayers();
+  vis("runoff", S.layers.runoff); ["streams", "streams-casing"].forEach((id) => vis(id, S.layers.streams));
   renderLegend();
 }
 function setBasemap(k) {
@@ -475,7 +478,7 @@ function onHover(e) {
     val = ` <span>|</span> ${f.name}: <b>${S.field === "soil" ? fmt(v, 2) : fmt(v, S.field === "lstm" ? 1 : 0)}${f.unit ? " " + f.unit : ""}</b>`;
   }
   const el = elevAt(lng, lat);
-  $("readout").innerHTML = `${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E${el != null ? ` <span>|</span> ${fmt(el)} m` : ""}${t ? ` <span>|</span> <b>${esc(t.name)}</b>, ${esc(t.province)}` : ""}${val}${pgReadout(lng, lat)}`;
+  $("readout").innerHTML = `${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E${el != null ? ` <span>|</span> ${fmt(el)} m` : ""}${t ? ` <span>|</span> <b>${esc(t.name)}</b>, ${esc(t.province)}` : ""}${val}${(() => { const r = runoffAt(lng, lat); return r && S.layers.runoff ? ` <span>|</span> runoff <b>${r.score}</b>` : ""; })()}${pgReadout(lng, lat)}`;
 }
 function inspect(lon, lat) {
   S.inspect = { lon, lat };
@@ -504,6 +507,9 @@ function inspect(lon, lat) {
       <dt>Flooded farmland</dt><dd>${fmt(t.flooded_farmland_ha)} ha (${pct(share)})</dd>
       <dt>Farmland</dt><dd>${fmt(t.farmland_ha)} ha</dd>
       <dt>Rank in Bicol</dt><dd>${t.rank} of ${S.munis.features.length}</dd>` : ""}
+      ${(() => { const r = runoffAt(lon, lat), tr = t && S.runoff?.towns?.[`${t.name}|${t.province}`]; return r || tr ? `<div class="sec">Runoff & ponding risk (terrain + rain, 200 m)</div>
+      ${r ? `<dt>This spot</dt><dd>${r.score}/100, ${runoffClass(r.score)}</dd><dt>Terrain wetness index</dt><dd>${r.twi.toFixed(1)}</dd>` : ""}
+      ${tr ? `<dt>Town land rated high</dt><dd>${pct(tr.high_share)}</dd>` : ""}` : ""; })()}
       <div class="sec">Weather here, ${short(iso)} (NASA POWER)</div>
       <dt>Rain that day</dt><dd>${fmt(rainDay)} mm</dd>
       <dt>Rain since 10 Oct</dt><dd>${fmt(rainSum)} mm</dd>
@@ -771,9 +777,7 @@ function bindChrome() {
     S.charts.ai?.resize();
   }));
   document.querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () => {
-    S.view3d = b.dataset.view === "3d";
-    document.querySelectorAll("[data-view]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
-    map.easeTo({ pitch: S.view3d ? 45 : 0, bearing: S.view3d ? map.getBearing() : 0, duration: 800 });
+    setView3d(b.dataset.view === "3d");
     applyLayers();
   }));
   $("btn-fit-bicol").addEventListener("click", () => map.fitBounds([[R.w, R.s], [R.e, R.n]], { padding: chromePadding(), pitch: S.view3d ? 30 : 0, bearing: 0, duration: 1200 }));
@@ -810,6 +814,23 @@ function bindChrome() {
 function chromePadding() {
   return window.innerWidth <= 760 ? { top: 60, bottom: 150, left: 10, right: 10 } : { top: 70, bottom: 130, left: 80, right: 60 };
 }
+// 2D = flat, north-up, no tilt or rotation; 3D = terrain on, tilt and rotate allowed.
+// Terrain must change before the camera moves: switching terrain mid-animation cancels the ease.
+const tilt = (deg) => (S.view3d ? deg : 0);
+function setView3d(on) {
+  S.view3d = on;
+  document.querySelectorAll("[data-view]").forEach((x) => x.setAttribute("aria-pressed", String((x.dataset.view === "3d") === on)));
+  map.stop();
+  applyLayers();
+  if (on) {
+    map.setMaxPitch(75); map.dragRotate.enable(); map.touchPitch.enable(); map.touchZoomRotate.enableRotation();
+    map.easeTo({ pitch: 45, duration: 800 });
+  } else {
+    map.dragRotate.disable(); map.touchPitch.disable(); map.touchZoomRotate.disableRotation();
+    map.easeTo({ pitch: 0, bearing: 0, duration: 700 });
+    map.once("moveend", () => { if (!S.view3d) map.setMaxPitch(0); });
+  }
+}
 function togglePanel(force) {
   const app = $("app"), show = force ?? app.classList.contains("no-panel");
   app.classList.toggle("no-panel", !show);
@@ -839,6 +860,9 @@ function renderLayers() {
     ${toggle("hotspots", "Flood hotspots", "Density of flooded farmland; fades as you zoom in")}
     ${toggle("flood", "Flooded farmland, 100 m", "Water on farmland, from zoom 9")}
     ${toggle("towns", "Towns", "Boundaries, shaded by share of farmland flooded")}
+    <p class="h">Runoff, all of Bicol (terrain + rain, 200 m)</p>
+    ${toggle("runoff", "Runoff & ponding risk", "Where Kristine's rain collects: NASADEM wetness index + NASA POWER rain. Modelled, not observed")}
+    ${toggle("streams", "Drainage network", "NASADEM flow paths draining 10 km² or more; thicker = bigger catchment")}
     <p class="h">Field Drowning Risk, 30 m (sample fields)</p>
     ${toggle("pilot", "Risk zones and fields", "High, watch and low cells; field outlines, flood edge and drainage channel. From zoom 11")}
     ${toggle("sarchange", "Radar wetness change", "Cells where Sentinel-1 VV dropped by 1 dB or more after the storm")}
@@ -907,6 +931,7 @@ function renderLegend() {
     parts.unshift(`<div><b>${st.name}, 30 m</b><small>risk engine grid, ${S.pgrid.width}×${S.pgrid.height} cells</small><div class="ramp" style="background:linear-gradient(90deg,${st.stops.map((q) => `rgba(${q[1][0]},${q[1][1]},${q[1][2]},${Math.max(0.2, q[1][3] / 255)}) ${((q[0] - a) / (b - a)) * 100}%`).join(",")})"></div><div class="ticks-row"><span>${st.fmt(a)}</span><span>${st.fmt(b)}</span></div></div>`);
   }
   if (S.pilot && S.layers.pilot && S.ready && map.getZoom() >= 10.5) parts.unshift(`<div><b>Field Drowning Risk, 30 m</b><div class="sw">${["high", "watch", "low"].map((k) => `<span><i style="background:${RISK_C[k]}"></i>${RISK_W[k]}</span>`).join("")}<span><i style="background:none;box-shadow:inset 0 0 0 2px #4ec4de"></i>Radar flood edge</span><span><i style="background:#7fe0ff"></i>Drainage channel</span></div></div>`);
+  if (S.runoff && (S.layers.runoff || S.layers.streams) && z < 12) parts.push(`<div><b>Runoff & ponding risk, 200 m</b><small>terrain + rain, never saw the radar</small>${S.layers.runoff ? `<div class="ramp" style="background:linear-gradient(90deg,rgba(150,205,235,.5),#2f9fd3 40%,#1b5fa8 70%,#281e78)"></div><div class="ticks-row"><span>60</span><span>High 70</span><span>100</span></div>` : ""}${S.layers.streams ? `<div class="sw"><span><i style="background:#4ec4de;height:3px;border-radius:2px"></i>Drainage, ≥10 km² upstream</span></div>` : ""}</div>`);
   if (S.layers.storm && z < 10) parts.push(`<div><b>Kristine (EONET winds, PAGASA classes)</b><div class="sw">${CATS.map((c) => `<span><i style="background:${c.c}"></i>${c.short}</span>`).join("")}</div></div>`);
   $("legend").innerHTML = parts.length ? `<button type="button" class="legend-toggle" aria-expanded="${!S.legendFolded}">Legend<i data-lucide="${S.legendFolded ? "chevron-up" : "chevron-down"}"></i></button>${S.legendFolded ? "" : parts.join("")}` : "";
   $("legend").querySelector(".legend-toggle")?.addEventListener("click", () => { S.legendFolded = !S.legendFolded; renderLegend(); });
@@ -1127,7 +1152,8 @@ function renderData() {
   const split = (d) => { const i = d.indexOf(" ("); return i > 0 ? [d.slice(0, i), d.slice(i + 2, -1)] : [d, ""]; };
   const regional = [
     ["NASA EONET", "Kristine's storm track, every 6 hours"],
-    ["NASA POWER regional daily", "rain and root-zone wetness for every 0.5° cell in Bicol (heatmaps, LSTM inputs)"],
+    ["NASA POWER regional daily", "rain and root-zone wetness for every 0.5° cell in Bicol (heatmaps, runoff score, LSTM inputs)"],
+    ["NASADEM, all of Bicol", "200 m flow accumulation, wetness index and drainage network for the runoff layer"],
     ["NASA GIBS", "MODIS, VIIRS, IMERG and SMAP imagery for each day of the replay"],
     ["Sentinel-1 RTC, both orbits", "Bicol flood screening at 100 m (2 Nov and 28 Oct passes)"],
   ];
@@ -1139,6 +1165,8 @@ function renderData() {
       <div style="margin-top:8px">High 70+ · Watch 40–69 · Low under 40. Built-up and permanent water are not scored.</div></div>
     <p class="h">Does it work? The independent check</p>
     <div class="hitbox"><b>${esc(pv.sar_hit_rate || "n/a")}</b><p>Of the farmland the radar saw flooded on 2 Nov, this share had already been rated high by the terrain + rain part of the model, which never saw the radar. The full model scores ${esc(pv.sar_hit_rate_full_model || "")}, but that number is circular because radar is in both the score and the flood map, so we do not headline it.</p></div>
+    ${S.runoff ? `<p class="h">The same check across all of Bicol</p>
+    <div class="hitbox"><b>${pct(S.runoff.validation.share_rated_high)}</b><p>of the farmland the radar saw flooded (28 Oct + 2 Nov) was rated high by the terrain + rain model at 200 m, against ${pct(S.runoff.validation.farmland_share_high)} of all farmland and ${pct(S.runoff.validation.land_share_high)} of all land. A real signal, but farmland is low-lying by nature, so the gap over farmland is the fair measure.</p></div>` : ""}
     <p class="h">NASA and partner data used</p>
     <ul class="ds">${regional.map(([a, b]) => `<li><span><b>${a}</b><small>${b}</small></span></li>`).join("")}
       ${(pv.datasets_used || []).map((d) => { const [a, b] = split(d); return `<li><span><b>${esc(a)}</b><small>${esc(b)}</small></span></li>`; }).join("")}</ul>
@@ -1165,11 +1193,11 @@ function renderData() {
 // ================= Story mode: the 30-second demo path =================
 const STORY = [
   { title: "Kristine soaks Bicol", text: () => { const rd = regionDaily(), pk = rd.reduce((m, d, i) => (d.max > rd[m].max ? i : m), 0); return `21–26 Oct 2024. The storm's centre stays ${fmt(S.closest?.km)} km from Naga at its closest, yet its rain bands drop up to ${fmt(rd[pk].max)} mm in a day on Bicol land (${short(S.tl.days[pk])}). The heatmap is NASA POWER daily rain.`; },
-    go: () => { setField("rain"); setGibs("none"); setTime(tAt("2024-10-22") + 0.5, true); map.fitBounds([[R.w, R.s], [R.e, R.n]], { padding: chromePadding(), pitch: 30, bearing: 0, duration: 1400 }); } },
+    go: () => { setField("rain"); setGibs("none"); setTime(tAt("2024-10-22") + 0.5, true); map.fitBounds([[R.w, R.s], [R.e, R.n]], { padding: chromePadding(), pitch: tilt(30), bearing: 0, duration: 1400 }); } },
   { title: "Clouds blind optical satellites", text: () => "NASA MODIS on 23 Oct sees only cloud over Bicol. Optical images cannot show where the water is during a typhoon.",
     go: () => { setField("none"); setGibs("modis"); setTime(tAt("2024-10-23") + 0.5, true); } },
   { title: "Radar sees through the cloud", text: () => `Sentinel-1 radar (28 Oct and 2 Nov passes): ${fmt(S.summary?.flooded_farmland_ha)} ha of Bicol farmland still under water, worst in Bula, Baao and Nabua. Orange marks the flood hotspots.`,
-    go: () => { setGibs("none"); setField("rainsum"); setTime(tAt("2024-11-02") + 0.5, true); map.flyTo({ center: [123.3, 13.5], zoom: 9.4, pitch: 40, bearing: 0, duration: 1800 }); } },
+    go: () => { setGibs("none"); setField("rainsum"); setTime(tAt("2024-11-02") + 0.5, true); map.flyTo({ center: [123.3, 13.5], zoom: 9.4, pitch: tilt(40), bearing: 0, duration: 1800 }); } },
   { title: "Each field gets a drowning risk", text: () => { const p = plotFeat("PL-02")?.properties; return p ? `At 30 m, radar, terrain and rain give each field a score. ${p.plot_id} scores ${p.risk_score}/100 (high). The farmer gets an SMS: open outlets, trench the lowest bund, harvest early.` : ""; },
     go: () => { S.layers.pilot = true; selectPlot("PL-02", true); flyToPilot(); applyLayers(); } },
   { title: "What to plant next season", text: () => "SakaSAR ranks three rotations against the current rice crop using the field's soil and risk, so the farmer and the Municipal Agriculture Office can choose together.",
@@ -1383,7 +1411,7 @@ function finishIntro(now) {
     brand.style.opacity = 1;
     sp.animate([{ clipPath: "inset(0 0 0 0)" }, { clipPath: "inset(0 0 0 100%)" }], { duration: dur, easing: "cubic-bezier(0.65, 0, 0.35, 1)", fill: "forwards" }).onfinish = () => { sp.remove(); scan.remove(); };
     scan.animate([{ transform: "translateX(0)", opacity: 1 }, { transform: `translateX(${W}px)`, opacity: 1 }], { duration: dur, easing: "cubic-bezier(0.65, 0, 0.35, 1)", fill: "forwards" });
-    if (!intro.hadView && map) map.fitBounds([[R.w, R.s], [R.e, R.n]], { padding: chromePadding(), pitch: 42, bearing: -8, duration: reduceMotion ? 0 : 2600, essential: true });
+    if (!intro.hadView && map) map.fitBounds([[R.w, R.s], [R.e, R.n]], { padding: chromePadding(), pitch: tilt(42), bearing: S.view3d ? -8 : 0, duration: reduceMotion ? 0 : 2600, essential: true });
   }, wait);
 }
 document.addEventListener("click", (e) => { if (e.target.closest("#splash")) finishIntro(true); });
@@ -1492,6 +1520,7 @@ function aiSuggestions(c) {
     t ? `What should farmers in ${t} do?` : "Which towns need help first?",
     t ? `How bad is the flooding in ${t}?` : "How much farmland flooded?",
     "Will the soil drain this week?",
+    t ? `Where does runoff collect in ${t}?` : "Where does runoff collect?",
     S.pilot ? `Explain the risk for ${S.plot}` : "Where was the storm?",
     "What should farmers plant next season?",
     "How accurate is this?",
@@ -1522,6 +1551,12 @@ function aiAnswer(q, c) {
       ${pv ? `<li>Of the farmland the radar saw flooded on 2 Nov, <b>${esc(pv.sar_hit_rate)}</b> had already been rated high by the terrain + rain model, which never saw the radar.</li>` : ""}
       ${tl.lstm_hindcast ? `<li>The LSTM's 7-day soil forecast issued 3 Nov was right within 1 day in <b>${tl.lstm_hindcast.cells.filter((x) => x && Math.abs(x.days_pred - x.days_actual) <= 1).length} of ${tl.lstm_hindcast.cells.filter(Boolean).length}</b> Bicol grid cells.</li>` : ""}
       <li>Limits: C-band radar sees surface water, not root-zone moisture; NASA POWER cells are about 50 km.</li></ul>` };
+  }
+  if (has("runoff", "ponding", "drainage", "river", "collect", "low-lying", "lowland")) {
+    const ro = S.runoff; if (!ro) return { who: "bot", html: "<p>The runoff layer has not loaded yet.</p>" };
+    const v = ro.validation, t = c.town, tr = t && ro.towns[`${t.name}|${t.province}`], r = c.lon != null ? runoffAt(c.lon, c.lat) : null;
+    return { who: "bot", src: ["NASADEM", "NASA POWER"], html: `<p>${t && tr ? `In <b>${esc(t.name)}</b>, ${pct(tr.high_share)} of the land is rated high for runoff and ponding${r ? `; the spot you clicked scores ${r.score}/100` : ""}.` : `Across Bicol, ${pct(v.land_share_high)} of the land is rated high for runoff and ponding.`}</p>
+      <p>The score is SakaSAR's terrain + rain model at 200 m: where NASADEM says water collects, weighted by Kristine's rain. It never saw the radar, yet it rated <b>${pct(v.share_rated_high)}</b> of the farmland the radar saw flooded as high, against ${pct(v.farmland_share_high)} of all farmland.</p>` };
   }
   if (has("storm", "kristine", "typhoon", "wind", "track")) {
     const cp = S.closest;
@@ -1579,5 +1614,40 @@ function aiOnInspect() {
   AI.msgs.push(aiAnswer(`what should farmers do in ${c.town.name}`, c));
   renderAIPane();
 }
+
+// ================= Bicol-wide runoff & ponding risk (terrain + rain) and drainage network =================
+// Built by pipeline/bicol_runoff.py from NASADEM (200 m) and NASA POWER rain 14–26 Oct; never sees the radar.
+function loadImageCanvas(url) {
+  return new Promise((res) => { const img = new Image(); img.onload = () => { const c = document.createElement("canvas"); c.width = img.width; c.height = img.height; c.getContext("2d").drawImage(img, 0, 0); res(c); }; img.onerror = () => res(null); img.src = url; });
+}
+async function loadRunoff() {
+  const ro = S.runoff; if (!ro) return;
+  const [disp, vals] = await Promise.all([loadImageCanvas(ro.image), loadImageCanvas(ro.values)]);
+  if (!disp || !vals) return;
+  const [[w, n], [e], , [, s]] = ro.coordinates;
+  registerRaster("runoff", disp, w, e, n, s, false);
+  S.runoffVals = { d: vals.getContext("2d").getImageData(0, 0, vals.width, vals.height).data, W: vals.width, H: vals.height, w, e, yN: mercY(n), yS: mercY(s) };
+  const go = () => {
+    if (!map.getSource("runoff")) {
+      map.addSource("runoff", { type: "raster", tiles: ["saka://runoff/v1/{z}/{x}/{y}"], tileSize: 256, minzoom: 5, maxzoom: 13, bounds: [w, s, e, n] });
+      map.addLayer({ id: "runoff", type: "raster", source: "runoff", paint: { "raster-opacity": ["interpolate", ["linear"], ["zoom"], 7, 0.85, 11, 0.45, 13, 0.2], "raster-resampling": "linear", "raster-fade-duration": 0 } }, map.getLayer("towns-fill") ? "towns-fill" : undefined);
+      map.addSource("streams", { type: "geojson", data: "data/region/bicol_streams.geojson" });
+      map.addLayer({ id: "streams-casing", type: "line", source: "streams", layout: { "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": "rgba(8,40,70,0.55)", "line-width": ["interpolate", ["linear"], ["get", "up_km2"], 10, 1.4, 100, 2.4, 1000, 3.8, 5000, 5.6] } }, map.getLayer("towns-line") ? "towns-line" : undefined);
+      map.addLayer({ id: "streams", type: "line", source: "streams", layout: { "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": ["interpolate", ["linear"], ["get", "up_km2"], 10, "#9fe3ff", 300, "#4ec4de", 3000, "#2f9fd3"], "line-width": ["interpolate", ["linear"], ["get", "up_km2"], 10, 0.6, 100, 1.2, 1000, 2.4, 5000, 3.8] } }, map.getLayer("towns-line") ? "towns-line" : undefined);
+    }
+    applyLayers();
+  };
+  S.ready ? go() : map.once("style.load", go);
+}
+function runoffAt(lon, lat) {
+  const V = S.runoffVals; if (!V || lon < V.w || lon > V.e) return null;
+  const x = Math.floor(((lon - V.w) / (V.e - V.w)) * V.W), y = Math.floor(((V.yN - mercY(lat)) / (V.yN - V.yS)) * V.H);
+  if (y < 0 || y >= V.H) return null;
+  const i = (y * V.W + x) * 4; if (!V.d[i + 3]) return null;
+  return { score: V.d[i], twi: V.d[i + 1] / 10 };
+}
+function runoffClass(v) { return v >= 70 ? "high" : v >= 40 ? "watch" : "low"; }
 
 init();

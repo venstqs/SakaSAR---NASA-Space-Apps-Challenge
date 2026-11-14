@@ -726,3 +726,5 @@ h2, h3, h4, .pilot-head h2, .plot-card h3, .story h2, .insp-head b { font-family
 .town-pop .maplibregl-popup-content { font: 400 12px/1.45 var(--ui); padding: 8px 10px; border-radius: 10px; }
 .town-pop .maplibregl-popup-content small { color: var(--muted); }
 .town-pop .maplibregl-popup-tip { display: none; }
+/* the story card must stay above windows (window z-index grows with focus) */
+.story { z-index: 9000; }

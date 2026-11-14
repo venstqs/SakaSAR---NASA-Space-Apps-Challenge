@@ -130,3 +130,19 @@ def test_best_rotation_skips_caution():
             {"id": "shortcycle", "priorities": {"nitrogen": 3}}]
     fit = {"legume": {"fit": "caution"}, "biotillage": {"fit": "good"}, "shortcycle": {"fit": "caution"}}
     assert REC._best_rotation(rots, fit, "nitrogen")["id"] == "biotillage"
+
+
+def test_bicol_runoff_outputs():
+    """Bicol-wide runoff layer: score bounds, honest validation fields, and a non-empty drainage network."""
+    import json
+    from pathlib import Path
+    region = Path(__file__).resolve().parent.parent / "data" / "region"
+    doc = json.loads((region / "bicol_runoff.json").read_text(encoding="utf-8"))
+    v = doc["validation"]
+    for k in ("share_rated_high", "farmland_share_high", "land_share_high"):
+        assert 0.0 <= v[k] <= 1.0
+    assert v["flooded_pixels_checked"] > 0
+    assert doc["rain_window"] == ["2024-10-14", "2024-10-26"]
+    streams = json.loads((region / "bicol_streams.geojson").read_text(encoding="utf-8"))
+    assert len(streams["features"]) > 100
+    assert all(f["properties"]["up_km2"] >= doc["stream_threshold_km2"] for f in streams["features"])
