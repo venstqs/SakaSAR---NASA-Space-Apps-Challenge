@@ -28,6 +28,32 @@ Optical satellite sensors (Landsat, MODIS) are blinded by cloud cover during typ
 
 ---
 
+## 📊 Results: STS Kristine (Trami), October 2024
+
+**Pilot:** rice paddies in Brgy. Bagongbong, Taban and Catanusan, **Minalabac, Camarines Sur** (Bicol River basin), about 9 km south of Naga City.
+**Radar:** Sentinel-1 orbit 134. Baseline = median of 4 calm passes (Aug–Sep 2024), just-before = 9 Oct, after = **2 Nov 2024**.
+
+| Demo number | Value |
+| :--- | :--- |
+| Plots rated **high** drowning risk | **2 of 5** (PL-01, PL-02) · 6.2 ha · 18 households *(hectares/households are illustrative until LGU data)* |
+| Flooded farmland seen by Sentinel-1 | **35.1 ha** in the pilot strip |
+| **Hit rate** (flooded area the terrain + rain map had *already* rated high, without seeing the radar) | **31%** |
+| Barangay visit order (extension officers / MDRRMO) | 1. Taban · 2. Bagongbong · 3. Catanusan |
+| Storm rainfall (GPM IMERG; NASA POWER cross-check 510 mm) | **497 mm** (event + 7 days prior) |
+| SMAP root-zone soil moisture during the event | **+2.2σ** above the 30-day baseline |
+| LSTM soil-saturation forecast (test years 2022–2026) | 60% lower error than persistence · Kristine hindcast: 7/7 waterlogged days |
+| Data licensing cost · processing time | **₱0** · ~1 s from cache, ~2–5 min with fresh downloads |
+
+| Farmer view | LGU / MDRRMO view |
+| :---: | :---: |
+| ![Farmer view](assets/screenshots/01-farmer-view.jpg) | ![Barangay priority list](assets/screenshots/02-lgu-barangay-priority.jpg) |
+| **Rotation fit vs current crop** | **LSTM soil-saturation outlook** |
+| ![Rotation fit](assets/screenshots/03-rotation-fit.jpg) | ![LSTM outlook](assets/screenshots/04-lstm-soil-outlook.jpg) |
+
+Full method, validation and limits: [`docs/METHODS.md`](docs/METHODS.md).
+
+---
+
 ## 🌿 Branch Architecture & Team Roster
 
 Per our 12-hour engineering checklist, three developers work across **six isolated feature branches** (two each) and merge into `main` only at the verified hour gates:
@@ -42,6 +68,15 @@ Per our 12-hour engineering checklist, three developers work across **six isolat
 | `feature/demo-submission` | **Marqus** | Pilot event record, demo storyboard & deck/video, project page text, and final judging package. |
 | *Hour-Gate Review* | **Engr. John Roy V. Galvez** | Monitors Hour 1, Hour 4, Hour 7, Hour 9 (Feature Freeze), and Hour 12 gates. |
 
+### 👥 Team
+
+| Member | GitHub | Role |
+| :--- | :--- | :--- |
+| **Adrian Xavier Moral** | [venstqs](https://github.com/venstqs) | Main developer & integration lead: SAR pipeline, risk engine, LSTM, FastAPI |
+| **Guian** | [Pudges-cmd](https://github.com/Pudges-cmd) | Terrain & rainfall pipeline (`terrain_rain/`): NASADEM, GPM IMERG, SMAP, NASA POWER |
+| **Marqus Szymoon Pelagio** | [mzep98](https://github.com/mzep98) | 3D MapLibre / Three.js dashboard, demo & submission |
+| **Engr. John Roy V. Galvez** | — | Hour-gate reviewer |
+
 ---
 
 ## 🛰️ Datasets & Sensor Fusion Grid
@@ -51,11 +86,12 @@ Per our 12-hour engineering checklist, three developers work across **six isolat
 | :--- | :--- | :--- | :--- |
 | **Sentinel-1 RTC (VV / VH)** | ESA / Copernicus (via Planetary Computer) | $10\text{ m} \to 30\text{ m}$ / 12-day | Cloud-piercing C-band ($5.405\text{ GHz}$) backscatter change ($\Delta\sigma^0_{\text{VV}}$) for surface wetness shift and post-storm standing-water flood extent. |
 | **NASADEM** | NASA / JPL | $30\text{ m}$ Spatial | Micro-topographic Slope ($\beta$), D8 Flow Accumulation ($a$), drainage corridor routing, and Topographic Wetness Index ($\text{TWI} = \ln(a/\tan\beta)$). |
-| **NASA POWER** | NASA LaRC | $0.5^\circ$ / Daily | Corrected daily precipitation (`PRECTOTCORR`), temperature extremes (`T2M_MAX`, `T2M_MIN`), and solar irradiance (`ALLSKY_SFC_SW_DWN`). |
-| **GPM IMERG** | NASA / JAXA | $0.1^\circ$ ($\sim 10\text{ km}$) | Storm-event and 7-day antecedent rainfall accumulation totals. |
-| **SMAP** | NASA | $9\text{–}36\text{ km}$ / 2–3 days | Regional coarse soil-moisture anomaly context. |
-| **Landsat 8-9 / MODIS** | NASA / USGS | $30\text{ m} \text{–} 250\text{ m}$ | Multi-year NDVI time series to quantify post-harvest bare-field exposure windows (`bare_field_days_per_year`). |
-| **SoilGrids 2.0 / WorldCover** | ISRIC / ESA | $250\text{ m}$ / $10\text{ m}$ | Topsoil clay/sand/silt fractions, organic carbon, and cropland masking. |
+| **GPM IMERG V07** | NASA / JAXA | $0.1^\circ$ ($\sim 10\text{ km}$) | Storm-event (469 mm) + 7-day antecedent (28 mm) rainfall → rainfall score $S_{\text{Rain}}$. |
+| **NASA POWER** | NASA LaRC | $0.5^\circ$ / Daily | Rainfall cross-check (510 mm); 2001–2026 daily weather and root-zone wetness (`GWETROOT`) to train the LSTM. |
+| **SMAP L4** | NASA | $\sim 11\text{ km}$ / daily | Event root-zone soil-moisture anomaly (+2.2σ), shown at native resolution as context. |
+| **SoilGrids 2.0** | ISRIC | $250\text{ m}$ | Per-plot sand / silt / clay / organic carbon (0–30 cm) → rotation fit. |
+| **ESA WorldCover 2021** | ESA | $10\text{ m}$ | Cropland / built-up / permanent-water mask (flood counted on farmland only). |
+| **MODIS NDVI** *(checked, not used)* | NASA | $250\text{ m}$ | Tested for bare-field windows: at 250 m a pixel mixes many paddies, so it never looks bare. `bare_field_days_per_year` stays a labelled placeholder (needs 30 m Landsat / Sentinel-2 or the MAO cropping calendar). |
 
 ### Future Work Datasets (Roadmap)
 - **NISAR (NASA-ISRO L-Band $1.25\text{ GHz}$ SAR):** Deeper canopy and sub-surface root-zone penetration ($10\text{–}30\text{ m}$).
@@ -74,6 +110,9 @@ $$\text{RiskScore}_p = \text{round}\Big(100 \times \big(0.45 \cdot S_{\text{SAR}
 - **`high` ($\ge 70$):** Immediate micro-drainage trenching / early salvage harvest.
 - **`watch` ($40\text{–}69$):** Clear perimeter furrows and monitor after rain bands.
 - **`low` ($< 40$):** Normal drainage; schedule post-harvest cover or legume rotation.
+- **Hit rate:** the headline 31% comes from the same rule *without* the SAR term (terrain + rain only), so it is an independent test against the radar's flood map. The full model's 100% is circular (radar on both sides) and is reported only as a consistency check.
+- **LSTM soil-saturation outlook** (`pipeline/soil_lstm.py`): forecasts root-zone saturation 1–7 days ahead from 30 days of NASA POWER weather plus the coming week's rain.
+- **Rotation fit** (`pipeline/rotation_engine.py`): each plot's three options are rated against its current crop using SoilGrids texture and drowning risk (e.g. legumes = caution on waterlogged plots).
 
 ### 2. Frozen Frontend JSON Schema (`mock-data.json` / `GET /api/data`)
 All branches read and write against the frozen contract:
@@ -95,23 +134,27 @@ pip install -r requirements.txt
 
 ### 2. Run the Data & Risk Pipelines
 ```bash
-# Step 1: Sentinel-1 SAR calibration, Lee filter, Δσ⁰ wetness change & flood mask
-python -m pipeline.sar_moisture
+# Everything in one go (runs SAR + terrain/rain + risk fusion; ~1 s from the committed cache)
+python -m pipeline.risk_engine            # add --refresh to re-download all satellite data
 
-# Step 2: NASADEM slope, D8 flow accumulation, TWI & NASA POWER rainfall
-python -m pipeline.terrain_rain
+# Or step by step
+python -m pipeline.sar_moisture           # Sentinel-1: Lee filter, ΔVV wetness change, flood mask
+python -m pipeline.terrain_rain           # NASADEM terrain + TWI, GPM IMERG / NASA POWER rainfall
 
-# Step 3: Fuse layers on the 30m grid, compute risk scores & hit rate, export mock-data.json
-python -m pipeline.risk_engine
+# Optional: retrain the LSTM soil-saturation model (needs PyTorch)
+pip install -r requirements-ml.txt && python -m pipeline.soil_lstm
+
+# Guian's terrain/rainfall package (works without WhiteboxTools)
+python terrain_rain/scripts/run_all.py
 ```
 
 ### 3. Launch the FastAPI Server & Dashboard
 ```bash
 uvicorn api:app --reload --port 8000
 ```
-- **Interactive Dashboard:** `http://localhost:8000/` (when merged with `feature/dashboard`)
+- **Interactive Dashboard:** `http://localhost:8000/` (add `#outlook` to open the LSTM panel)
 - **OpenAPI / Swagger Docs:** `http://localhost:8000/docs`
-- **Run Test Suite:** `pytest`
+- **Run Test Suite:** `python -m pytest -q`
 
 ---
 
@@ -121,8 +164,11 @@ uvicorn api:app --reload --port 8000
    Surface wetness and ponding layers are derived from C-band ($5.6\text{ cm}$ wavelength) Sentinel-1 SAR backscatter and NASADEM micro-topographic pooling ($\text{TWI}$), not direct in-situ sub-surface soil moisture probes. Dense canopy volume scattering and specular water reflection are accounted for separately.
 2. **Decision-Support Scope:**
    Drowning risk scores and crop rotation rankings are rule-based decision aids. Farmers, cooperatives, and municipal agriculturists must verify local drainage feasibility, seed availability, soil pH, labor, and market demand before planting.
-3. **Use of AI Disclosure (NASA Space Apps Compliance):**
-   AI coding assistants (Claude Code and Google Gemini / Antigravity) were used for software scaffolding, geospatial pipeline structuring, documentation, and test generation. All satellite datasets, hydrological formulas, and validation metrics are computed deterministically from open NASA and ESA/Copernicus data. No NASA logos or branding were used in any AI-generated media.
+3. **Illustrative plot data:**
+   The five plot outlines, hectares, household counts, crops and bare-field days are sample values placed evenly across real farmland. The satellite measurements on them are real; replace the plot data with LGU parcel and census records for a pilot.
+4. **Not claimed:** no L-band dielectric inversion, no "7 days early" detection, and no "35–50% water saving". These appear in the original concept but are not built or tested here.
+5. **Use of AI Disclosure (NASA Space Apps Compliance):**
+   AI coding assistants (Anthropic Claude Code and Google Gemini in Antigravity) were used for software scaffolding, geospatial pipeline code, debugging, documentation and test generation. The team trained one machine-learning model itself: a small PyTorch LSTM on public NASA POWER data (`pipeline/soil_lstm.py`), evaluated on held-out years. All satellite datasets, hydrological formulas and validation metrics are computed deterministically from open NASA, ESA/Copernicus and ISRIC data. No AI-generated images or video are used, and no NASA logos appear in AI-generated content.
 
 ---
 
