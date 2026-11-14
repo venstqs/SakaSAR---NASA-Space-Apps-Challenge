@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SakaSAR — Agro-Hydrological Decision Support</title>
+  <title>SakaSAR — Typhoon flood screening for Bicol farms</title>
+  <meta name="description" content="Sentinel-1 radar flood screening for Bicol farms after Typhoon Kristine (2024): flooded farmland by town, field drowning risk, what farmers should do, and next-season crop options." />
   <link rel="icon" type="image/x-icon" href="favicon.ico" />
   <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png" />
@@ -19,358 +20,137 @@
   <meta name="twitter:image" content="https://sakasar.vercel.app/assets/logo.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
-  <link rel="stylesheet" href="outlook.css" />
 </head>
 <body>
-  <!-- Full-Screen Map Canvas -->
-  <div id="map" role="region" aria-label="Interactive SAR hydrology and farm plot map"></div>
-  <canvas id="fx-overlay" aria-hidden="true"></canvas>
+  <div class="app">
 
-  <!-- 1. LEFT FLOATING COMMAND CARD -->
-  <aside class="floating-card left-panel" id="left-panel" aria-label="SakaSAR agro-hydrological decision support command panel">
-    <div class="drag-handle" aria-hidden="true"><span class="drag-handle-bar"></span></div>
-    <div class="brand-header">
-      <button class="icon-btn" id="btn-collapse-left" title="Toggle Panel" aria-label="Toggle command panel" type="button">
-        <i data-lucide="menu" width="18" height="18" stroke-width="2"></i>
-      </button>
-      <div class="brand-logo">
-        <img src="assets/sakasar-logo.png" alt="SakaSAR logo" class="brand-logo-img" />
-      </div>
-      <div class="brand-title-wrap">
-        <span class="brand-title">SakaSAR</span>
-        <span class="brand-sub">Agro-Hydrological Decision Support</span>
-      </div>
-      <button class="icon-btn chevron-btn" id="btn-chevron-left" title="Minimize" aria-label="Collapse panel body" aria-expanded="true" type="button">
-        <i data-lucide="chevron-up" width="18" height="18" stroke-width="2"></i>
-      </button>
-    </div>
-
-    <div class="left-panel-collapse">
-      <div id="left-panel-body">
-      <div class="panel-footer-tabs panel-top-tabs" role="tablist" aria-label="Panel sections">
-        <button class="tab-pill active" data-drawer="overview" type="button" role="tab" aria-selected="true">
-          <i data-lucide="layout-dashboard" width="14" height="14" stroke-width="2"></i>
-          <span>Overview</span>
-        </button>
-        <button class="tab-pill" data-drawer="layers" type="button" role="tab" aria-selected="false">
-          <i data-lucide="layers" width="14" height="14" stroke-width="2"></i>
-          <span>Layers</span>
-        </button>
-        <button class="tab-pill" data-drawer="rotations" type="button" role="tab" aria-selected="false">
-          <i data-lucide="refresh-cw" width="14" height="14" stroke-width="2"></i>
-          <span>Rotations</span>
-        </button>
-        <button class="tab-pill" data-drawer="data" type="button" role="tab" aria-selected="false">
-          <i data-lucide="bar-chart-2" width="14" height="14" stroke-width="2"></i>
-          <span>Data</span>
-        </button>
-      </div>
-
-      <div class="sub-drawer" id="drawer-overview">
-      <div class="search-box">
-        <label for="plot-search" class="sr-only">Search farm plots, barangays, or crops</label>
-        <span class="search-icon" aria-hidden="true">
-          <i data-lucide="search" width="16" height="16" stroke-width="2"></i>
-        </span>
-        <input type="text" id="plot-search" placeholder="Search farm plots, barangays, crops..." />
-      </div>
-
-      <div class="status-summary">
-        <h2 id="headline-status">2 plots at high drowning risk</h2>
-        <p class="timestamp-sub" id="headline-sub">Updated post-storm overpass · C-band surface wetness</p>
-      </div>
-
-      <!-- 2x2 KPI Grid -->
-      <div class="kpi-grid">
-        <div class="kpi-item">
-          <div class="kpi-val" id="kpi-ha">6.2 ha</div>
-          <div class="kpi-label">High-risk area (2 plots)</div>
+    <!-- Sidebar: the story, from the whole region down to one field -->
+    <aside class="sidebar" id="sidebar" aria-label="SakaSAR">
+      <header class="sb-head">
+        <img src="assets/sakasar-logo.png" alt="" class="sb-logo" width="40" height="40" />
+        <div>
+          <h1 class="sb-title">SakaSAR</h1>
+          <p class="sb-sub">Radar flood screening for Bicol farms after Typhoon Kristine, October 2024</p>
         </div>
-        <div class="kpi-item">
-          <div class="kpi-val" id="kpi-households">18</div>
-          <div class="kpi-label">Farming households</div>
-        </div>
-        <div class="kpi-item">
-          <div class="kpi-val" id="kpi-hitrate">89%</div>
-          <div class="kpi-label">SAR flood hit rate</div>
-        </div>
-        <div class="kpi-item">
-          <div class="kpi-val" id="kpi-baredays">68 days</div>
-          <div class="kpi-label">Bare-field window/yr</div>
-        </div>
+      </header>
+
+      <div class="scope-switch" role="tablist" aria-label="View">
+        <button type="button" role="tab" class="scope-btn" id="tab-region" aria-selected="true" aria-controls="scope-region">Bicol Region</button>
+        <button type="button" role="tab" class="scope-btn" id="tab-pilot" aria-selected="false" aria-controls="scope-pilot">Minalabac fields</button>
       </div>
 
-      <!-- Horizontal Plot Stepper -->
-      <div class="corridor-section">
-        <div class="corridor-header">
-          <span>Along the runoff corridor</span>
-          <span class="status-pill-sm danger" id="corridor-badge">Drainage alert</span>
-        </div>
-        <div class="stepper-track" id="plot-stepper"></div>
+      <div class="sb-scroll" id="sb-scroll">
+        <!-- REGION -->
+        <section class="scope" id="scope-region" role="tabpanel" aria-labelledby="tab-region">
+          <p class="lede" id="region-lede">Loading the region…</p>
+          <div class="province-bars" id="province-bars"></div>
+
+          <div class="block-head">
+            <h2>Towns to reach first</h2>
+            <p class="hint">Ranked by flooded farmland the radar saw</p>
+          </div>
+          <label class="search">
+            <span class="sr-only">Find a town</span>
+            <input type="search" id="muni-search" placeholder="Find a town or province" autocomplete="off" />
+          </label>
+          <ol class="rank-list" id="muni-list"></ol>
+          <p class="empty hidden" id="muni-empty">No town matches that name.</p>
+        </section>
+
+        <!-- PILOT -->
+        <section class="scope" id="scope-pilot" role="tabpanel" aria-labelledby="tab-pilot" hidden>
+          <p class="lede" id="pilot-lede"></p>
+          <ol class="plot-list" id="plot-list" aria-label="Sample plots"></ol>
+
+          <article class="plot-detail" id="plot-detail" aria-live="polite">
+            <header class="pd-head">
+              <h2 id="pd-title"></h2>
+              <p class="pd-meta" id="pd-meta"></p>
+            </header>
+            <div class="risk-meter" id="pd-risk"></div>
+            <dl class="facts" id="pd-facts"></dl>
+
+            <h3 class="pd-h">What to do</h3>
+            <ol class="steps" id="pd-steps"></ol>
+
+            <h3 class="pd-h" id="drain-heading">Will this field drain this week?</h3>
+            <div class="drain" id="pd-drain"></div>
+
+            <h3 class="pd-h">Next season</h3>
+            <label class="priority">
+              <span>The farmer cares most about</span>
+              <select id="priority-select">
+                <option value="nitrogen">soil fertility</option>
+                <option value="water">saving water</option>
+                <option value="cash">cash income</option>
+              </select>
+            </label>
+            <ol class="rotations" id="pd-rotations"></ol>
+
+            <h3 class="pd-h">Text message to the farmer</h3>
+            <blockquote class="sms" id="pd-sms"></blockquote>
+            <div class="sms-row">
+              <span class="sms-count" id="pd-sms-count"></span>
+              <button type="button" class="btn" id="btn-copy-sms">Copy message</button>
+            </div>
+          </article>
+
+          <details class="brgy" id="brgy-block">
+            <summary>Barangays to visit first</summary>
+            <ol class="rank-list compact" id="brgy-list"></ol>
+          </details>
+        </section>
       </div>
 
-      <!-- Action Buttons -->
-      <div class="action-grid">
-        <button class="btn-secondary" id="btn-open-rotation" type="button">
-          <i data-lucide="sprout" width="15" height="15" stroke-width="2"></i>
-          <span>Rotation options</span>
-        </button>
-        <button class="btn-primary" id="btn-open-sms" type="button">
-          <i data-lucide="send" width="15" height="15" stroke-width="2"></i>
-          <span>Send SMS alert</span>
-        </button>
-      </div>
-      <button class="btn-full-light" id="btn-reset-bounds" type="button">
-        <i data-lucide="globe" width="15" height="15" stroke-width="2"></i>
-        <span>See all of Pilot Area</span>
-      </button>
+      <footer class="sb-foot">
+        <button type="button" class="link-btn" id="btn-about">About the data and limits</button>
+      </footer>
+    </aside>
 
-      </div>
+    <!-- Map -->
+    <main class="map-wrap" id="map-wrap">
+      <div id="map" aria-label="Map"></div>
+      <canvas id="fx-overlay" aria-hidden="true"></canvas>
 
-      <!-- Expandable Sub-Drawer inside Left Panel -->
-      <div class="sub-drawer hidden" id="drawer-layers">
-        <label class="layer-check">
-          <input type="checkbox" id="chk-risk" checked />
-          <span>Field Drowning Risk (30 m zones + plots)</span>
-        </label>
-        <label class="layer-check">
-          <input type="checkbox" id="chk-flood" checked />
-          <span>Observed SAR Flood Extent Mask</span>
-        </label>
-        <label class="layer-check">
-          <input type="checkbox" id="chk-flow" checked />
-          <span>NASADEM Runoff Corridor</span>
-        </label>
-        <div class="sar-mini-toggle">
-          <span>SAR Scene:</span>
-          <button class="mini-btn" data-sar="off" type="button">Off</button>
-          <button class="mini-btn" data-sar="pre" type="button">Pre-Storm</button>
-          <button class="mini-btn active" data-sar="post" type="button">Post-Storm</button>
+      <div class="map-tools" role="group" aria-label="Map controls">
+        <button type="button" class="tool" id="btn-layers" aria-expanded="false" aria-controls="layers-panel">Layers</button>
+        <button type="button" class="tool" id="btn-3d" aria-pressed="false">3D</button>
+        <button type="button" class="tool icon" id="btn-zoom-in" aria-label="Zoom in">+</button>
+        <button type="button" class="tool icon" id="btn-zoom-out" aria-label="Zoom out">−</button>
+        <div class="layers-panel" id="layers-panel" hidden>
+          <label><input type="checkbox" id="lyr-flood" checked /> Flooded farmland (radar)</label>
+          <label><input type="checkbox" id="lyr-towns" checked /> Town boundaries</label>
+          <label><input type="checkbox" id="lyr-risk" checked /> Field drowning risk (30 m)</label>
+          <label><input type="checkbox" id="lyr-canal" checked /> Drainage channel</label>
         </div>
       </div>
 
-      <div class="sub-drawer hidden" id="drawer-rotations">
-        <div class="priority-bar">
-          <label for="priority-select">Farmer Priority:</label>
-          <select id="priority-select">
-            <option value="nitrogen">Soil Nitrogen Fixation</option>
-            <option value="water">Water Conservation</option>
-            <option value="cash">Cash Crop Income</option>
-          </select>
+      <div class="legend" id="legend" aria-label="Legend"></div>
+
+      <!-- The storm ribbon: daily rain and the radar passes that matter -->
+      <section class="ribbon" id="ribbon" aria-label="Storm timeline">
+        <button type="button" class="ribbon-play" id="btn-play" aria-label="Play the storm story">▶</button>
+        <div class="ribbon-body">
+          <svg id="ribbon-svg" role="img" aria-label="Daily rainfall and Sentinel-1 radar passes"></svg>
+          <p class="ribbon-caption" id="ribbon-caption"></p>
         </div>
-        <div id="rotation-cards-container" class="rotation-stack"></div>
-      </div>
-
-      <div class="sub-drawer hidden" id="drawer-data">
-        <div class="limit-callout">
-          <strong>Scientific Limit:</strong> Wetness layers represent <em>C-band Sentinel-1 surface wetness</em>, not direct root-zone moisture measurements.
-        </div>
-        <div class="meta-kv">
-          <span>Licensing Cost: <strong>₱0 (Open Data)</strong></span>
-          <span>Run Time: <strong id="data-runtime">—</strong></span>
-          <span>Hit rate: <strong id="data-hitrate">—</strong></span>
-        </div>
-        <div class="dataset-links">
-          <strong>Download our datasets (CSV)</strong>
-          <a href="data/datasets/plot_features.csv" download>Plot features</a>
-          <a href="data/datasets/plot_recommendations.csv" download>Farmer recommendations</a>
-          <a href="data/datasets/pixels_30m_pilot.csv" download>30 m pixels (flood-labelled)</a>
-          <a href="data/datasets/daily_weather_soil_2001_2026.csv" download>Daily weather &amp; soil 2001–2026</a>
-        </div>
-        <ul class="compact-list" id="provenance-list"></ul>
-        <p class="future-work-text" id="future-work-text"></p>
-      </div>
-      </div>
-    </div>
-  </aside>
-
-  <!-- 2. TOP CENTER FLOATING TIMELINE & OVERALL RISK BAR -->
-  <header class="floating-card top-timeline-bar" aria-label="Overpass timeline and field drowning risk">
-    <button class="play-circle" id="btn-play-timeline" title="Cycle Overpass Steps" aria-label="Cycle overpass timeline" type="button">
-      <i data-lucide="play" width="16" height="16" stroke-width="2.2"></i>
-    </button>
-    <span class="speed-pill">1x</span>
-
-    <div class="scrubber-wrap">
-      <label for="time-slider" class="sr-only">Overpass timeline stage</label>
-      <input type="range" id="time-slider" min="0" max="5" step="1" value="3" />
-      <div class="scrubber-labels">
-        <span data-step="0">Baseline</span>
-        <span data-step="1">Pre-Storm</span>
-        <span data-step="2">Kristine</span>
-        <span data-step="3" class="active">Radar Sees Water</span>
-        <span data-step="4">Field Action</span>
-        <span data-step="5">Next Season</span>
-      </div>
-    </div>
-
-    <div class="time-readout">
-      <strong id="stage-clock">2 Nov 2024 · post-storm</strong>
-      <span id="stage-sub">Sentinel-1 sees standing water</span>
-    </div>
-  </header>
-
-  <!-- 3. TOP RIGHT ACTION PILLS -->
-  <div class="top-right-actions">
-    <button class="circle-action-btn" id="btn-bell" title="View Sample SMS Alert" aria-label="Toggle sample SMS alert card" type="button">
-      <i data-lucide="bell" width="18" height="18" stroke-width="2"></i>
-    </button>
-    <button class="simulate-pill-btn" id="btn-role-switch" type="button" aria-pressed="false" title="Switch between the farmer plot view and the LGU barangay priority list">
-      <i data-lucide="user-check" width="16" height="16" stroke-width="2"></i>
-      <span id="role-label">View: Farmer</span>
-      <i data-lucide="chevron-down" width="14" height="14" stroke-width="2"></i>
-    </button>
+      </section>
+    </main>
   </div>
 
-  <!-- 4. FLOATING PLOT INSPECTION POPUP CARD -->
-  <section class="floating-card inspect-card" id="inspect-card" aria-label="Selected plot inspection">
-    <div class="drag-handle" aria-hidden="true"><span class="drag-handle-bar"></span></div>
-    <div class="inspect-header">
-      <div class="inspect-title-group">
-        <h3 id="inspect-title">PL-01 · Brgy. San Isidro</h3>
-        <div class="inspect-meta-row" id="inspect-meta">
-          <span>3.4 ha</span>
-          <span class="meta-dot" aria-hidden="true">·</span>
-          <span>Irrigated Lowland Rice</span>
-          <span class="meta-dot" aria-hidden="true">·</span>
-          <span>ΔSAR -3.6 dB</span>
-        </div>
-      </div>
-      <button class="icon-btn" id="btn-close-inspect" title="Close" aria-label="Close plot inspection card" type="button">
-        <i data-lucide="x" width="18" height="18" stroke-width="2"></i>
-      </button>
-    </div>
+  <dialog class="about" id="about-dialog" aria-labelledby="about-title">
+    <form method="dialog" class="about-close"><button class="link-btn">Close</button></form>
+    <h2 id="about-title">About the data</h2>
+    <div id="about-body"></div>
+  </dialog>
 
-    <div class="inspect-badge-row">
-      <span class="risk-tag high" id="inspect-risk-badge">
-        <span class="risk-dot" aria-hidden="true"></span>
-        <span>HIGH DROWNING RISK · 88/100</span>
-      </span>
-      <span class="twi-tag" id="inspect-twi">TWI: 14.2</span>
-    </div>
-
-    <div class="inspect-action-box">
-      <div class="inspect-section-label">
-        <i data-lucide="clipboard-list" width="16" height="16" stroke-width="2" aria-hidden="true"></i>
-        <span>RECOMMENDED FIELD ACTION</span>
-      </div>
-      <p class="inspect-action-text" id="inspect-action">
-        Loading plot salvage instructions...
-      </p>
-    </div>
-
-    <div class="reco-box" id="inspect-reco">
-      <div class="inspect-section-label">
-        <i data-lucide="calendar-clock" width="16" height="16" stroke-width="2" aria-hidden="true"></i>
-        <span>RECOMMENDATIONS · RADAR + LSTM</span>
-      </div>
-      <ol class="reco-list"></ol>
-    </div>
-
-    <div class="sms-preview-box" id="sms-box">
-      <div class="sms-box-header">
-        <span class="sms-title-inline">
-          <i data-lucide="smartphone" width="16" height="16" stroke-width="2" aria-hidden="true"></i>
-          <span>SAMPLE FARMER SMS ALERT</span>
-        </span>
-        <span id="sms-counter" class="sms-count">0/160 CHARS</span>
-      </div>
-      <p id="inspect-sms-text"></p>
-    </div>
-  </section>
-
-  <!-- 4b. LGU VIEW: BARANGAY PRIORITY LIST (from provenance.barangay_ranking) -->
-  <section class="floating-card inspect-card hidden" id="lgu-card" aria-label="Barangay priority list for the Municipal Agriculture Office and MDRRMO">
-    <div class="drag-handle" aria-hidden="true"><span class="drag-handle-bar"></span></div>
-    <div class="inspect-header">
-      <div class="inspect-title-group">
-        <h3>Barangay priority list</h3>
-        <div class="inspect-meta-row"><span>Visit order for MAO field teams &amp; MDRRMO</span></div>
-      </div>
-      <button class="icon-btn" id="btn-close-lgu" title="Close" aria-label="Close barangay priority list" type="button">
-        <i data-lucide="x" width="18" height="18" stroke-width="2"></i>
-      </button>
-    </div>
-    <ol class="lgu-list" id="lgu-list"></ol>
-    <p class="lgu-note" id="lgu-note"></p>
-  </section>
-
-  <!-- 5. RIGHT VERTICAL MAP TOOL DOCK -->
-  <nav class="floating-card right-tool-dock" aria-label="Map navigation and layer controls">
-    <button class="dock-btn" id="dock-zoom-in" title="Zoom In" aria-label="Zoom in" type="button">
-      <i data-lucide="plus" width="17" height="17" stroke-width="2"></i>
-    </button>
-    <button class="dock-btn" id="dock-zoom-out" title="Zoom Out" aria-label="Zoom out" type="button">
-      <i data-lucide="minus" width="17" height="17" stroke-width="2"></i>
-    </button>
-    <button class="dock-btn" id="dock-compass" title="Reset Bearing" aria-label="Reset map bearing to north" type="button">
-      <i data-lucide="compass" width="17" height="17" stroke-width="2"></i>
-    </button>
-    <button class="dock-btn active" id="dock-pitch" title="Toggle 2D / 3D Tilt" aria-label="Toggle 2D or 3D tilt" type="button">3D</button>
-    <div class="dock-divider" role="separator"></div>
-    <button class="dock-btn" id="dock-sar" title="Toggle Post-Storm SAR Wetness" aria-label="Toggle post-storm SAR wetness layer" type="button">
-      <i data-lucide="radio" width="17" height="17" stroke-width="2"></i>
-    </button>
-    <button class="dock-btn active" id="dock-flood" title="Toggle Observed Flood Mask" aria-label="Toggle observed flood extent mask" type="button">
-      <i data-lucide="waves" width="17" height="17" stroke-width="2"></i>
-    </button>
-    <button class="dock-btn" id="dock-center" title="Recenter Pilot Plots" aria-label="Recenter map on pilot plots" type="button">
-      <i data-lucide="crosshair" width="17" height="17" stroke-width="2"></i>
-    </button>
-  </nav>
-
-  <!-- 6. COMPACT BOTTOM-LEFT MINI-LEGEND -->
-  <section class="floating-card bottom-symbology" aria-label="Field drowning risk mini legend">
-    <span class="mini-sym-item low">
-      <span class="dot" aria-hidden="true"></span>
-      <span class="mini-sym-level">LOW</span>
-      <span class="mini-sym-action">Normal</span>
-    </span>
-    <span class="mini-sym-sep" aria-hidden="true"></span>
-    <span class="mini-sym-item watch">
-      <span class="dot" aria-hidden="true"></span>
-      <span class="mini-sym-level">WATCH</span>
-      <span class="mini-sym-action">Clear Canals</span>
-    </span>
-    <span class="mini-sym-sep" aria-hidden="true"></span>
-    <span class="mini-sym-item high">
-      <span class="dot" aria-hidden="true"></span>
-      <span class="mini-sym-level">HIGH</span>
-      <span class="mini-sym-action">Trench / Harvest</span>
-    </span>
-  </section>
-
-  <!-- 7. BOTTOM-RIGHT UNIFIED TELEMETRY PILL -->
-  <footer class="bottom-right-HUD" aria-label="Map scale and cursor coordinates">
-    <div class="telemetry-pill">
-      <span class="telemetry-scale">30m Grid · ~500 m</span>
-      <span class="telemetry-sep" aria-hidden="true">|</span>
-      <span class="telemetry-coord" id="coord-readout">13.5416, 123.2057</span>
-    </div>
-  </footer>
-
-  <div id="sms-toast" class="sms-toast hidden" role="status" aria-live="polite"></div>
+  <div class="toast hidden" id="toast" role="status"></div>
 
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
-  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
-  <script>
-    if (window.lucide) {
-      window.lucide.createIcons();
-    }
-
-    (function () {
-      const chevronBtn = document.getElementById("btn-chevron-left");
-      const collapseBtn = document.getElementById("btn-collapse-left");
-      if (collapseBtn && chevronBtn) {
-        collapseBtn.addEventListener("click", () => chevronBtn.click());
-      }
-    })();
-  </script>
   <script src="app.js"></script>
-  <script src="outlook.js"></script>
 </body>
 </html>

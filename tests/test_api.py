@@ -59,13 +59,23 @@ def test_dashboard_served_and_repo_not_exposed():
         assert client.get(f"/{f}").status_code == 404
 
 
-def test_soil_outlook_endpoint_and_panel_served():
+def test_soil_outlook_endpoint_and_file():
     o = client.get("/api/soil-outlook").json()
     assert o["model"]["type"].startswith("LSTM")
     assert len(o["hindcasts"]) == 2 and len(o["scenario_outlook"]["cases"]) == 3
-    for f in ("outlook.js", "outlook.css"):
-        assert client.get(f"/{f}").status_code == 200
+    assert client.get("/data/soil_outlook.json").json() == o
     assert client.post("/api/advisor/chat", json={"message": "hi"}).status_code in (404, 405)
+
+
+def test_region_files_served_and_locked_down():
+    if not (ROOT / "data" / "region" / "bicol_summary.json").exists():
+        return  # regional layer not built in this checkout
+    s = client.get("/api/region").json()
+    assert s["municipalities"] > 100 and s["provinces"]
+    assert client.get("/data/region/bicol_municipalities.geojson").json()["type"] == "FeatureCollection"
+    assert client.get("/data/region/bicol_flood.png").status_code == 200
+    for bad in ("/data/region/..%2F..%2Fapi.py", "/data/region/missing.json"):
+        assert client.get(bad).status_code == 404
 
 
 def test_logo_served_and_assets_locked_down():

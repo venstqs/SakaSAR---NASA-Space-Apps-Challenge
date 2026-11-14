@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse
 ROOT = Path(__file__).resolve().parent
 DATA_PATH = ROOT / "mock-data.json"
 OUTLOOK_PATH = ROOT / "data" / "soil_outlook.json"
-DASHBOARD_FILES = {"index.html", "app.js", "style.css", "mock-data.json", "outlook.js", "outlook.css", "favicon.ico"}
+DASHBOARD_FILES = {"index.html", "app.js", "style.css", "mock-data.json", "favicon.ico"}
 
 app = FastAPI(title="SakaSAR API", version="1.1.0",
               description="SAR root-zone hydrology and drowning-risk data for the Camarines Sur pilot.")
@@ -93,6 +93,30 @@ def get_recommendations(plot_id: str | None = None) -> dict:
     if plot_id not in recs:
         raise HTTPException(404, f"unknown plot_id {plot_id}")
     return {plot_id: recs[plot_id]}
+
+
+REGION_DIR = ROOT / "data" / "region"
+
+
+@app.get("/data/region/{name}", tags=["data"], summary="Bicol Region flood screening files (GeoJSON, JSON, PNG overlay)")
+def get_region_file(name: str) -> FileResponse:
+    target = (REGION_DIR / name).resolve()
+    if target.parent != REGION_DIR.resolve() or not target.is_file() or target.suffix.lower() not in {".geojson", ".json", ".png"}:
+        raise HTTPException(404)
+    return FileResponse(target)
+
+
+@app.get("/data/soil_outlook.json", include_in_schema=False)
+def get_soil_outlook_file() -> FileResponse:
+    return FileResponse(OUTLOOK_PATH)
+
+
+@app.get("/api/region", tags=["data"], summary="Bicol Region summary: flooded farmland by province and top towns")
+def get_region_summary() -> dict:
+    try:
+        return json.loads((REGION_DIR / "bicol_summary.json").read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        raise HTTPException(503, "bicol_summary.json not found — run `python -m pipeline.bicol_region`")
 
 
 DATASETS_DIR = ROOT / "data" / "datasets"

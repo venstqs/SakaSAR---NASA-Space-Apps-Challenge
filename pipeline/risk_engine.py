@@ -177,6 +177,18 @@ def _soil_outlook_summary() -> dict | None:
     }
 
 
+def _rain_timeline(start: str = "2024-09-28", end: str = "2024-11-06") -> list[dict]:
+    """Daily NASA POWER rainfall around the event, for the dashboard's storm ribbon."""
+    try:
+        from . import soil_lstm as L
+
+        days, data = L.load_power()
+    except Exception:
+        return []
+    return [{"date": d.isoformat(), "mm": round(float(data["PRECTOTCORR"][i]), 1)}
+            for i, d in enumerate(days) if start <= d.isoformat() <= end]
+
+
 def export_layers(g_sar: dict, g_ter: dict, grids: dict, landcover) -> None:
     """Write the stacked 30 m grid as GeoTIFFs (open in QGIS to inspect any layer)."""
     f32 = lambda a: np.asarray(a, dtype="float32")  # noqa: E731
@@ -369,6 +381,7 @@ def run(refresh: bool = False) -> dict:
         "pilot_area_class_shares": bbox_shares,
         "barangay_ranking": barangay_ranking,
         "rainfall": {k: v for k, v in rain.items() if k != "daily_mm"},
+        "rain_timeline": _rain_timeline(),
         "soil_moisture_outlook": _soil_outlook_summary(),
         "smap_rootzone_anomaly": smap,
         "soil_source": soil_meta,

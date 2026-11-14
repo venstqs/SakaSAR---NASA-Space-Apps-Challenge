@@ -99,13 +99,19 @@ API: `/api/data`, `/api/plots`, `/api/risk-map`, `/api/rotations?priority=water|
 `/api/provenance`, `/api/soil-outlook`, plus whitelisted dashboard files and `/assets/<image>`.
 Never mount the repo root as static files.
 
-## 6. Dashboard rules
+## 6. Dashboard (rebuilt 15 Nov 2026)
 
-- The map centre comes from `provenance.map_center`. No hard-coded coordinates.
-- Show **only measured values**. The 3D water is built from `observed_flood_extent` (SAR shows where
-  water is, not its depth). SAR before/after come from `sar_backscatter_comparison`.
-- Farmer view = plot card. LGU view = `barangay_ranking`. Only one right-side card is open at a time.
-- Labels use the real scene dates from `provenance.sar_scenes`.
+- Layout: one docked sidebar (Bicol Region → Minalabac fields) plus the map. No floating cards. The bottom
+  **storm ribbon** shows daily NASA POWER rain (`provenance.rain_timeline`) and the three radar passes (9 Oct, 21 Oct rejected for wind,
+  2 Nov). Clicking a pass sets the map mode (`pre` / `storm` / `post`).
+- **Region view** reads `data/region/bicol_summary.json`, `bicol_municipalities.geojson` and the `bicol_flood.png` overlay
+  (built by `python -m pipeline.bicol_region`, 100 m, both Sentinel-1 orbits). Towns are ranked by flooded farmland.
+- **Field view**: plot chips, then risk, facts, "What to do" (from `recommendations`), "Will this field drain this week?"
+  (LSTM hindcast in plain words, not a separate panel), next-season rotation fit, the SMS with a copy button, and the barangay list.
+- Design tokens: river-silt panels `#0F2B2A`/`#17393A`, text `#E7EFEA`/`#9FB8AE`, floodwater blue `#4EC4DE` (the only accent;
+  same blue as radar water), risk `#F25F3A` / `#EBB043` / `#7CC69A`. Fonts: Atkinson Hyperlegible (body), Archivo (headings, numbers).
+- Show **only measured values**. The 3D water is built from `observed_flood_extent`; SAR shows where water is, not its depth.
+- The map centre comes from `provenance.map_center`. No hard-coded coordinates in the UI.
 
 ## 7. Honesty rules for code, docs and pitch
 

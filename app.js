@@ -889,228 +889,79 @@ function updateThreeSelectedPlot(plotId) {
   });
 }
 
-async function initApp() {
-  const res = await fetch(DATA_SOURCE_URL);
-  appData = await res.json();
-  mapCenter = (appData.provenance && appData.provenance.map_center) || DEFAULT_CENTER;
-  pilotBounds = computePilotBounds(appData);
-  const coordEl = document.getElementById("coord-readout");
-  if (coordEl) coordEl.textContent = `${mapCenter[1].toFixed(4)}, ${mapCenter[0].toFixed(4)}`;
+// =====================================================================================
+// SakaSAR dashboard: region → town → field, driven by the storm ribbon
+// =====================================================================================
+const REGION_BBOX = [[122.3, 11.8], [124.45, 14.6]];
+const RISK_COLOR = { high: "#f25f3a", watch: "#ebb043", low: "#7cc69a" };
+const RISK_WORD = { high: "High risk of drowning", watch: "Watch this field", low: "Low risk" };
+const FIT_COLOR = { good: "#7cc69a", neutral: "#9fb8ae", caution: "#ebb043" };
+const FIT_LABEL = { good: "Good fit", neutral: "Possible", caution: "Caution" };
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const $ = (id) => document.getElementById(id);
 
-  // Initialize MapLibre with Satellite Imagery + Hybrid Reference Labels
-  map = new maplibregl.Map({
-    container: "map",
-    style: {
-      version: 8,
-      sources: {
-        satellite: {
-          type: "raster",
-          tiles: [
-            "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-          ],
-          tileSize: 256,
-          attribution: "Esri, NASA, Copernicus Sentinel-1"
-        },
-        osm_labels: {
-          type: "raster",
-          tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-          tileSize: 256
-        }
-      },
-      layers: [
-        {
-          id: "satellite-base",
-          type: "raster",
-          source: "satellite",
-          paint: { "raster-saturation": -0.1, "raster-contrast": 0.1 }
-        },
-        {
-          id: "road-overlay",
-          type: "raster",
-          source: "osm_labels",
-          paint: { "raster-opacity": 0.0 }
-        }
-      ]
-    },
-    center: mapCenter,
-    zoom: 15.0,
-    pitch: 30,
-    bearing: -12,
-    attributionControl: { compact: true }
-  });
+let scope = "region";
+let mapMode = "post";
+let region = { summary: null, munis: null, overlay: null };
+let outlook = null;
+let currentPriority = "nitrogen";
+let selectedMuni = null;
+let muniPopup = null;
 
-  map.on("mousemove", (e) => {
-    document.getElementById("coord-readout").textContent =
-      `${e.lngLat.lat.toFixed(4)}, ${e.lngLat.lng.toFixed(4)}`;
-  });
+// ---------- helpers ----------
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+const fmt = (n) => (typeof n === "number" ? Math.round(n).toLocaleString("en-PH") : "n/a");
+const pct = (x) => (typeof x === "number" ? `${(x * 100).toFixed(x < 0.1 ? 1 : 0)}%` : "n/a");
 
-  map.on("load", () => {
-    const threeCustomLayer = {
-      id: "fieldshift-3d-world",
-      type: "custom",
-      renderingMode: "3d",
-      onAdd: function (mapInstance, gl) {
-        console.log("SakaSAR 3D WebGL layer initialized. THREE.REVISION:", THREE.REVISION);
-        buildThreeScene(mapInstance, gl);
-      },
-      render: function (gl, matrix) {
-        if (!threeState.ready) return;
-
-        const nowSec = performance.now() * 0.001;
-        threeState.currentWaterLevel +=
-          (threeState.targetWaterLevel - threeState.currentWaterLevel) * 0.06;
-
-        threeState.waterUniforms.uTime.value = nowSec;
-        threeState.waterUniforms.uWaterLevel.value = threeState.currentWaterLevel;
-        threeState.canalWaterUniforms.uTime.value = nowSec;
-        threeState.canalWaterUniforms.uWaterLevel.value = Math.max(0.18, threeState.currentWaterLevel);
-        threeState.cropUniforms.uTime.value = nowSec;
-        threeState.sarUniforms.uTime.value = nowSec;
-
-        const camCenter = map.getCenter();
-        const camCenterLocal = lngLatToLocalMeters([camCenter.lng, camCenter.lat]);
-        const pitchRad = (map.getPitch() * Math.PI) / 180;
-        const bearingRad = (map.getBearing() * Math.PI) / 180;
-        const camDist = 600 * Math.pow(2, 15 - map.getZoom());
-        const camLocal = new THREE.Vector3(
-          camCenterLocal.x - Math.sin(bearingRad) * Math.sin(pitchRad) * camDist,
-          Math.max(40, Math.cos(pitchRad) * camDist),
-          camCenterLocal.z + Math.cos(bearingRad) * Math.sin(pitchRad) * camDist
-        );
-        threeState.waterUniforms.uCamPos.value.copy(camLocal);
-        threeState.canalWaterUniforms.uCamPos.value.copy(camLocal);
-
-        const m = new THREE.Matrix4().fromArray(matrix);
-        const l = new THREE.Matrix4()
-          .makeTranslation(threeOrigin.x, threeOrigin.y, threeOrigin.z)
-          .scale(new THREE.Vector3(threeScale, -threeScale, threeScale))
-          .multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2));
-
-        threeState.camera.projectionMatrix = m.multiply(l);
-        threeState.camera.projectionMatrixInverse
-          .copy(threeState.camera.projectionMatrix)
-          .invert();
-        threeState.renderer.resetState();
-        threeState.renderer.render(threeState.scene, threeState.camera);
-        map.triggerRepaint();
-      }
-    };
-
-    // Real Sentinel-1 before/after layers from the pipeline (toggled by the SAR Scene buttons)
-    const sarCmp = appData.sar_backscatter_comparison || {};
-    map.addSource("sar-pre-source", { type: "geojson", data: sarCmp.before_event || { type: "FeatureCollection", features: [] } });
-    map.addSource("sar-post-source", { type: "geojson", data: sarCmp.after_event || { type: "FeatureCollection", features: [] } });
-    map.addLayer({
-      id: "sar-pre-fill", type: "fill", source: "sar-pre-source",
-      layout: { visibility: sarMode === "pre" ? "visible" : "none" },
-      paint: { "fill-color": "#64748b", "fill-opacity": 0.45, "fill-outline-color": "#cbd5e1" }
-    });
-    map.addLayer({
-      id: "sar-post-fill", type: "fill", source: "sar-post-source",
-      layout: { visibility: sarMode === "post" ? "visible" : "none" },
-      paint: { "fill-color": "#06b6d4", "fill-opacity": 0.28, "fill-outline-color": "#67e8f9" }
-    });
-
-    // 30 m risk zones (pipeline risk grid): shows which part of each field drowns first
-    if (appData.risk_zones) {
-      map.addSource("risk-zones-source", { type: "geojson", data: appData.risk_zones });
-      map.addLayer({
-        id: "risk-zones-fill", type: "fill", source: "risk-zones-source",
-        paint: {
-          "fill-color": ["match", ["get", "risk_class"], "high", "#dc2626", "watch", "#f59e0b", "#64748b"],
-          "fill-opacity": 0.32
-        }
-      });
-      map.addLayer({
-        id: "risk-zones-line", type: "line", source: "risk-zones-source",
-        paint: {
-          "line-color": ["match", ["get", "risk_class"], "high", "#fca5a5", "watch", "#fcd34d", "#cbd5e1"],
-          "line-width": 0.8, "line-opacity": 0.7
-        }
-      });
-    }
-
-    map.addSource("plots-source", {
-      type: "geojson",
-      data: appData.plots
-    });
-
-    map.addLayer({
-      id: "plots-hit-target",
-      type: "fill",
-      source: "plots-source",
-      paint: {
-        "fill-color": "#000000",
-        "fill-opacity": 0.01
-      }
-    });
-
-    map.addLayer(threeCustomLayer);
-
-    // Add Floating Pill Markers Above Each Parcel
-    appData.plots.features.forEach((feat) => {
-      const coords = getPolygonCenter(feat.geometry.coordinates[0]);
-      const p = feat.properties;
-      const dotColor =
-        p.risk_class === "high" ? "#dc2626" : p.risk_class === "watch" ? "#d97706" : "#059669";
-
-      const el = document.createElement("button");
-      el.type = "button";
-      el.className = "plot-pill-marker";
-      el.dataset.plotId = p.plot_id;
-      el.setAttribute("aria-label", `Inspect ${p.plot_id} in ${p.barangay}, risk score ${p.risk_score}`);
-      el.innerHTML = `<span class="marker-dot" style="background:${dotColor}" aria-hidden="true"></span><span>${p.plot_id} · ${p.risk_score}</span>`;
-      el.addEventListener("click", () => selectPlot(feat));
-
-      new maplibregl.Marker({ element: el }).setLngLat(coords).addTo(map);
-    });
-
-    map.on("click", "plots-hit-target", (e) => {
-      if (e.features && e.features[0]) {
-        const clickedId = e.features[0].properties.plot_id;
-        const fullFeat = appData.plots.features.find((f) => f.properties.plot_id === clickedId);
-        if (fullFeat) selectPlot(fullFeat);
-      }
-    });
-
-    map.on("mouseenter", "plots-hit-target", () => {
-      map.getCanvas().style.cursor = "pointer";
-    });
-    map.on("mouseleave", "plots-hit-target", () => {
-      map.getCanvas().style.cursor = "";
-    });
-
-    startMapAnimations();
-    fitPilot(false);
-  });
-
-  populateLeftPanel();
-  renderRotations("nitrogen");
-  selectPlot(appData.plots.features[0], false);
-  bindUIEvents();
-  // On phones, start with the map visible; the plot card opens when a plot is tapped.
-  if (window.matchMedia("(max-width: 640px)").matches) {
-    document.getElementById("inspect-card")?.classList.add("hidden");
-  }
+function sceneDate(id, withYear = true) {
+  const m = /_(\d{4})(\d{2})(\d{2})T/.exec(id || "");
+  if (!m) return null;
+  return `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]}${withYear ? ` ${m[1]}` : ""}`;
+}
+const isoLabel = (iso) => { const d = new Date(iso + "T00:00:00"); return `${d.getDate()} ${MONTHS[d.getMonth()]}`; };
+function signedDb(v) {
+  if (typeof v !== "number" || Number.isNaN(v)) return "n/a";
+  return `${v > 0 ? "+" : ""}${v.toFixed(1)} dB`;
 }
 
-// Frame all plots between the floating panels (left command panel, right plot card).
-function fitPilot(animate = true) {
-  if (!map || !appData) return;
-  const pts = appData.plots.features.flatMap((f) => f.geometry.coordinates[0]);
-  const lngs = pts.map((p) => p[0]);
-  const lats = pts.map((p) => p[1]);
-  const phone = window.matchMedia("(max-width: 640px)").matches;
-  const tablet = window.matchMedia("(max-width: 1024px)").matches;
-  const padding = phone
-    ? { top: Math.round(window.innerHeight * 0.52), bottom: 70, left: 24, right: 24 }
-    : tablet
-      ? { top: 90, bottom: 90, left: 380, right: 40 }
-      : { top: 110, bottom: 90, left: 390, right: 480 };
-  map.fitBounds(
-    [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-    { padding, pitch: is3D ? 45 : 0, bearing: -12, duration: animate ? 900 : 0, maxZoom: 17 }
-  );
+let toastTimer = null;
+function showToast(message, ms = 3400) {
+  const t = $("toast");
+  t.textContent = message;
+  t.classList.remove("hidden");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.add("hidden"), ms);
+}
+
+async function fetchJSON(urls) {
+  for (const u of [].concat(urls)) {
+    try {
+      const r = await fetch(u);
+      if (r.ok) return await r.json();
+    } catch (_) { /* try the next source */ }
+  }
+  return null;
+}
+
+function geomBounds(geom) {
+  let minX = 180, minY = 90, maxX = -180, maxY = -90;
+  const walk = (c) => {
+    if (typeof c[0] === "number") {
+      minX = Math.min(minX, c[0]); maxX = Math.max(maxX, c[0]);
+      minY = Math.min(minY, c[1]); maxY = Math.max(maxY, c[1]);
+    } else c.forEach(walk);
+  };
+  walk(geom.coordinates);
+  return [[minX, minY], [maxX, maxY]];
+}
+
+function getPolygonCenter(ring) {
+  let lng = 0, lat = 0;
+  const len = ring.length - 1;
+  for (let i = 0; i < len; i++) { lng += ring[i][0]; lat += ring[i][1]; }
+  return [lng / len, lat / len];
 }
 
 function computePilotBounds(data) {
@@ -1123,639 +974,598 @@ function computePilotBounds(data) {
   (data.plots?.features || []).forEach((f) => collect(f.geometry));
   (data.observed_flood_extent?.features || []).forEach((f) => collect(f.geometry));
   if (!pts.length) return null;
-  const lngs = pts.map((p) => p[0]);
-  const lats = pts.map((p) => p[1]);
+  const lngs = pts.map((p) => p[0]), lats = pts.map((p) => p[1]);
   return [Math.min(...lngs), Math.min(...lats), Math.max(...lngs), Math.max(...lats)];
 }
 
-function getPolygonCenter(ring) {
-  let lng = 0, lat = 0;
-  const len = ring.length - 1;
-  for (let i = 0; i < len; i++) {
-    lng += ring[i][0];
-    lat += ring[i][1];
-  }
-  return [lng / len, lat / len];
-}
+const phone = () => window.matchMedia("(max-width: 760px)").matches;
 
-// ---- small helpers ----------------------------------------------------------
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-// Sentinel-1 item ids embed the acquisition date: S1A_IW_GRDH_1SDV_20241102T213901_...
-function sceneDate(id, withYear = true) {
-  const m = /_(\d{4})(\d{2})(\d{2})T/.exec(id || "");
-  if (!m) return null;
-  return `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]}${withYear ? ` ${m[1]}` : ""}`;
-}
-
-function sarScenes() {
-  return (appData && appData.provenance && appData.provenance.sar_scenes) || {};
-}
-
-function signedDb(v) {
-  if (typeof v !== "number" || Number.isNaN(v)) return "n/a";
-  return `${v > 0 ? "+" : ""}${v.toFixed(1)}`;
-}
-
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
-
-let toastTimer = null;
-function showToast(message, ms = 3200) {
-  const toast = document.getElementById("sms-toast");
-  if (!toast) return;
-  toast.textContent = message;
-  toast.classList.remove("hidden");
-  if (toastTimer) clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.add("hidden"), ms);
-}
-
-function closeOutlook() {
-  const panel = document.getElementById("fs-outlook-panel");
-  if (panel && !panel.hidden) {
-    panel.hidden = true;
-    document.querySelector(".fs-outlook-fab")?.setAttribute("aria-expanded", "false");
-  }
-}
-
-// ---- Farmer / LGU view ------------------------------------------------------
-let viewRole = "farmer";
-function setRole(role) {
-  viewRole = role;
-  const isLgu = role === "lgu";
-  const label = document.getElementById("role-label");
-  if (label) label.textContent = isLgu ? "View: LGU / MDRRMO" : "View: Farmer";
-  document.getElementById("btn-role-switch")?.setAttribute("aria-pressed", String(isLgu));
-  document.getElementById("lgu-card")?.classList.toggle("hidden", !isLgu);
-  document.getElementById("inspect-card")?.classList.toggle("hidden", isLgu);
-  closeOutlook();
-}
-
-function renderBarangayRanking() {
-  const list = document.getElementById("lgu-list");
-  if (!list) return;
-  const ranking = (appData.provenance && appData.provenance.barangay_ranking) || [];
-  list.innerHTML = ranking
-    .map((r) => {
-      const cls = r.high_risk_ha > 0 ? "high" : r.watch_ha > 0 ? "watch" : "low";
-      const hh = r.high_risk_households ? ` · ${r.high_risk_households} households` : "";
-      return `
-        <li><button type="button" class="lgu-row" data-brgy="${escapeHtml(r.barangay)}"
-            aria-label="Rank ${r.rank}: ${escapeHtml(r.barangay)}, ${r.high_risk_ha} hectares high risk">
-          <span class="lgu-rank ${cls}">${r.rank}</span>
-          <span><strong>${escapeHtml(r.barangay)}</strong>
-            <small>${r.high_risk_ha} ha high · ${r.watch_ha} ha watch${hh}</small></span>
-          <span class="lgu-score">max ${r.max_risk_score}/100</span>
-        </button></li>`;
-    })
-    .join("");
-  list.querySelectorAll(".lgu-row").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      // jump to the highest-risk plot in that barangay
-      const plots = appData.plots.features.filter((f) => f.properties.barangay === btn.dataset.brgy);
-      const top = plots.sort((a, b) => b.properties.risk_score - a.properties.risk_score)[0];
-      if (top) selectPlot(top, true);
-    });
+function fitRegion(animate = true) {
+  if (!map) return;
+  map.fitBounds(REGION_BBOX, {
+    padding: phone() ? { top: 50, bottom: 90, left: 10, right: 10 } : { top: 60, bottom: 130, left: 30, right: 30 },
+    pitch: 0, bearing: 0, duration: animate ? 900 : 0,
   });
-  const note = document.getElementById("lgu-note");
-  if (note) {
-    note.textContent =
-      "Ranked by hectares rated high on the 30 m risk grid inside the sample plots. " +
-      "Household counts are placeholders until LGU parcel and census data are added.";
-  }
 }
 
-// Farmer recommendation timeline (pipeline/recommend.py): measured risk + LSTM + rotation fit
-function renderRecommendations(p) {
-  const box = document.getElementById("inspect-reco");
-  if (!box) return;
-  const recs = p.recommendations || [];
-  box.classList.toggle("hidden", !recs.length);
-  box.querySelector(".reco-list").innerHTML = recs
-    .map(
-      (r) => `
-      <li class="reco-step">
-        <span class="reco-when">${escapeHtml(r.when)}</span>
-        <p class="reco-action">${escapeHtml(r.action)}</p>
-        <p class="reco-why">${escapeHtml(r.why)}</p>
-        <span class="reco-sources">${r.sources.map((s) => `<span>${escapeHtml(s)}</span>`).join("")}</span>
-      </li>`
-    )
-    .join("");
+function fitPilot(animate = true) {
+  if (!map || !appData) return;
+  const pts = appData.plots.features.flatMap((f) => f.geometry.coordinates[0]);
+  const lngs = pts.map((p) => p[0]), lats = pts.map((p) => p[1]);
+  map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], {
+    padding: phone() ? { top: 40, bottom: 90, left: 20, right: 20 } : { top: 70, bottom: 140, left: 50, right: 70 },
+    pitch: is3D ? 45 : 0, bearing: -12, duration: animate ? 1200 : 0, maxZoom: 17,
+  });
 }
 
-function populateLeftPanel() {
-  const prov = appData.provenance;
-  const nHigh = prov.high_risk_plots;
-  document.getElementById("headline-status").textContent =
-    nHigh === 0 ? "No plots at high drowning risk" : `${nHigh} plot${nHigh === 1 ? "" : "s"} at high drowning risk`;
-  const afterDate = sceneDate(sarScenes().after);
-  document.getElementById("headline-sub").textContent =
-    `${afterDate ? `Sentinel-1 pass ${afterDate}` : "Post-storm Sentinel-1 pass"} · C-band surface wetness`;
-  renderBarangayRanking();
-  document.getElementById("kpi-ha").textContent = `${prov.total_high_risk_ha} ha`;
-  document.getElementById("kpi-households").textContent = prov.households_affected;
-  document.getElementById("kpi-hitrate").textContent = prov.sar_hit_rate;
-  document.getElementById("kpi-baredays").textContent = `${prov.avg_bare_field_days} d/yr`;
-  if ((prov.pending_inputs || []).includes("bare_field_days_per_year")) {
-    // honest label: MODIS 250 m could not resolve field bare windows (see provenance.bare_field_check)
-    const tile = document.getElementById("kpi-baredays").closest(".kpi-item");
-    const label = tile && tile.querySelector(".kpi-label");
-    if (label && !/placeholder/i.test(label.textContent)) label.textContent += " (placeholder)";
-  }
+// ---------- boot ----------
+async function initApp() {
+  const [data, summary, munis, overlay, soil] = await Promise.all([
+    fetchJSON(DATA_SOURCE_URL),
+    fetchJSON("data/region/bicol_summary.json"),
+    fetchJSON("data/region/bicol_municipalities.geojson"),
+    fetchJSON("data/region/bicol_flood.json"),
+    fetchJSON(["data/soil_outlook.json", "/api/soil-outlook"]),
+  ]);
+  appData = data;
+  region = { summary, munis, overlay };
+  outlook = soil;
+  mapCenter = (appData.provenance && appData.provenance.map_center) || DEFAULT_CENTER;
+  pilotBounds = computePilotBounds(appData);
 
-  // Populate 5-node Corridor Stepper
-  const stepper = document.getElementById("plot-stepper");
-  stepper.innerHTML = appData.plots.features
-    .map((f) => {
-      const p = f.properties;
-      const iconName =
-        p.risk_class === "high" ? "alert-triangle" : p.risk_class === "watch" ? "clock" : "check";
-      return `
-        <button class="step-node" type="button" data-id="${p.plot_id}" aria-label="Select ${p.plot_id}, ${p.risk_class} risk">
-          <div class="step-circle ${p.risk_class}" aria-hidden="true">
-            <i data-lucide="${iconName}" width="13" height="13" stroke-width="2.4"></i>
-          </div>
-          <span class="step-id">${p.plot_id}</span>
-          <span class="step-state">${p.risk_class}</span>
-        </button>
-      `;
-    })
-    .join("");
-
-  if (window.lucide) {
-    window.lucide.createIcons({ nodes: [stepper] });
-  }
-
-  stepper.querySelectorAll(".step-node").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const feat = appData.plots.features.find((f) => f.properties.plot_id === btn.dataset.id);
-      if (feat) selectPlot(feat, true);
-    });
+  map = new maplibregl.Map({
+    container: "map",
+    style: {
+      version: 8,
+      sources: {
+        satellite: {
+          type: "raster",
+          tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+          tileSize: 256,
+          attribution: "Imagery Esri · Radar Copernicus Sentinel-1 · NASA NASADEM · ESA WorldCover · Boundaries NAMRIA/PSA",
+        },
+      },
+      layers: [{ id: "satellite-base", type: "raster", source: "satellite", paint: { "raster-saturation": -0.25, "raster-brightness-max": 0.85 } }],
+    },
+    center: [123.35, 13.2],
+    zoom: 7.3,
+    attributionControl: { compact: true },
   });
 
-  // Provenance List
-  document.getElementById("provenance-list").innerHTML = prov.datasets_used
-    .map((d) => `<li>${d}</li>`)
-    .join("");
-  const runEl = document.getElementById("data-runtime");
-  if (runEl) runEl.textContent = prov.processing_time || "n/a";
-  const hitEl = document.getElementById("data-hitrate");
-  if (hitEl) hitEl.textContent = `${prov.sar_hit_rate} (independent) · ${prov.sar_hit_rate_full_model || "n/a"} full model`;
-  document.getElementById("future-work-text").textContent =
-    `Future work (cut from 12h build): ${prov.future_work_datasets.join(", ")}.`;
+  map.on("load", () => {
+    addRegionLayers();
+    addPilotLayers();
+    startMapAnimations();
+    (scope === "pilot" ? fitPilot : fitRegion)(false);
+    updateZoomClass();
+    applyLayers();
+    buildRibbon(); // layout is final now
+  });
+  map.on("zoom", updateZoomClass);
+
+  renderRegion();
+  renderPilotStatic();
+  selectPlot(appData.plots.features[0], false);
+  renderLegend();
+  bindUI();
+  requestAnimationFrame(buildRibbon);
+  setMapMode("post", false);
+  renderAbout();
+  if (["#outlook", "#field", "#minalabac"].includes(location.hash)) setScope("pilot");
 }
 
-function closeRiskPopover() {
-  const riskBtn = document.getElementById("btn-risk-popover");
-  const riskPopover = document.getElementById("risk-symbology-popover");
-  if (riskPopover && !riskPopover.classList.contains("hidden")) {
-    riskPopover.classList.add("hidden");
+function updateZoomClass() {
+  $("map-wrap").classList.toggle("zoomed-out", map.getZoom() < 12);
+}
+
+// ---------- map layers ----------
+function addRegionLayers() {
+  if (region.overlay) {
+    map.addSource("bicol-flood", { type: "image", url: region.overlay.image, coordinates: region.overlay.coordinates });
+    map.addLayer({ id: "bicol-flood", type: "raster", source: "bicol-flood",
+      paint: { "raster-opacity": 0.95, "raster-fade-duration": 0, "raster-resampling": "nearest" } });
   }
-  if (riskBtn) {
-    riskBtn.setAttribute("aria-expanded", "false");
+  if (region.munis) {
+    map.addSource("munis", { type: "geojson", data: region.munis });
+    map.addLayer({ id: "munis-fill", type: "fill", source: "munis",
+      paint: { "fill-color": ["interpolate", ["linear"], ["get", "flooded_share"],
+        0, "rgba(78,196,222,0)", 0.01, "rgba(78,196,222,0.10)", 0.05, "rgba(78,196,222,0.28)", 0.15, "rgba(78,196,222,0.5)"] } });
+    map.addLayer({ id: "munis-line", type: "line", source: "munis",
+      paint: { "line-color": "rgba(231,239,234,0.45)", "line-width": ["interpolate", ["linear"], ["zoom"], 7, 0.4, 11, 1.2] } });
+    map.addLayer({ id: "munis-active", type: "line", source: "munis", filter: ["==", ["get", "name"], ""],
+      paint: { "line-color": "#4ec4de", "line-width": 3 } });
+    map.on("click", "munis-fill", (e) => {
+      if (map.getZoom() > 13) return; // in the field view, clicks go to plots
+      const p = e.features[0].properties;
+      selectMuni(p.name, p.province, e.lngLat);
+    });
+    map.on("mouseenter", "munis-fill", () => { if (map.getZoom() <= 13) map.getCanvas().style.cursor = "pointer"; });
+    map.on("mouseleave", "munis-fill", () => { map.getCanvas().style.cursor = ""; });
+  }
+  // "Open the field view" marker at the pilot, visible when zoomed out
+  const pin = document.createElement("button");
+  pin.type = "button";
+  pin.className = "pilot-marker";
+  pin.textContent = "Minalabac: 30 m field view";
+  pin.addEventListener("click", () => setScope("pilot"));
+  new maplibregl.Marker({ element: pin }).setLngLat(mapCenter).addTo(map);
+}
+
+function addPilotLayers() {
+  const threeCustomLayer = {
+    id: "fieldshift-3d-world",
+    type: "custom",
+    renderingMode: "3d",
+    onAdd: (mapInstance, gl) => buildThreeScene(mapInstance, gl),
+    render: (gl, matrix) => {
+      if (!threeState.ready) return;
+      const nowSec = performance.now() * 0.001;
+      threeState.currentWaterLevel += (threeState.targetWaterLevel - threeState.currentWaterLevel) * 0.06;
+      threeState.waterUniforms.uTime.value = nowSec;
+      threeState.waterUniforms.uWaterLevel.value = threeState.currentWaterLevel;
+      threeState.canalWaterUniforms.uTime.value = nowSec;
+      threeState.canalWaterUniforms.uWaterLevel.value = Math.max(0.18, threeState.currentWaterLevel);
+      threeState.cropUniforms.uTime.value = nowSec;
+      threeState.sarUniforms.uTime.value = nowSec;
+      const camCenter = map.getCenter();
+      const camCenterLocal = lngLatToLocalMeters([camCenter.lng, camCenter.lat]);
+      const pitchRad = (map.getPitch() * Math.PI) / 180;
+      const bearingRad = (map.getBearing() * Math.PI) / 180;
+      const camDist = 600 * Math.pow(2, 15 - map.getZoom());
+      const camLocal = new THREE.Vector3(
+        camCenterLocal.x - Math.sin(bearingRad) * Math.sin(pitchRad) * camDist,
+        Math.max(40, Math.cos(pitchRad) * camDist),
+        camCenterLocal.z + Math.cos(bearingRad) * Math.sin(pitchRad) * camDist
+      );
+      threeState.waterUniforms.uCamPos.value.copy(camLocal);
+      threeState.canalWaterUniforms.uCamPos.value.copy(camLocal);
+      const m = new THREE.Matrix4().fromArray(matrix);
+      const l = new THREE.Matrix4()
+        .makeTranslation(threeOrigin.x, threeOrigin.y, threeOrigin.z)
+        .scale(new THREE.Vector3(threeScale, -threeScale, threeScale))
+        .multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2));
+      threeState.camera.projectionMatrix = m.multiply(l);
+      threeState.camera.projectionMatrixInverse.copy(threeState.camera.projectionMatrix).invert();
+      threeState.renderer.resetState();
+      threeState.renderer.render(threeState.scene, threeState.camera);
+      map.triggerRepaint();
+    },
+  };
+
+  const sarCmp = appData.sar_backscatter_comparison || {};
+  const empty = { type: "FeatureCollection", features: [] };
+  map.addSource("sar-pre-source", { type: "geojson", data: sarCmp.before_event || empty });
+  map.addSource("sar-post-source", { type: "geojson", data: sarCmp.after_event || empty });
+  map.addLayer({ id: "sar-pre-fill", type: "fill", source: "sar-pre-source",
+    paint: { "fill-color": "#9fb8ae", "fill-opacity": 0.45 } });
+  map.addLayer({ id: "sar-post-fill", type: "fill", source: "sar-post-source",
+    paint: { "fill-color": "#4ec4de", "fill-opacity": 0.22 } });
+
+  if (appData.risk_zones) {
+    map.addSource("risk-zones-source", { type: "geojson", data: appData.risk_zones });
+    map.addLayer({ id: "risk-zones-fill", type: "fill", source: "risk-zones-source",
+      paint: { "fill-color": ["match", ["get", "risk_class"], "high", RISK_COLOR.high, "watch", RISK_COLOR.watch, "#9fb8ae"], "fill-opacity": 0.3 } });
+    map.addLayer({ id: "risk-zones-line", type: "line", source: "risk-zones-source",
+      paint: { "line-color": ["match", ["get", "risk_class"], "high", RISK_COLOR.high, "watch", RISK_COLOR.watch, "#9fb8ae"], "line-width": 0.8, "line-opacity": 0.8 } });
+  }
+
+  map.addSource("plots-source", { type: "geojson", data: appData.plots });
+  map.addLayer({ id: "plots-hit-target", type: "fill", source: "plots-source", paint: { "fill-color": "#000", "fill-opacity": 0.01 } });
+  map.addLayer(threeCustomLayer);
+
+  appData.plots.features.forEach((feat) => {
+    const p = feat.properties;
+    const el = document.createElement("button");
+    el.type = "button";
+    el.className = "plot-pill-marker";
+    el.dataset.plotId = p.plot_id;
+    el.setAttribute("aria-label", `${p.plot_id} in ${p.barangay}, risk ${p.risk_score} of 100`);
+    el.innerHTML = `<span class="marker-dot" style="background:${RISK_COLOR[p.risk_class]}" aria-hidden="true"></span><span>${p.plot_id} ${p.risk_score}</span>`;
+    el.addEventListener("click", () => { setScope("pilot", false); selectPlot(feat, true); });
+    new maplibregl.Marker({ element: el }).setLngLat(getPolygonCenter(feat.geometry.coordinates[0])).addTo(map);
+  });
+
+  map.on("click", "plots-hit-target", (e) => {
+    const id = e.features?.[0]?.properties?.plot_id;
+    const feat = appData.plots.features.find((f) => f.properties.plot_id === id);
+    if (feat) { setScope("pilot", false); selectPlot(feat, true); }
+  });
+}
+
+function setVis(id, on) {
+  if (map && map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none");
+}
+
+function applyLayers() {
+  const flood = $("lyr-flood").checked && mapMode === "post";
+  const towns = $("lyr-towns").checked;
+  const risk = $("lyr-risk").checked;
+  const canal = $("lyr-canal").checked;
+  setVis("bicol-flood", flood);
+  setVis("sar-post-fill", flood);
+  setVis("sar-pre-fill", mapMode === "pre");
+  ["munis-fill", "munis-line", "munis-active"].forEach((id) => setVis(id, towns));
+  setVis("munis-fill", towns && mapMode === "post");
+  ["risk-zones-fill", "risk-zones-line"].forEach((id) => setVis(id, risk && mapMode === "post"));
+  if (threeState.waterMesh) threeState.waterMesh.visible = flood;
+  if (threeState.parcelGroup) threeState.parcelGroup.visible = risk;
+  if (threeState.canalGroup) threeState.canalGroup.visible = canal;
+}
+
+function renderLegend() {
+  const el = $("legend");
+  if (scope === "region") {
+    el.innerHTML = `
+      <b>Bicol after Kristine</b>
+      <span class="lg"><i style="--c:#4ec4de"></i>Flooded farmland, radar 2 Nov</span>
+      <span class="lg"><i style="--c:rgba(233,228,201,0.5)"></i>Other farmland</span>
+      <span>Town shading: share of its farmland flooded</span>
+      <span class="lg-ramp" aria-hidden="true"></span>
+      <span class="lg-ends"><span>none</span><span>15% or more</span></span>`;
+  } else {
+    el.innerHTML = `
+      <b>Field drowning risk, 30 m</b>
+      <span class="lg"><i style="--c:${RISK_COLOR.high}"></i>High: trench or harvest now</span>
+      <span class="lg"><i style="--c:${RISK_COLOR.watch}"></i>Watch: clear furrows</span>
+      <span class="lg"><i style="--c:${RISK_COLOR.low}"></i>Low: normal drainage</span>
+      <span class="lg"><i style="--c:#4ec4de"></i>Standing water seen by radar</span>`;
   }
 }
 
-// Only measured values: change vs the Aug–Sep baseline median on each real Sentinel-1 pass.
-function formatDeltaSarLabel(p) {
-  const normalizedMode = sarMode === "before" ? "pre" : sarMode === "after" ? "post" : sarMode;
-  const sc = sarScenes();
-  const pre = sceneDate(sc.just_before, false) || "pre-storm";
-  const post = sceneDate(sc.after, false) || "post-storm";
-  if (normalizedMode === "pre") {
-    return `ΔSAR ${signedDb(p.pre_event_change_db)} dB (${pre} pass)`;
-  }
-  if (normalizedMode === "post") {
-    return `ΔSAR ${signedDb(p.sar_wetness_change_db)} dB (${post} pass)`;
-  }
-  if (timelineStage === STAGE.BASELINE) {
-    return "ΔSAR 0.0 dB (baseline reference)";
-  }
-  if (timelineStage === STAGE.STORM) {
-    return "No usable radar pass during the storm";
-  }
-  return `ΔSAR ${signedDb(p.sar_wetness_change_db)} dB (last pass, ${post})`;
+// ---------- scope ----------
+function setScope(next, move = true) {
+  scope = next;
+  const pilot = next === "pilot";
+  $("tab-region").setAttribute("aria-selected", String(!pilot));
+  $("tab-pilot").setAttribute("aria-selected", String(pilot));
+  $("scope-region").hidden = pilot;
+  $("scope-pilot").hidden = !pilot;
+  $("sb-scroll").scrollTop = 0;
+  if (muniPopup) { muniPopup.remove(); muniPopup = null; }
+  renderLegend();
+  if (move) (pilot ? fitPilot : fitRegion)(true);
 }
 
-function updateInspectSarReadout() {
-  if (!appData || !appData.plots) return;
-  const feat = appData.plots.features.find((f) => f.properties.plot_id === selectedPlotId);
-  if (!feat) return;
-  const p = feat.properties;
-  const metaEl = document.getElementById("inspect-meta");
-  if (metaEl) {
-    metaEl.innerHTML = `
-      <span>${p.hectares} ha</span>
-      <span class="meta-dot" aria-hidden="true">·</span>
-      <span>${p.current_crop}</span>
-      <span class="meta-dot" aria-hidden="true">·</span>
-      <span>${formatDeltaSarLabel(p)}</span>
-    `;
+// ---------- region ----------
+function renderRegion() {
+  const s = region.summary;
+  if (!s) {
+    $("region-lede").textContent = "The Bicol-wide flood layer has not been built yet. Run python -m pipeline.bicol_region.";
+    return;
   }
+  const cov = s.radar_coverage < 0.97 ? ` Radar covered ${pct(s.radar_coverage)} of the region.` : "";
+  $("region-lede").innerHTML =
+    `Radar saw <strong>${fmt(s.flooded_farmland_ha)} ha</strong> of flooded farmland across Bicol after Kristine, ` +
+    `out of ${fmt(s.farmland_ha)} ha of farmland mapped.${cov}`;
+  const max = Math.max(...s.provinces.map((p) => p.flooded_farmland_ha), 1);
+  $("province-bars").innerHTML = s.provinces.map((p) => `
+    <div class="prov" title="${escapeHtml(p.province)}: ${pct(p.flooded_share)} of farmland flooded">
+      <span class="prov-name">${escapeHtml(p.province)}</span>
+      <span class="prov-track"><span class="prov-fill" style="width:${(100 * p.flooded_farmland_ha) / max}%"></span></span>
+      <span class="prov-val">${fmt(p.flooded_farmland_ha)} ha</span>
+    </div>`).join("");
+  renderMuniList("");
+}
+
+function muniRows() {
+  return (region.munis?.features || []).map((f) => f.properties);
+}
+
+function renderMuniList(q) {
+  const query = q.trim().toLowerCase();
+  const rows = muniRows().filter((p) => !query || p.name.toLowerCase().includes(query) || p.province.toLowerCase().includes(query));
+  const shown = query ? rows : rows.slice(0, 40);
+  $("muni-empty").classList.toggle("hidden", rows.length > 0);
+  $("muni-list").innerHTML = shown.map((p) => `
+    <li><button type="button" class="rank-row${p.name === "Minalabac" ? " pilot" : ""}${selectedMuni === p.name ? " active" : ""}"
+        data-name="${escapeHtml(p.name)}" data-prov="${escapeHtml(p.province)}">
+      <span class="rank-n">${p.rank}</span>
+      <span><span class="rank-name">${escapeHtml(p.name)}</span><span class="rank-sub">${escapeHtml(p.province)}</span></span>
+      <span class="rank-val"><b>${fmt(p.flooded_farmland_ha)} ha</b><small>${pct(p.flooded_share)} of farmland</small></span>
+    </button></li>`).join("") +
+    (!query && rows.length > shown.length ? `<li class="empty">Showing the top 40 of ${rows.length} towns. Search to find any town.</li>` : "");
+  $("muni-list").querySelectorAll(".rank-row").forEach((b) =>
+    b.addEventListener("click", () => selectMuni(b.dataset.name, b.dataset.prov)));
+}
+
+function selectMuni(name, province, at) {
+  const f = (region.munis?.features || []).find((x) => x.properties.name === name && x.properties.province === province);
+  if (!f || !map) return;
+  selectedMuni = name;
+  const p = f.properties;
+  map.setFilter("munis-active", ["all", ["==", ["get", "name"], name], ["==", ["get", "province"], province]]);
+  map.fitBounds(geomBounds(f.geometry), { padding: phone() ? 30 : { top: 80, bottom: 150, left: 60, right: 60 }, pitch: 0, bearing: 0, duration: 900, maxZoom: 12 });
+  if (muniPopup) muniPopup.remove();
+  const pilotBtn = name === "Minalabac" ? `<br><button type="button" class="btn" id="popup-pilot" style="margin-top:8px">Open the 30 m field view</button>` : "";
+  const center = at || [(geomBounds(f.geometry)[0][0] + geomBounds(f.geometry)[1][0]) / 2, (geomBounds(f.geometry)[0][1] + geomBounds(f.geometry)[1][1]) / 2];
+  muniPopup = new maplibregl.Popup({ closeButton: true, maxWidth: "260px", offset: 8 })
+    .setLngLat(center)
+    .setHTML(`<b>${escapeHtml(p.name)}, ${escapeHtml(p.province)}</b><br>
+      ${fmt(p.flooded_farmland_ha)} ha of ${fmt(p.farmland_ha)} ha farmland flooded (${pct(p.flooded_share)}).<br>
+      Rank ${p.rank} of ${muniRows().length} towns in Bicol.<br>
+      <span style="color:#9fb8ae">Sentinel-1 ${escapeHtml(p.sentinel1)}; radar covered ${pct(p.radar_coverage)} of the town.</span>${pilotBtn}`)
+    .addTo(map);
+  $("popup-pilot")?.addEventListener("click", () => setScope("pilot"));
+  renderMuniList($("muni-search").value);
+}
+
+// ---------- field view ----------
+function renderPilotStatic() {
+  const pv = appData.provenance;
+  const n = pv.high_risk_plots;
+  $("pilot-lede").innerHTML =
+    `Five sample rice plots in <strong>Minalabac</strong>, Camarines Sur, checked at 30 m. ` +
+    `${n === 0 ? "None are" : `<strong>${n}</strong> ${n === 1 ? "is" : "are"}`} at high risk of drowning.`;
+  $("plot-list").innerHTML = appData.plots.features.map((f) => {
+    const p = f.properties;
+    return `<li><button type="button" class="plot-chip" data-id="${p.plot_id}" aria-pressed="false" style="--c:${RISK_COLOR[p.risk_class]}"
+      aria-label="${p.plot_id}, ${p.risk_class} risk">
+      <b>${p.plot_id}</b><span>${p.risk_score}/100</span></button></li>`;
+  }).join("");
+  $("plot-list").querySelectorAll(".plot-chip").forEach((b) => b.addEventListener("click", () => {
+    const f = appData.plots.features.find((x) => x.properties.plot_id === b.dataset.id);
+    if (f) selectPlot(f, true);
+  }));
+  const ranking = pv.barangay_ranking || [];
+  $("brgy-list").innerHTML = ranking.map((r) => `
+    <li><button type="button" class="rank-row" data-brgy="${escapeHtml(r.barangay)}">
+      <span class="rank-n">${r.rank}</span>
+      <span><span class="rank-name">${escapeHtml(r.barangay)}</span>
+        <span class="rank-sub">${r.high_risk_ha} ha high, ${r.watch_ha} ha watch</span></span>
+      <span class="rank-val"><b>${r.max_risk_score}</b><small>top score</small></span>
+    </button></li>`).join("");
+  $("brgy-list").querySelectorAll(".rank-row").forEach((b) => b.addEventListener("click", () => {
+    const plots = appData.plots.features.filter((f) => f.properties.barangay === b.dataset.brgy);
+    const top = plots.sort((a, c) => c.properties.risk_score - a.properties.risk_score)[0];
+    if (top) selectPlot(top, true);
+  }));
 }
 
 function selectPlot(feat, fly = true) {
   const p = feat.properties;
   selectedPlotId = p.plot_id;
-  closeRiskPopover();
-  if (fly) {
-    // a user picked a plot: show its card, close the other right-side panels
-    if (viewRole === "lgu") setRole("farmer");
-    closeOutlook();
-  }
+  updateThreeSelectedPlot(p.plot_id);
+  document.querySelectorAll(".plot-chip").forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.id === p.plot_id)));
+  document.querySelectorAll(".plot-pill-marker").forEach((m) => m.classList.toggle("active", m.dataset.plotId === p.plot_id));
 
-  updateThreeSelectedPlot(selectedPlotId);
+  const brgy = p.barangay.replace(/^Brgy\.\s*/, "");
+  $("pd-title").textContent = `${p.plot_id} in ${brgy}`;
+  $("pd-meta").textContent = `${p.current_crop}, ${p.hectares} ha (sample plot)`;
+  $("pd-risk").innerHTML = `
+    <span class="risk-word" style="--c:${RISK_COLOR[p.risk_class]}">${RISK_WORD[p.risk_class]}</span>
+    <span class="hint"> ${p.risk_score} out of 100</span>
+    <div class="risk-track" role="img" aria-label="Risk ${p.risk_score} of 100"><span class="risk-pin" style="left:${p.risk_score}%"></span></div>
+    <div class="risk-scale"><span>Low, under 40</span><span>Watch, 40 to 69</span><span>High, 70+</span></div>`;
+  const soil = p.soil_0_30cm;
+  const facts = [
+    ["Radar change after the storm", `${signedDb(p.sar_wetness_change_db)}`, "Darker is wetter"],
+    ["Radar change on 9 Oct, before the storm", signedDb(p.pre_event_change_db), "Compared with the Aug–Sep average"],
+    ["Plot under standing water", pct(p.flooded_pixel_fraction), ""],
+    ["Water-collecting terrain (TWI)", String(p.twi_value), "Higher collects more runoff"],
+    ["Storm rain, GPM IMERG", `${fmt(appData.provenance.rainfall?.r_total_mm)} mm`, "21–26 Oct plus 7 days before"],
+    ["Soil", soil ? `${soil.texture}, ${soil.clay_pct}% clay` : "n/a", "SoilGrids"],
+  ];
+  $("pd-facts").innerHTML = facts.map(([k, v, h]) => `<div><dt>${k}</dt><dd>${escapeHtml(v)}</dd>${h ? `<dt>${h}</dt>` : ""}</div>`).join("");
 
-  const inspect = document.getElementById("inspect-card");
-  inspect.classList.remove("hidden");
+  const recs = (p.recommendations || []).filter((r) => r.when !== "This week");
+  $("pd-steps").innerHTML = recs.map((r, i) => `
+    <li class="step" style="${i === 0 ? `--c:${RISK_COLOR[p.risk_class]}` : ""}">
+      <span class="step-when">${escapeHtml(r.when)}</span>
+      <p class="step-do">${escapeHtml(r.action)}</p>
+      <p class="step-why">${escapeHtml(r.why)}</p>
+    </li>`).join("");
+  renderDrain(p);
+  renderRotations(currentPriority);
 
-  document.getElementById("inspect-title").textContent = `${p.plot_id} · ${p.barangay}`;
-  updateInspectSarReadout();
-
-  const badge = document.getElementById("inspect-risk-badge");
-  badge.className = `risk-tag ${p.risk_class}`;
-  badge.innerHTML = `<span class="risk-dot" aria-hidden="true"></span><span>${p.risk_class.toUpperCase()} DROWNING RISK · ${p.risk_score}/100</span>`;
-
-  document.getElementById("inspect-twi").textContent = `TWI: ${p.twi_value}`;
-  if (appData.rotation_strategies) renderRotations(); // rotation fit follows the selected plot
-  document.getElementById("inspect-action").textContent = p.plain_language_action;
-  renderRecommendations(p);
-
-  const sms = p.sms_alert.slice(0, 160);
-  document.getElementById("inspect-sms-text").textContent = sms;
-  document.getElementById("sms-counter").textContent = `${sms.length}/160 CHARS`;
-
-  document.querySelectorAll(".step-node").forEach((node) => {
-    const isSelected = node.dataset.id === p.plot_id;
-    node.classList.toggle("active", isSelected);
-    node.setAttribute("aria-pressed", String(isSelected));
-  });
-
-  document.querySelectorAll(".plot-pill-marker").forEach((marker) => {
-    const isSelected = marker.dataset.plotId === p.plot_id;
-    marker.classList.toggle("active", isSelected);
-    marker.setAttribute("aria-pressed", String(isSelected));
-  });
+  $("pd-sms").textContent = p.sms_alert;
+  $("pd-sms-count").textContent = `${p.sms_alert.length} of 160 characters`;
 
   if (fly && map) {
-    const center = getPolygonCenter(feat.geometry.coordinates[0]);
-    map.flyTo({ center, zoom: 15.6, pitch: is3D ? 55 : 0, duration: 900 });
+    map.flyTo({ center: getPolygonCenter(feat.geometry.coordinates[0]), zoom: 16, pitch: is3D ? 50 : 0, bearing: -12, duration: 1000 });
   }
 }
 
-let currentPriority = "nitrogen";
-const FIT_LABEL = { good: "Good fit", neutral: "Possible", caution: "Caution" };
-
-function renderRotations(priorityKey = currentPriority) {
-  currentPriority = priorityKey;
-  const sorted = [...appData.rotation_strategies].sort(
-    (a, b) => a.priorities[priorityKey] - b.priorities[priorityKey]
-  );
-  const plotFeat = appData.plots.features.find((f) => f.properties.plot_id === selectedPlotId);
-  const plot = plotFeat ? plotFeat.properties : null;
-  const fit = (plot && plot.rotation_fit) || {};
-  const soil = plot && plot.soil_0_30cm;
-
-  const container = document.getElementById("rotation-cards-container");
-  const baseline = plot
-    ? `<div class="rot-baseline">For <strong>${escapeHtml(plot.plot_id)}</strong> · now growing
-         <strong>${escapeHtml(plot.baseline_crop || plot.current_crop)}</strong>${
-           soil ? ` · ${escapeHtml(soil.texture)}, ${soil.clay_pct}% clay` : ""
-         } · ${escapeHtml(plot.risk_class)} drowning risk</div>`
-    : "";
-  container.innerHTML = baseline + sorted
-    .map(
-      (s, idx) => `
-      <div class="rot-card">
-        <h4>#${idx + 1} ${s.name}</h4>
-        ${fit[s.id] ? `<div class="rot-fit fit-${fit[s.id].fit}"><strong>${FIT_LABEL[fit[s.id].fit] || fit[s.id].fit}:</strong> ${escapeHtml(fit[s.id].why)}</div>` : ""}
-        <div class="rot-crops"><strong>Crops:</strong> ${s.crops}</div>
-        <div class="rot-benefit"><strong>Benefits:</strong> ${s.benefits}</div>
-        <div class="rot-gap" style="display:flex;align-items:flex-start;gap:6px;">
-          <i data-lucide="alert-triangle" width="13" height="13" stroke-width="2" style="margin-top:2px;flex-shrink:0;" aria-hidden="true"></i>
-          <span><strong>Risks &amp; Gaps · Verify Locally:</strong> ${s.risks_and_gaps}</span>
-        </div>
-      </div>
-    `
-    )
-    .join("");
-
-  if (window.lucide) {
-    window.lucide.createIcons({ nodes: [container] });
-  }
+// "Will this field drain this week?" — the LSTM answer in plain words
+function renderDrain(p) {
+  const el = $("pd-drain");
+  const h = outlook?.hindcasts?.find((x) => /2 Nov/.test(x.label)) || outlook?.hindcasts?.slice(-1)[0];
+  if (!h) { el.innerHTML = `<p class="drain-note">The soil forecast is not available in this build.</p>`; return; }
+  const n = h.days_waterlogged_pred;
+  const answer = n >= 5
+    ? `<strong>Not yet.</strong> The root zone stays waterlogged on ${n} of the next 7 days, so roots stay short of air.`
+    : n >= 2
+      ? `<strong>Slowly.</strong> Waterlogged on ${n} of the next 7 days, then it starts to drain.`
+      : `<strong>Yes.</strong> The root zone drains within a day or two.`;
+  const days = h.days.map((d) => {
+    const v = d.gwetroot_pred;
+    const hpx = Math.max(6, Math.min(100, ((v - 0.85) / 0.15) * 100));
+    return `<span class="dday" title="${isoLabel(d.date)}: ${v.toFixed(2)} of saturation (actual ${d.gwetroot_actual.toFixed(2)})">
+      <i style="--h:${hpx}%;--o:${v >= 0.97 ? 0.95 : 0.5}"></i>${isoLabel(d.date)}</span>`;
+  }).join("");
+  const so = outlook.scenario_outlook || {};
+  const k = (so.cases || []).find((c) => /Kristine/.test(c.scenario));
+  const urgency = p.risk_class === "high" ? "This plot is high risk, so treat it as urgent."
+    : p.risk_class === "watch" ? "This plot is on watch, so check it after each rain."
+    : "This plot drains well, so it recovers first.";
+  el.innerHTML = `
+    <p class="drain-answer">${answer}</p>
+    <div class="drain-days" aria-label="Forecast root-zone saturation for the 7 days after the radar pass">${days}</div>
+    <p class="drain-note">Our LSTM model forecast this from 25 years of NASA POWER weather, the day after the 2 Nov radar pass.
+      What actually happened: waterlogged on ${h.days_waterlogged_actual} of 7 days. It describes the whole area (about 50 km), not one paddy. ${urgency}</p>
+    ${k ? `<p class="drain-scn">If another Kristine-sized week of rain (${fmt(k.rain_total_mm)} mm) arrived on today's soil
+      (${escapeHtml(so.root_zone_class_today)}, as of ${isoLabel(so.issued_after)}), the root zone would end the week ${escapeHtml(k.end_of_week_class)}.</p>` : ""}`;
 }
 
+function renderRotations(priority = currentPriority) {
+  currentPriority = priority;
+  const feat = appData.plots.features.find((f) => f.properties.plot_id === selectedPlotId);
+  const fit = feat?.properties.rotation_fit || {};
+  const sorted = [...appData.rotation_strategies].sort((a, b) => a.priorities[priority] - b.priorities[priority]);
+  $("pd-rotations").innerHTML = sorted.map((s) => {
+    const f = fit[s.id] || {};
+    return `<li class="rot" style="--c:${FIT_COLOR[f.fit] || "#9fb8ae"}">
+      <div class="rot-top"><span class="rot-name">${escapeHtml(s.name)}</span>
+        <span class="rot-fit">${escapeHtml(FIT_LABEL[f.fit] || "")}</span></div>
+      <p class="rot-crops">${escapeHtml(s.crops)}</p>
+      ${f.why ? `<p class="rot-why">${escapeHtml(f.why.charAt(0).toUpperCase() + f.why.slice(1))}.</p>` : ""}
+      <p class="rot-check">Check first: ${escapeHtml(s.risks_and_gaps)}</p>
+    </li>`;
+  }).join("");
+}
 
-function bindUIEvents() {
-  // Drawer Tab Switcher
-  document.querySelectorAll(".tab-pill").forEach((tab) => {
-    tab.addEventListener("click", () => {
-      document.querySelectorAll(".tab-pill").forEach((t) => {
-        t.classList.remove("active");
-        t.setAttribute("aria-selected", "false");
-      });
-      tab.classList.add("active");
-      tab.setAttribute("aria-selected", "true");
+// ---------- the storm ribbon ----------
+const PASSES = [
+  { mode: "pre", date: "2024-10-09", label: "9 Oct", caption: "<b>9 Oct 2024</b>: last calm radar pass before Kristine. The fields were dry." },
+  { mode: "storm", date: "2024-10-21", label: "21 Oct", rejected: true,
+    caption: "<b>21–26 Oct</b>: Kristine. Clouds hide the ground from optical satellites, and wind roughens the water, so the 21 Oct radar pass cannot see floods." },
+  { mode: "post", date: "2024-11-02", label: "2 Nov", caption: "" },
+];
 
-      const target = tab.dataset.drawer;
-      ["overview", "layers", "rotations", "data"].forEach((id) => {
-        document.getElementById(`drawer-${id}`).classList.toggle("hidden", id !== target);
-      });
-    });
+function postCaption() {
+  const s = region.summary;
+  const ha = scope === "region" && s ? `${fmt(s.flooded_farmland_ha)} ha of Bicol farmland` : "standing water on the Minalabac plots";
+  return `<b>2 Nov 2024</b>: calm radar pass. It shows ${ha}.`;
+}
+
+function buildRibbon() {
+  const svg = $("ribbon-svg");
+  const tl = appData.provenance.rain_timeline || [];
+  const W = svg.clientWidth || 800, H = svg.clientHeight || 60;
+  if (!tl.length) { svg.innerHTML = ""; return; }
+  const top = 16, axis = 12, plotH = H - top - axis;
+  const n = tl.length, bw = W / n;
+  const maxMm = Math.max(...tl.map((d) => d.mm), 1);
+  const idx = (iso) => tl.findIndex((d) => d.date === iso);
+  const x = (i) => i * bw;
+  const s0 = idx("2024-10-21"), s1 = idx("2024-10-26");
+  let out = "";
+  if (s0 >= 0 && s1 >= 0) out += `<rect class="rb-storm" x="${x(s0)}" y="${top - 4}" width="${x(s1 + 1) - x(s0)}" height="${plotH + 4}" rx="3"/>`;
+  tl.forEach((d, i) => {
+    const h = Math.max(1, (d.mm / maxMm) * plotH);
+    const storm = d.date >= "2024-10-21" && d.date <= "2024-10-26";
+    out += `<rect class="rb-bar${storm ? " storm" : ""}" x="${x(i) + bw * 0.18}" y="${top + plotH - h}" width="${bw * 0.64}" height="${h}"><title>${isoLabel(d.date)}: ${d.mm} mm</title></rect>`;
+    const dd = new Date(d.date + "T00:00:00");
+    if (dd.getDate() === 1 || i === 0) out += `<text class="rb-axis" x="${x(i)}" y="${H - 1}">${dd.getDate() === 1 ? MONTHS[dd.getMonth()] : isoLabel(d.date)}</text>`;
   });
-
-  // Quick Buttons
-  document.getElementById("btn-open-rotation").addEventListener("click", () => {
-    document.querySelector('[data-drawer="rotations"]').click();
+  PASSES.forEach((p) => {
+    const i = idx(p.date);
+    if (i < 0) return;
+    const cx = x(i) + bw / 2;
+    out += `<g class="rb-pass${p.rejected ? " rejected" : ""}${mapMode === p.mode ? " active" : ""}" data-mode="${p.mode}" tabindex="0" role="button"
+      aria-label="Show ${p.label} ${p.rejected ? "(storm, radar unusable)" : "radar pass"}">
+      <line x1="${cx}" x2="${cx}" y1="${top - 2}" y2="${top + plotH}"/>
+      <circle cx="${cx}" cy="${top - 6}" r="6"/>
+      <text x="${cx + 10}" y="${top - 2}">${p.label}${p.rejected ? " (wind)" : ""}</text></g>`;
   });
-
-  document.getElementById("btn-open-sms").addEventListener("click", () => {
-    closeRiskPopover();
-    setRole("farmer"); // shows the plot card with the SMS preview
-    const counter = document.getElementById("sms-counter")?.textContent || "160/160 CHARS";
-    showToast(`Simulated SMS alert queued for ${selectedPlotId} (${counter.toLowerCase()}) — no external gateway`);
+  if (W > 520) out += `<text class="rb-axis" x="0" y="${top - 6}">Daily rain, NASA POWER (peak ${fmt(maxMm)} mm)</text>`;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("preserveAspectRatio", "xMinYMid meet");
+  svg.innerHTML = out;
+  svg.querySelectorAll(".rb-pass").forEach((g) => {
+    g.addEventListener("click", () => setMapMode(g.dataset.mode));
+    g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setMapMode(g.dataset.mode); } });
   });
+}
 
-  document.getElementById("btn-bell").addEventListener("click", (e) => {
-    e.stopPropagation();
-    const inspect = document.getElementById("inspect-card");
-    if (inspect.classList.contains("hidden")) {
-      closeRiskPopover();
-      setRole("farmer");
-    } else {
-      inspect.classList.add("hidden");
-    }
+function setMapMode(mode, announce = true) {
+  mapMode = mode;
+  sarMode = mode === "storm" ? "off" : mode;
+  timelineStage = mode === "pre" ? STAGE.PRE : mode === "storm" ? STAGE.STORM : STAGE.POST;
+  if (mode === "post" && sarSweepProgress === 0) sarSweepProgress = 0.01;
+  document.querySelectorAll(".rb-pass").forEach((g) => g.classList.toggle("active", g.dataset.mode === mode));
+  const pass = PASSES.find((p) => p.mode === mode);
+  $("ribbon-caption").innerHTML = mode === "post" ? postCaption() : pass.caption;
+  if (map && map.isStyleLoaded()) applyLayers();
+  if (announce && mode === "pre") showToast("Before the storm: no flooding to show. Pick 2 Nov to see the flood.");
+}
+
+let playTimer = null;
+function togglePlay() {
+  const btn = $("btn-play");
+  if (playTimer) { clearInterval(playTimer); playTimer = null; btn.textContent = "▶"; btn.setAttribute("aria-label", "Play the storm story"); return; }
+  const order = ["pre", "storm", "post"];
+  let i = 0;
+  setMapMode(order[i], false);
+  btn.textContent = "❚❚";
+  btn.setAttribute("aria-label", "Pause");
+  playTimer = setInterval(() => {
+    i += 1;
+    if (i >= order.length) { togglePlay(); return; }
+    setMapMode(order[i], false);
+  }, 2800);
+}
+
+// ---------- about ----------
+function renderAbout() {
+  const pv = appData.provenance;
+  const s = region.summary;
+  const m = outlook?.metrics?.GWETROOT;
+  const ds = [...(pv.datasets_used || []), ...((s && s.sources) || []).filter((x) => /NAMRIA/.test(x))];
+  $("about-body").innerHTML = `
+    <h3>How the maps are made</h3>
+    <p>Sentinel-1 radar sees through clouds. Calm floodwater reflects the radar away like a mirror, so flooded ground turns dark
+      when we compare the 2 Nov 2024 pass with a pre-storm average. We count that dark water on farmland only (ESA WorldCover).</p>
+    <ul>
+      <li><b>Bicol Region</b>: 100 m cells, ${s ? `${fmt(s.municipalities)} towns, ` : ""}two radar orbits (west and centre after 2 Nov, Catanduanes and the east after 28 Oct).</li>
+      <li><b>Minalabac fields</b>: 30 m cells. Risk = radar change (45%) + water-collecting terrain from NASADEM (35%) + storm rain from GPM IMERG (20%).</li>
+    </ul>
+    <h3>How good it is</h3>
+    <ul>
+      <li>Hit rate <b>${escapeHtml(pv.sar_hit_rate)}</b>: share of the radar-flooded farmland that the terrain-and-rain map had already rated high, without seeing the radar.
+        The full model scores ${escapeHtml(pv.sar_hit_rate_full_model || "n/a")}, but that is circular because the radar is on both sides.</li>
+      ${m ? `<li>Drainage forecast (LSTM): ${m.skill_vs_persistence_pct}% less error than "same as today" on unseen 2022–2026 data; it called all 7 waterlogged days after Kristine.</li>` : ""}
+    </ul>
+    <h3>What it cannot tell you</h3>
+    <ul>
+      <li>C-band radar sees surface water, not moisture at the roots. Water under tall rice or between houses can be missed.</li>
+      <li>The 100 m regional map undercounts small flooded paddies; use it to rank towns, not to measure single farms.</li>
+      <li>Plot outlines, hectares and households in Minalabac are samples until LGU parcel data is added.</li>
+    </ul>
+    <h3>Data used</h3>
+    <ul>${ds.map((d) => `<li>${escapeHtml(d)}</li>`).join("")}</ul>
+    <h3>Download our data</h3>
+    <ul>
+      <li><a href="data/region/bicol_municipalities.geojson" download>Bicol towns: flooded farmland (GeoJSON)</a></li>
+      <li><a href="data/datasets/plot_features.csv" download>Minalabac plot features (CSV)</a></li>
+      <li><a href="data/datasets/pixels_30m_pilot.csv" download>30 m cells with flood labels (CSV)</a></li>
+      <li><a href="data/datasets/daily_weather_soil_2001_2026.csv" download>Daily weather and soil, 2001–2026 (CSV)</a></li>
+    </ul>
+    <p class="hint">Processing time for the field view: ${escapeHtml(pv.processing_time || "n/a")}. Data licensing cost: ₱0.</p>`;
+}
+
+// ---------- events ----------
+function bindUI() {
+  $("tab-region").addEventListener("click", () => setScope("region"));
+  $("tab-pilot").addEventListener("click", () => setScope("pilot"));
+  $("muni-search").addEventListener("input", (e) => renderMuniList(e.target.value));
+  $("priority-select").addEventListener("change", (e) => renderRotations(e.target.value));
+  $("btn-copy-sms").addEventListener("click", async () => {
+    const text = $("pd-sms").textContent;
+    try { await navigator.clipboard.writeText(text); showToast("Message copied. Paste it into your SMS app."); }
+    catch (_) { showToast("Copy is blocked in this browser. Select the message and copy it by hand."); }
   });
-
-  document.getElementById("btn-close-inspect").addEventListener("click", () => {
-    document.getElementById("inspect-card").classList.add("hidden");
+  $("btn-about").addEventListener("click", () => $("about-dialog").showModal());
+  $("btn-play").addEventListener("click", togglePlay);
+  $("btn-layers").addEventListener("click", () => {
+    const panel = $("layers-panel");
+    panel.hidden = !panel.hidden;
+    $("btn-layers").setAttribute("aria-expanded", String(!panel.hidden));
   });
-
-  // Farmer <-> LGU view (barangay priority list for MAO / MDRRMO)
-  document.getElementById("btn-role-switch").addEventListener("click", () => {
-    setRole(viewRole === "lgu" ? "farmer" : "lgu");
-  });
-  document.getElementById("btn-close-lgu")?.addEventListener("click", () => setRole("farmer"));
-
-  // Escape closes whichever right-side card is open
-  document.addEventListener("keydown", (e) => {
-    if (e.key !== "Escape") return;
-    document.getElementById("inspect-card")?.classList.add("hidden");
-    document.getElementById("lgu-card")?.classList.add("hidden");
-    closeOutlook();
-  });
-
-  document.getElementById("btn-reset-bounds").addEventListener("click", () => fitPilot(true));
-
-  // Collapse Left Panel (smooth accordion shrink)
-  const leftPanel = document.getElementById("left-panel");
-  const chevronBtn = document.getElementById("btn-chevron-left");
-  if (leftPanel && chevronBtn) {
-    chevronBtn.addEventListener("click", () => {
-      const isCollapsed = leftPanel.classList.toggle("collapsed");
-      chevronBtn.setAttribute("aria-expanded", String(!isCollapsed));
-    });
-  }
-
-  // Search Filter
-  document.getElementById("plot-search").addEventListener("input", (e) => {
-    const q = e.target.value.toLowerCase();
-    const match = appData.plots.features.find(
-      (f) =>
-        f.properties.plot_id.toLowerCase().includes(q) ||
-        f.properties.barangay.toLowerCase().includes(q) ||
-        f.properties.current_crop.toLowerCase().includes(q)
-    );
-    if (match && q.length >= 2) selectPlot(match, true);
-  });
-
-  // Priority Selector for Rotation Engine
-  document.getElementById("priority-select").addEventListener("change", (e) => {
-    renderRotations(e.target.value);
-  });
-
-  // Layer Checkboxes
-  document.getElementById("chk-risk").addEventListener("change", (e) => {
-    threeState.showParcels = e.target.checked;
-    if (threeState.parcelGroup) {
-      threeState.parcelGroup.visible = e.target.checked;
-    }
-    ["risk-zones-fill", "risk-zones-line"].forEach((id) => {
-      if (map && map.getLayer(id)) map.setLayoutProperty(id, "visibility", e.target.checked ? "visible" : "none");
-    });
-  });
-
-  document.getElementById("chk-flood").addEventListener("change", (e) => {
-    const checked = e.target.checked;
-    threeState.showFlood = checked;
-    if (threeState.waterMesh) {
-      threeState.waterMesh.visible = checked;
-    }
-    const dockFlood = document.getElementById("dock-flood");
-    if (dockFlood) {
-      dockFlood.classList.toggle("active", checked);
-      dockFlood.setAttribute("aria-pressed", String(checked));
-    }
-    if (!checked && sarMode !== "off") {
-      setSarMode("off", false);
-    } else if (checked && sarMode !== "post") {
-      setSarMode("post", false); // the flood mask is a post-storm product
-    }
-  });
-
-  document.getElementById("chk-flow").addEventListener("change", (e) => {
-    threeState.showCorridor = e.target.checked;
-    if (threeState.canalGroup) {
-      threeState.canalGroup.visible = e.target.checked;
-    }
-  });
-
-  // SAR Before/After Mini Switcher
-  document.querySelectorAll(".mini-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".mini-btn").forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      setSarMode(btn.dataset.sar);
-    });
-  });
-
-  // Timeline Scrubber
-  const slider = document.getElementById("time-slider");
-  // Stage labels use the real Sentinel-1 acquisition dates from the pipeline.
-  const sc = sarScenes();
-  const base = sc.baseline || [];
-  const stages = [
-    {
-      clock: base.length ? `${sceneDate(base[0], false)} – ${sceneDate(base[base.length - 1], false)} baseline` : "Baseline",
-      sub: base.length ? `Median of ${base.length} calm Sentinel-1 passes` : "Pre-storm reference",
-      sar: "off"
-    },
-    { clock: `${sceneDate(sc.just_before) || "Pre-storm"} · pre-storm`, sub: "Last calm pass before Kristine", sar: "pre" },
-    { clock: "21–26 Oct 2024 · Kristine", sub: "Clouds block optical satellites; storm-day radar unusable (wind)", sar: "off" },
-    { clock: `${sceneDate(sc.after) || "Post-storm"} · post-storm`, sub: "Sentinel-1 sees standing water", sar: "post" },
-    { clock: "Field action", sub: "Farmer gets the alert: trench & early harvest", sar: "off" },
-    { clock: "Next season", sub: "Rotation options vs current crop", sar: "off" }
-  ];
-  const initialStage = stages[Number(slider.value)] || stages[STAGE.POST];
-  document.getElementById("stage-clock").textContent = initialStage.clock;
-  document.getElementById("stage-sub").textContent = initialStage.sub;
-
-  slider.addEventListener("input", (e) => {
-    const idx = Number(e.target.value);
-    timelineStage = idx;
-    document.querySelectorAll(".scrubber-labels span").forEach((el, i) => {
-      el.classList.toggle("active", i === idx);
-    });
-    document.getElementById("stage-clock").textContent = stages[idx].clock;
-    document.getElementById("stage-sub").textContent = stages[idx].sub;
-    setSarMode(stages[idx].sar);
-
-    if (idx === STAGE.ACTION) {
-      setRole("farmer"); // show the plot card with the action and SMS
-    }
-    if (idx === STAGE.NEXT) document.querySelector('[data-drawer="rotations"]').click();
-  });
-
-  document.getElementById("btn-play-timeline").addEventListener("click", (e) => {
-    const btn = e.currentTarget;
-    if (playInterval) {
-      clearInterval(playInterval);
-      playInterval = null;
-      btn.setAttribute("aria-pressed", "false");
-      btn.innerHTML = '<i data-lucide="play" width="16" height="16" stroke-width="2.2"></i>';
-    } else {
-      btn.setAttribute("aria-pressed", "true");
-      btn.innerHTML = '<i data-lucide="pause" width="16" height="16" stroke-width="2.2"></i>';
-      playInterval = setInterval(() => {
-        slider.value = (Number(slider.value) + 1) % stages.length;
-        slider.dispatchEvent(new Event("input"));
-      }, 2200);
-    }
-    if (window.lucide) {
-      window.lucide.createIcons({ nodes: [btn] });
-    }
-  });
-
-  // Right Tool Dock
-  document.getElementById("dock-zoom-in").addEventListener("click", () => map.zoomIn());
-  document.getElementById("dock-zoom-out").addEventListener("click", () => map.zoomOut());
-  document.getElementById("dock-compass").addEventListener("click", () => map.resetNorth());
-  document.getElementById("dock-pitch").addEventListener("click", (e) => {
-    const btn = e.currentTarget;
+  ["lyr-flood", "lyr-towns", "lyr-risk", "lyr-canal"].forEach((id) => $(id).addEventListener("change", applyLayers));
+  $("btn-3d").setAttribute("aria-pressed", String(is3D));
+  $("btn-3d").addEventListener("click", () => {
     is3D = !is3D;
-    btn.textContent = is3D ? "3D" : "2D";
-    btn.classList.toggle("active", is3D);
-    btn.setAttribute("aria-pressed", String(is3D));
-    map.easeTo({ pitch: is3D ? 52 : 0 });
+    $("btn-3d").setAttribute("aria-pressed", String(is3D));
+    map.easeTo({ pitch: is3D ? (map.getZoom() > 12 ? 50 : 35) : 0, duration: 600 });
   });
-  document.getElementById("dock-sar").addEventListener("click", (e) => {
-    const active = e.currentTarget.classList.toggle("active");
-    e.currentTarget.setAttribute("aria-pressed", String(active));
-    setSarMode(active ? "post" : "off");
+  $("btn-zoom-in").addEventListener("click", () => map.zoomIn());
+  $("btn-zoom-out").addEventListener("click", () => map.zoomOut());
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { $("layers-panel").hidden = true; $("btn-layers").setAttribute("aria-expanded", "false"); }
   });
-  document.getElementById("dock-flood").addEventListener("click", () => {
-    const chk = document.getElementById("chk-flood");
-    chk.checked = !chk.checked;
-    chk.dispatchEvent(new Event("change"));
-  });
-  document.getElementById("dock-center").addEventListener("click", () => {
-    document.getElementById("btn-reset-bounds").click();
-  });
-
-  // Field Drowning Risk Symbology Popover (mutually exclusive with #inspect-card)
-  const riskBtn = document.getElementById("btn-risk-popover");
-  const riskPopover = document.getElementById("risk-symbology-popover");
-  if (riskBtn && riskPopover) {
-    riskBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const willOpen = riskPopover.classList.contains("hidden");
-      if (willOpen) {
-        document.getElementById("inspect-card").classList.add("hidden");
-      }
-      riskPopover.classList.toggle("hidden", !willOpen);
-      riskBtn.setAttribute("aria-expanded", String(willOpen));
-    });
-
-    riskPopover.addEventListener("click", (e) => e.stopPropagation());
-
-    document.addEventListener("click", (e) => {
-      if (!riskPopover.classList.contains("hidden") && !riskBtn.contains(e.target)) {
-        closeRiskPopover();
-      }
-    });
-
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && !riskPopover.classList.contains("hidden")) {
-        closeRiskPopover();
-        riskBtn.focus();
-      }
-    });
-  }
-}
-
-function setSarMode(mode, syncFloodCheckbox = true) {
-  const normalized = mode === "before" ? "pre" : mode === "after" ? "post" : mode;
-  sarMode = normalized;
-
-  document.querySelectorAll(".mini-btn").forEach((b) => {
-    b.classList.toggle("active", b.dataset.sar === normalized);
-  });
-
-  const dockSar = document.getElementById("dock-sar");
-  if (dockSar) {
-    const isActive = normalized !== "off";
-    dockSar.classList.toggle("active", isActive);
-    dockSar.setAttribute("aria-pressed", String(isActive));
-  }
-
-  if (syncFloodCheckbox) {
-    // The observed flood mask comes from the post-storm pass, so it only shows in "post".
-    const showWater = normalized === "post";
-    const chkFlood = document.getElementById("chk-flood");
-    if (chkFlood) {
-      chkFlood.checked = showWater;
-    }
-    threeState.showFlood = showWater;
-    if (threeState.waterMesh) {
-      threeState.waterMesh.visible = showWater;
-    }
-    const dockFlood = document.getElementById("dock-flood");
-    if (dockFlood) {
-      dockFlood.classList.toggle("active", showWater);
-      dockFlood.setAttribute("aria-pressed", String(showWater));
-    }
-  }
-
-  // Explain an empty pre-storm layer instead of leaving the user guessing
-  if (normalized === "pre" && appData) {
-    const before = appData.sar_backscatter_comparison?.before_event?.features || [];
-    if (!before.length) {
-      const d = sceneDate(sarScenes().just_before) || "Pre-storm pass";
-      showToast(`${d}: no standing water detected before the storm — fields were normal`);
-    }
-  }
-
-  if (map && map.getLayer("sar-pre-fill")) {
-    map.setLayoutProperty("sar-pre-fill", "visibility", normalized === "pre" ? "visible" : "none");
-    map.setLayoutProperty("sar-post-fill", "visibility", normalized === "post" ? "visible" : "none");
-  }
-
-  if (threeState.sarGroup) {
-    if (normalized === "off") {
-      threeState.sarGroup.visible = false;
-      sarSweepProgress = 0;
-    } else {
-      threeState.sarGroup.visible = true;
-      if (threeState.sarUniforms) {
-        threeState.sarUniforms.uMode.value = normalized === "pre" ? 0.0 : 1.0;
-      }
-      sarSweepProgress = normalized === "post" ? 0.01 : 0;
-    }
-  }
-
-  updateInspectSarReadout();
+  let rt = null;
+  window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(buildRibbon, 150); });
+  window.addEventListener("hashchange", () => { if (["#outlook", "#field", "#minalabac"].includes(location.hash)) setScope("pilot"); });
 }
 
 function startMapAnimations() {
