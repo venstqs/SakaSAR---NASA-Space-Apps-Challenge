@@ -117,7 +117,7 @@ Never mount the repo root as static files.
 
 ## 8. Open items (as of 14 Nov 2026)
 
-1. Public URL: enable GitHub Pages (Settings → Pages → `main` / root) or deploy `api.py`.
+1. Live dashboard (GitHub Pages, from `main`): https://venstqs.github.io/SakaSAR---NASA-Space-Apps-Challenge/
 2. Bare-field days: need 30 m Landsat/Sentinel-2 NDVI or the MAO cropping calendar.
 3. Submission: form text is drafted in `docs/SUBMISSION.md` (fill the TO DO fields); ≤30 s video or ≤7 slides,
    and a source for the reported Kristine flooding.
