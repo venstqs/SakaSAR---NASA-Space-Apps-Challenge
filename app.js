@@ -1354,6 +1354,7 @@ function selectPlot(feat, fly = true) {
       <p class="step-do">${escapeHtml(r.action)}</p>
       <p class="step-why">${escapeHtml(r.why)}</p>
     </li>`).join("");
+  renderScenario(p);
   renderDrain(p);
   renderRotations(currentPriority);
 
@@ -1411,6 +1412,86 @@ function renderRotations(priority = currentPriority) {
       <p class="rot-check">Check first: ${escapeHtml(s.risks_and_gaps)}</p>
     </li>`;
   }).join("");
+}
+
+// ---------- What to do next week: LSTM rain scenarios ----------
+const SCN_LABEL = [
+  { key: "dry", name: "Dry week", match: /dry/i },
+  { key: "normal", name: "Normal week", match: /typical/i },
+  { key: "typhoon", name: "Typhoon week", match: /Kristine/i },
+];
+const SCN_ACTIONS = {
+  dry: {
+    high: ["Fields drain this week: repair broken bunds and replant gaps.", "Keep one outlet open in case of a late shower.", "Apply fertiliser once the soil firms up."],
+    watch: ["Clear furrows and side-dress fertiliser while it is dry.", "Check that the low corners have drained."],
+    low: ["Prepare seed for the post-harvest legume crop.", "Normal field work."],
+  },
+  normal: {
+    high: ["Keep outlets open; do not fertilise while water stands.", "Walk the lowest bund after each rain and reopen the trench if it silts up."],
+    watch: ["Check the low corners after each rain band.", "Delay fertiliser by a few days if puddles stay."],
+    low: ["Normal field work; keep outlets clear."],
+  },
+  typhoon: {
+    high: ["Harvest mature rice now rather than risk losing it.", "Desilt the canal and pre-cut the drainage trench before the rain.", "Move fertiliser, seed and equipment to high ground."],
+    watch: ["Clear furrows and outlets before the rain arrives.", "Hold off planting until the storm passes."],
+    low: ["Secure stored grain and inputs.", "Check outlets once; this plot drains well."],
+  },
+};
+let scenarioKey = "normal";
+
+function renderScenario(p) {
+  const so = outlook?.scenario_outlook;
+  const btns = $("scn-btns"), out = $("scn-out");
+  if (!so) { btns.innerHTML = ""; out.innerHTML = `<p class="scn-note">The forecast model output is not available in this build.</p>`; return; }
+  const cases = SCN_LABEL.map((l) => ({ ...l, c: so.cases.find((c) => l.match.test(c.scenario)) })).filter((x) => x.c);
+  btns.innerHTML = cases.map((x) => `<button type="button" role="radio" class="scn-btn" data-key="${x.key}" aria-checked="${x.key === scenarioKey}">
+      <b>${x.name}</b><span>${fmt(x.c.rain_total_mm)} mm rain</span></button>`).join("");
+  btns.querySelectorAll(".scn-btn").forEach((b) => b.addEventListener("click", () => { scenarioKey = b.dataset.key; renderScenario(p); }));
+  const sel = cases.find((x) => x.key === scenarioKey) || cases[0];
+  const start = new Date(so.issued_after + "T00:00:00");
+  const days = sel.c.gwetroot_by_day.map((v, i) => {
+    const d = new Date(start); d.setDate(d.getDate() + i + 1);
+    const hpx = Math.max(6, Math.min(100, ((v - 0.6) / 0.4) * 100));
+    const o = v >= 0.97 ? 0.95 : v >= 0.9 ? 0.75 : 0.45;
+    return `<span class="dday" title="${d.getDate()} ${MONTHS[d.getMonth()]}: ${v.toFixed(2)} of saturation"><i style="--h:${hpx}%;--o:${o}"></i>${d.getDate()} ${MONTHS[d.getMonth()]}</span>`;
+  }).join("");
+  const wl = sel.c.days_waterlogged;
+  const verdict = wl >= 5 ? `<strong>Roots stay waterlogged</strong> on ${wl} of 7 days.`
+    : wl >= 1 ? `<strong>Waterlogged on ${wl} of 7 days</strong>, then the soil drains.`
+    : sel.c.end_of_week_class === "wet"
+      ? `<strong>Roots get very wet</strong> by the end of the week, close to full, but not waterlogged yet.`
+      : `<strong>Roots stay ${escapeHtml(sel.c.end_of_week_class)}.</strong> No waterlogging expected.`;
+  const acts = [...((SCN_ACTIONS[sel.key] || {})[p.risk_class] || [])];
+  if (sel.key === "typhoon" && p.risk_class !== "low") {
+    acts.unshift("Surface flooding comes first here: the radar saw standing water on this plot after Kristine, so water can pond before the roots fill up.");
+  }
+  out.innerHTML = `
+    <p class="scn-verdict">${verdict}</p>
+    <div class="drain-days" aria-label="Forecast root-zone saturation for the next 7 days">${days}</div>
+    <p class="scn-note">Soil today: ${escapeHtml(so.root_zone_class_today)} (${so.root_zone_today.toFixed(2)} of saturation, NASA POWER as of ${isoLabel(so.issued_after)}). Taller, darker bars mean wetter roots.</p>
+    <ul class="scn-actions">${acts.map((a) => `<li>${escapeHtml(a)}</li>`).join("")}</ul>
+    <p class="scn-note">The forecast covers the whole area (about 50 km); the actions use this plot's own ${escapeHtml(p.risk_class)} risk.</p>`;
+}
+
+// ---------- draggable cards (like the Bulos twin) ----------
+function makeDraggable(el) {
+  if (!el) return;
+  let sx = 0, sy = 0, ox = 0, oy = 0, on = false;
+  el.addEventListener("pointerdown", (e) => {
+    on = true; el.classList.add("dragging"); el.setPointerCapture(e.pointerId);
+    const r = el.getBoundingClientRect(), pr = el.offsetParent.getBoundingClientRect();
+    sx = e.clientX; sy = e.clientY; ox = r.left - pr.left; oy = r.top - pr.top;
+    el.style.left = `${ox}px`; el.style.top = `${oy}px`; el.style.bottom = "auto";
+  });
+  el.addEventListener("pointermove", (e) => {
+    if (!on) return;
+    const pr = el.offsetParent.getBoundingClientRect();
+    el.style.left = `${Math.min(Math.max(0, ox + e.clientX - sx), pr.width - el.offsetWidth)}px`;
+    el.style.top = `${Math.min(Math.max(0, oy + e.clientY - sy), pr.height - el.offsetHeight)}px`;
+  });
+  const end = () => { on = false; el.classList.remove("dragging"); };
+  el.addEventListener("pointerup", end);
+  el.addEventListener("pointercancel", end);
 }
 
 // ---------- the storm ribbon ----------
@@ -1535,6 +1616,8 @@ function renderAbout() {
 
 // ---------- events ----------
 function bindUI() {
+  makeDraggable($("legend"));
+  setTimeout(() => $("map-hint")?.classList.add("hidden"), 9000);
   $("tab-region").addEventListener("click", () => setScope("region"));
   $("tab-pilot").addEventListener("click", () => setScope("pilot"));
   $("muni-search").addEventListener("input", (e) => renderMuniList(e.target.value));

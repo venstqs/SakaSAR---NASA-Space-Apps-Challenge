@@ -73,10 +73,17 @@
             <div class="risk-meter" id="pd-risk"></div>
             <dl class="facts" id="pd-facts"></dl>
 
-            <h3 class="pd-h">What to do</h3>
+            <section class="nextweek" aria-labelledby="nw-title">
+              <h3 class="pd-h" id="nw-title">What to do next week</h3>
+              <p class="hint">Pick the rain you expect. Our LSTM model, trained on 25 years of NASA weather for this area, shows how wet the roots get.</p>
+              <div class="scn-btns" id="scn-btns" role="radiogroup" aria-label="Rain next week"></div>
+              <div class="scn-out" id="scn-out" aria-live="polite"></div>
+            </section>
+
+            <h3 class="pd-h">What to do now</h3>
             <ol class="steps" id="pd-steps"></ol>
 
-            <h3 class="pd-h" id="drain-heading">Will this field drain this week?</h3>
+            <h3 class="pd-h" id="drain-heading">Did our forecast work after Kristine?</h3>
             <div class="drain" id="pd-drain"></div>
 
             <h3 class="pd-h">Next season</h3>
@@ -129,6 +136,7 @@
       </div>
 
       <div class="legend" id="legend" aria-label="Legend"></div>
+      <p class="map-hint" id="map-hint">Drag to move. Right-drag or Ctrl+drag to turn and tilt.</p>
 
       <!-- The storm ribbon: daily rain and the radar passes that matter -->
       <section class="ribbon" id="ribbon" aria-label="Storm timeline">
