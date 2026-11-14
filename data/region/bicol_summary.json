@@ -1,0 +1,256 @@
+{
+ "region": "Bicol Region (Region V)",
+ "event": "Severe Tropical Storm Kristine (Trami), 21–26 Oct 2024",
+ "grid": "100 m, EPSG:32651",
+ "farmland_ha": 131745,
+ "flooded_farmland_ha": 3137,
+ "municipalities": 114,
+ "radar_coverage": 1.0,
+ "provinces": [
+  {
+   "province": "Camarines Sur",
+   "farmland_ha": 73670,
+   "flooded_farmland_ha": 2887,
+   "municipalities": 37,
+   "flooded_share": 0.0392
+  },
+  {
+   "province": "Albay",
+   "farmland_ha": 19890,
+   "flooded_farmland_ha": 250,
+   "municipalities": 18,
+   "flooded_share": 0.0126
+  },
+  {
+   "province": "Masbate",
+   "farmland_ha": 13330,
+   "flooded_farmland_ha": 0,
+   "municipalities": 21,
+   "flooded_share": 0.0
+  },
+  {
+   "province": "Catanduanes",
+   "farmland_ha": 2676,
+   "flooded_farmland_ha": 0,
+   "municipalities": 11,
+   "flooded_share": 0.0
+  },
+  {
+   "province": "Sorsogon",
+   "farmland_ha": 13223,
+   "flooded_farmland_ha": 0,
+   "municipalities": 15,
+   "flooded_share": 0.0
+  },
+  {
+   "province": "Camarines Norte",
+   "farmland_ha": 8956,
+   "flooded_farmland_ha": 0,
+   "municipalities": 12,
+   "flooded_share": 0.0
+  }
+ ],
+ "top_municipalities": [
+  {
+   "name": "Bula",
+   "province": "Camarines Sur",
+   "farmland_ha": 5526,
+   "flooded_farmland_ha": 1155,
+   "flooded_share": 0.209,
+   "radar_coverage": 1.0,
+   "sentinel1": "orbit 134, after 2024-11-02",
+   "rank": 1
+  },
+  {
+   "name": "Baao",
+   "province": "Camarines Sur",
+   "farmland_ha": 2669,
+   "flooded_farmland_ha": 736,
+   "flooded_share": 0.2758,
+   "radar_coverage": 1.0,
+   "sentinel1": "orbit 134, after 2024-11-02",
+   "rank": 2
+  },
+  {
+   "name": "Nabua",
+   "province": "Camarines Sur",
+   "farmland_ha": 3241,
+   "flooded_farmland_ha": 444,
+   "flooded_share": 0.137,
+   "radar_coverage": 1.0,
+   "sentinel1": "orbit 134, after 2024-11-02",
+   "rank": 3
+  },
+  {
+   "name": "Bato",
+   "province": "Camarines Sur",
+   "farmland_ha": 1604,
+   "flooded_farmland_ha": 407,
+   "flooded_share": 0.2537,
+   "radar_coverage": 1.0,
+   "sentinel1": "orbit 134, after 2024-11-02",
+   "rank": 4
+  },
+  {
+   "name": "Libon",
+   "province": "Albay",
+   "farmland_ha": 4199,
+   "flooded_farmland_ha": 246,
+   "flooded_share": 0.0586,
+   "radar_coverage": 1.0,
+   "sentinel1": "orbit 134, after 2024-11-02",
+   "rank": 5
+  },
+  {
+   "name": "Minalabac",
+   "province": "Camarines Sur",
+   "farmland_ha": 6465,
+   "flooded_farmland_ha": 73,
+   "flooded_share": 0.0113,
+   "radar_coverage": 1.0,
+   "sentinel1": "orbit 134, after 2024-11-02",
+   "rank": 6
+  },
+  {
+   "name": "San Fernando",
+   "province": "Camarines Sur",
+   "farmland_ha": 1636,
+   "flooded_farmland_ha": 47,
+   "flooded_share": 0.0287,
+   "radar_coverage": 1.0,
+   "sentinel1": "orbit 134, after 2024-11-02",
+   "rank": 7
+  },
+  {
+   "name": "Milaor",
+   "province": "Camarines Sur",
+   "farmland_ha": 2353,
+   "flooded_farmland_ha": 25,
+   "flooded_share": 0.0106,
+   "radar_coverage": 1.0,
+   "sentinel1": "orbit 134, after 2024-11-02",
+   "rank": 8
+  },
+  {
+   "name": "Polangui",
+   "province": "Albay",
+   "farmland_ha": 2382,
+   "flooded_farmland_ha": 4,
+   "flooded_share": 0.0017,
+   "radar_coverage": 1.0,
+   "sentinel1": "orbit 134, after 2024-11-02",
+   "rank": 9
+  },
+  {
+   "name": "Aroroy",
+   "province": "Masbate",
+   "farmland_ha": 361,
+   "flooded_farmland_ha": 0,
+   "flooded_share": 0.0,
+   "radar_coverage": 1.0,
+   "sentinel1": "orbit 134, after 2024-11-02",
+   "rank": 10
+  },
+  {
+   "name": "Bacacay",
+   "province": "Albay",
+   "farmland_ha": 637,
+   "flooded_farmland_ha": 0,
+   "flooded_share": 0.0,
+   "radar_coverage": 1.0,
+   "sentinel1": "orbit 134, after 2024-11-02",
+   "rank": 11
+  },
+  {
+   "name": "Bagamanoc",
+   "province": "Catanduanes",
+   "farmland_ha": 141,
+   "flooded_farmland_ha": 0,
+   "flooded_share": 0.0,
+   "radar_coverage": 1.0,
+   "sentinel1": "orbit 61, after 2024-10-28",
+   "rank": 12
+  },
+  {
+   "name": "Balatan",
+   "province": "Camarines Sur",
+   "farmland_ha": 74,
+   "flooded_farmland_ha": 0,
+   "flooded_share": 0.0,
+   "radar_coverage": 1.0,
+   "sentinel1": "orbit 134, after 2024-11-02",
+   "rank": 13
+  },
+  {
+   "name": "Baleno",
+   "province": "Masbate",
+   "farmland_ha": 89,
+   "flooded_farmland_ha": 0,
+   "flooded_share": 0.0,
+   "radar_coverage": 1.0,
+   "sentinel1": "orbit 134, after 2024-11-02",
+   "rank": 14
+  },
+  {
+   "name": "Balud",
+   "province": "Masbate",
+   "farmland_ha": 1097,
+   "flooded_farmland_ha": 0,
+   "flooded_share": 0.0,
+   "radar_coverage": 1.0,
+   "sentinel1": "orbit 134, after 2024-11-02",
+   "rank": 15
+  }
+ ],
+ "orbits": {
+  "134": {
+   "tau": -15.0,
+   "otsu": -11.83,
+   "after": "2024-11-02",
+   "baseline": [
+    "2024-09-15",
+    "2024-09-27",
+    "2024-10-09"
+   ]
+  },
+  "61": {
+   "tau": -15.0,
+   "otsu": -11.42,
+   "after": "2024-10-28",
+   "baseline": [
+    "2024-09-10",
+    "2024-10-04",
+    "2024-10-16"
+   ]
+  }
+ },
+ "overlay": {
+  "image": "data/region/bicol_flood.png",
+  "coordinates": [
+   [
+    122.29159,
+    14.60466
+   ],
+   [
+    124.46683,
+    14.60466
+   ],
+   [
+    124.46683,
+    11.79686
+   ],
+   [
+    122.29159,
+    11.79686
+   ]
+  ]
+ },
+ "method": "Sentinel-1 RTC VV at 100 m: flood = dark (Otsu-bounded threshold), ≥2 dB drop vs a 3-pass pre-storm median, slope < 5°, not permanent water; counted on ESA WorldCover cropland. Orbit 134 (after 2 Nov) where available, orbit 61 (after 28 Oct) elsewhere. Water under tall canopy and in built-up areas is missed; 100 m cells undercount small flooded paddies.",
+ "sources": [
+  "Sentinel-1 RTC (ESA/Copernicus, Microsoft Planetary Computer)",
+  "NASADEM (NASA)",
+  "ESA WorldCover 2021 (CC BY 4.0)",
+  "Municipal boundaries: NAMRIA/PSA via geoBoundaries (CC BY 3.0 IGO)"
+ ],
+ "processing_time_sec": 650.0
+}
