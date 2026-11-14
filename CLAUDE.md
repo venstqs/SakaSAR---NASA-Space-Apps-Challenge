@@ -127,3 +127,21 @@ Never mount the repo root as static files.
 2. Bare-field days: need 30 m Landsat/Sentinel-2 NDVI or the MAO cropping calendar.
 3. Submission: form text is drafted in `docs/SUBMISSION.md` (fill the TO DO fields); ≤30 s video or ≤7 slides,
    and a source for the reported Kristine flooding.
+
+## 9. Handoff — read this first if you are continuing the work
+
+State on 15 Nov 2026 (main): dashboard rebuilt (section 6); pipeline, LSTM, recommendations and datasets done.
+
+Rules that keep the project consistent:
+1. Run `python -m pytest -q` before every commit (27+ tests). Do not push if anything fails.
+2. Never put back: the Naga City plots, the 21 Oct radar pass as the "after" scene, the 100% hit rate as the headline,
+   invented numbers in the UI, or Claude co-author lines in commits.
+3. Pipeline outputs are generated: change the Python in `pipeline/`, then re-run it. Do not hand-edit `mock-data.json`.
+4. Test the dashboard in a real browser (local: `uvicorn api:app --port 8000`) at a 1534×728 window and a 390×844 phone.
+
+Still to do:
+- Bicol regional layer: run `python -m pipeline.bicol_region` (≈25 min, downloads cached in git-ignored `data/cache_region/`),
+  check that `data/region/bicol_summary.json` has radar_coverage near 1.0 and plausible flooded hectares, then commit `data/region/`.
+- README: add the Bicol region results and refresh `assets/screenshots/` from the new dashboard.
+- Submission (`docs/SUBMISSION.md`): demo video/slides link and a source for the reported Kristine flooding.
+
