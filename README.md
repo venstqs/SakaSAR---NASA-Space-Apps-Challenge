@@ -1,6 +1,8 @@
 <div align="center">
 
-# 🌾 Field Shift: Agro-Hydrological Decision Support
+<img src="assets/logo.png" alt="SakaSAR Logo" width="160" />
+
+# 🌾 SakaSAR — Field Shift: Agro-Hydrological Decision Support
 ### *Sub-Surface Dielectric & Micro-Topographic SAR Analytics for Root-Zone Hydrology and Adaptive Crop Rotation under Extreme Weather Regimes*
 
 [![NASA Space Apps Challenge 2026](https://img.shields.io/badge/NASA%20Space%20Apps-2026-0B3D91?style=for-the-badge&logo=nasa&logoColor=white)](https://www.spaceappschallenge.org/)
