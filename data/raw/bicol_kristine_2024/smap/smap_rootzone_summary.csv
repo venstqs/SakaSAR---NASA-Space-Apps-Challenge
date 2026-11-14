@@ -1,0 +1,6 @@
+metric,units,note
+smap_event_mean,m3/m3,Event-window mean root-zone soil moisture (2024-10-21 to 2024-10-26)
+smap_base30d_mean,m3/m3,30-day pre-event baseline mean (2024-09-21 to 2024-10-21)
+smap_base30d_std,m3/m3,30-day pre-event baseline std (2024-09-21 to 2024-10-21)
+smap_oct_clim_mean,m3/m3,3-year October climatology mean (Oct 2021-2023)
+smap_oct_clim_std,m3/m3,3-year October climatology std (Oct 2021-2023)
