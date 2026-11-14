@@ -8,16 +8,17 @@
     "event_reference": "STS Kristine (Trami) — Oct 21-26, 2024 (Sentinel-1 Pass 2024-11-02)",
     "grid_resolution": "30m Shared Grid",
     "licensing_cost": "₱0 (Open NASA & Copernicus Data)",
-    "processing_time": "0.7 sec",
+    "processing_time": "1.4 sec",
     "sar_hit_rate": "100%",
     "total_high_risk_ha": 6.2,
     "high_risk_plots": 2,
     "households_affected": 18,
     "avg_bare_field_days": 68,
     "datasets_used": [
-      "Sentinel-1 (ESA/Copernicus C-Band SAR VV/VH) — RTC, orbit 134, 2024-10-09 vs 2024-11-02",
+      "Sentinel-1 (ESA/Copernicus C-Band SAR VV/VH) — RTC, orbit 134; baseline median of 4 passes (2024-08-10 to 2024-09-27), just-before 2024-10-09, after 2024-11-02",
       "NASADEM (30m Slope, Flow Accumulation & TWI)",
       "NASA POWER (Daily PRECTOTCORR Rainfall — 510 mm antecedent + event)",
+      "ESA WorldCover 2021 (10m Land Cover — cropland / built-up / permanent-water mask)",
       "GPM IMERG — pending (feature/terrain-rain)",
       "SMAP Soil-Moisture Anomaly — pending (feature/terrain-rain)",
       "Landsat 8-9 / MODIS NDVI — pending (feature/rotation-engine; bare-field days are placeholders)",
@@ -32,11 +33,32 @@
     "data_mode": "real",
     "risk_formula": "round(100 × (0.45·S_SAR + 0.35·S_TWI + 0.20·S_Rain)); high ≥ 70, watch ≥ 40",
     "sar_scenes": {
-      "before": "S1A_IW_GRDH_1SDV_20241009T213901_20241009T213930_056031_06DA7E_rtc",
-      "after": "S1A_IW_GRDH_1SDV_20241102T213901_20241102T213930_056381_06E85F_rtc"
+      "baseline": [
+        "S1A_IW_GRDH_1SDV_20240810T213859_20240810T213928_055156_06B8D0_rtc",
+        "S1A_IW_GRDH_1SDV_20240822T213859_20240822T213928_055331_06BF3E_rtc",
+        "S1A_IW_GRDH_1SDV_20240915T213900_20240915T213929_055681_06CCB0_rtc",
+        "S1A_IW_GRDH_1SDV_20240927T213900_20240927T213929_055856_06D39E_rtc"
+      ],
+      "just_before": "S1A_IW_GRDH_1SDV_20241009T213901_20241009T213930_056031_06DA7E_rtc",
+      "after": "S1A_IW_GRDH_1SDV_20241102T213901_20241102T213930_056381_06E85F_rtc",
+      "storm_day_rejected": {
+        "item_id": "S1A_IW_GRDH_1SDV_20241021T213901_20241021T213930_056206_06E170_rtc",
+        "datetime": "2024-10-21T21:39:15Z",
+        "orbit": "descending 134",
+        "polarisations": "VV+VH",
+        "why_not_used": "taken at the storm peak (05:39 PHT 22 Oct): wind-roughened water brightened +5.3 dB regionally, so open water is not detectable in this scene"
+      }
     },
     "sar_flood_threshold_db": -15.0,
+    "pre_event_change_db": 0.31,
     "observed_flood_area_ha": 38.08,
+    "flooded_farmland_ha": 35.1,
+    "pilot_area_landcover_ha": {
+      "tree cover": 1.9,
+      "grassland": 4.8,
+      "cropland": 131.8,
+      "permanent water": 0.3
+    },
     "sar_hit_rate_plots": "10%",
     "sar_hit_rate_terrain_only": "31%",
     "sar_hit_rate_note": "sar_hit_rate = share of SAR-flooded 30 m cells in the pilot bbox that the full risk map rated high. It shares ΔVV with the flood mask, so it is a consistency check. sar_hit_rate_terrain_only uses a model without SAR (terrain + rain) and is the independent test. sar_hit_rate_plots uses whole-plot classes (CLAUDE.md §3D.3). All are n/a when the SAR flood mask is empty.",
@@ -44,24 +66,47 @@
       "high": ">= 70",
       "watch": "40-69",
       "low": "< 40",
-      "missing": "no valid SAR pixel (flagged, not scored)"
+      "missing": "no valid SAR pixel (flagged, not scored)",
+      "excluded": "built-up or permanent water per WorldCover (not farmland, not scored)"
+    },
+    "grid_layers": {
+      "crs": "EPSG:32651",
+      "cell_m": 30.0,
+      "layers": [
+        "wetness_change_vv_db",
+        "observed_flood",
+        "twi",
+        "slope_deg",
+        "risk_score",
+        "risk_class",
+        "landcover"
+      ],
+      "missing_value_flag": "NaN for float layers; risk_class -1 = missing SAR, -2 = excluded land cover",
+      "missing_cells_in_pilot_area": {
+        "sar": 0,
+        "terrain": 0,
+        "landcover": 0
+      },
+      "geotiffs": "data/layers/*.tif"
     },
     "pilot_area_class_shares": {
+      "excluded_ha": 0.27,
+      "excluded_share": 0.002,
       "missing_ha": 0.0,
       "missing_share": 0.0,
-      "low_ha": 48.15,
-      "low_share": 0.347,
-      "watch_ha": 31.86,
-      "watch_share": 0.23,
-      "high_ha": 58.68,
-      "high_share": 0.423
+      "low_ha": 44.64,
+      "low_share": 0.322,
+      "watch_ha": 37.53,
+      "watch_share": 0.271,
+      "high_ha": 56.25,
+      "high_share": 0.406
     },
     "barangay_ranking": [
       {
         "barangay": "Brgy. Taban",
         "plots": 2,
-        "high_risk_ha": 2.79,
-        "watch_ha": 1.35,
+        "high_risk_ha": 3.15,
+        "watch_ha": 0.72,
         "high_risk_households": 8,
         "max_risk_score": 84,
         "rank": 1
@@ -69,8 +114,8 @@
       {
         "barangay": "Brgy. Bagongbong",
         "plots": 1,
-        "high_risk_ha": 2.79,
-        "watch_ha": 0.36,
+        "high_risk_ha": 2.52,
+        "watch_ha": 0.63,
         "high_risk_households": 10,
         "max_risk_score": 78,
         "rank": 2
@@ -79,7 +124,7 @@
         "barangay": "Brgy. Catanusan",
         "plots": 2,
         "high_risk_ha": 0.0,
-        "watch_ha": 0.99,
+        "watch_ha": 1.62,
         "high_risk_households": 0,
         "max_risk_score": 40,
         "rank": 3
@@ -123,33 +168,38 @@
           "households": 10,
           "risk_class": "high",
           "risk_score": 78,
-          "sar_wetness_change_db": -8.42,
+          "sar_wetness_change_db": -6.2,
           "twi_value": 8.7,
           "current_crop": "Irrigated Lowland Rice",
           "bare_field_days_per_year": 72,
-          "plain_language_action": "High drowning risk driven by a -8.4 dB Sentinel-1 wetness drop on ground that collects runoff (TWI 8.7). Open field outlets and cut a 30 cm drainage trench along the lowest bund within 48 h; harvest mature rice early if water stands more than 2 days.",
+          "plain_language_action": "High drowning risk driven by a -6.2 dB Sentinel-1 wetness drop on ground that collects runoff (TWI 8.7). Open field outlets and cut a 30 cm drainage trench along the lowest bund within 48 h; harvest mature rice early if water stands more than 2 days.",
           "sms_alert": "FIELD SHIFT ALERT: PL-01 (3.4ha, Bagongbong) HIGH drowning risk (78/100). Open outlets, trench lowest bund in 48h; harvest mature rice early.",
           "s_sar": 1.0,
           "s_twi": 0.375,
           "s_rain": 1.0,
-          "vh_wetness_change_db": -6.98,
-          "vv_before_db": -7.34,
+          "vh_wetness_change_db": -5.68,
+          "vv_before_db": -9.56,
           "vv_after_db": -15.77,
+          "pre_event_change_db": 2.22,
+          "baseline_spread_db": 2.25,
           "flooded_pixel_fraction": 0.657,
           "mean_slope_deg": 2.12,
           "mean_elevation_m": 0.6,
           "polygon_area_ha": 3.4,
           "risk_zone_shares": {
+            "excluded_ha": 0.0,
+            "excluded_share": 0.0,
             "missing_ha": 0.0,
             "missing_share": 0.0,
             "low_ha": 0.0,
             "low_share": 0.0,
-            "watch_ha": 0.36,
-            "watch_share": 0.114,
-            "high_ha": 2.79,
-            "high_share": 0.886
+            "watch_ha": 0.63,
+            "watch_share": 0.2,
+            "high_ha": 2.52,
+            "high_share": 0.8
           },
-          "missing_data_fraction": 0.0
+          "missing_data_fraction": 0.0,
+          "cropland_fraction": 1.0
         },
         "geometry": {
           "type": "Polygon",
@@ -189,33 +239,38 @@
           "households": 8,
           "risk_class": "high",
           "risk_score": 84,
-          "sar_wetness_change_db": -6.9,
+          "sar_wetness_change_db": -6.38,
           "twi_value": 10.5,
           "current_crop": "Irrigated Lowland Rice",
           "bare_field_days_per_year": 66,
-          "plain_language_action": "High drowning risk driven by a -6.9 dB Sentinel-1 wetness drop on ground that collects runoff (TWI 10.5). Open field outlets and cut a 30 cm drainage trench along the lowest bund within 48 h; harvest mature rice early if water stands more than 2 days.",
+          "plain_language_action": "High drowning risk driven by a -6.4 dB Sentinel-1 wetness drop on ground that collects runoff (TWI 10.5). Open field outlets and cut a 30 cm drainage trench along the lowest bund within 48 h; harvest mature rice early if water stands more than 2 days.",
           "sms_alert": "FIELD SHIFT ALERT: PL-02 (2.8ha, Taban) HIGH drowning risk (84/100). Open outlets, trench lowest bund in 48h; harvest mature rice early.",
           "s_sar": 1.0,
           "s_twi": 0.548,
           "s_rain": 1.0,
-          "vh_wetness_change_db": -5.97,
-          "vv_before_db": -7.45,
+          "vh_wetness_change_db": -5.24,
+          "vv_before_db": -7.96,
           "vv_after_db": -14.34,
+          "pre_event_change_db": 0.52,
+          "baseline_spread_db": 1.62,
           "flooded_pixel_fraction": 0.6,
           "mean_slope_deg": 0.66,
           "mean_elevation_m": 2.6,
           "polygon_area_ha": 2.8,
           "risk_zone_shares": {
+            "excluded_ha": 0.0,
+            "excluded_share": 0.0,
             "missing_ha": 0.0,
             "missing_share": 0.0,
-            "low_ha": 0.18,
-            "low_share": 0.067,
-            "watch_ha": 0.18,
-            "watch_share": 0.067,
+            "low_ha": 0.27,
+            "low_share": 0.1,
+            "watch_ha": 0.09,
+            "watch_share": 0.033,
             "high_ha": 2.34,
             "high_share": 0.867
           },
-          "missing_data_fraction": 0.0
+          "missing_data_fraction": 0.0,
+          "cropland_fraction": 0.933
         },
         "geometry": {
           "type": "Polygon",
@@ -254,34 +309,39 @@
           "hectares": 2.1,
           "households": 5,
           "risk_class": "watch",
-          "risk_score": 59,
-          "sar_wetness_change_db": -1.92,
+          "risk_score": 60,
+          "sar_wetness_change_db": -2.01,
           "twi_value": 9.9,
           "current_crop": "White Corn",
           "bare_field_days_per_year": 81,
-          "plain_language_action": "Moderate drowning risk, mainly from a -1.9 dB Sentinel-1 wetness drop. Clear perimeter furrows and field outlets before the next rain band and re-check after the next Sentinel-1 pass (12-day repeat).",
-          "sms_alert": "FIELD SHIFT WATCH: PL-03 (2.1ha, Taban) moderate risk (59/100). Clear furrows and outlets before next rain; recheck in 12 days.",
-          "s_sar": 0.479,
+          "plain_language_action": "Moderate drowning risk, mainly from a -2.0 dB Sentinel-1 wetness drop. Clear perimeter furrows and field outlets before the next rain band and re-check after the next Sentinel-1 pass (12-day repeat).",
+          "sms_alert": "FIELD SHIFT WATCH: PL-03 (2.1ha, Taban) moderate risk (60/100). Clear furrows and outlets before next rain; recheck in 12 days.",
+          "s_sar": 0.503,
           "s_twi": 0.485,
           "s_rain": 1.0,
-          "vh_wetness_change_db": 0.5,
-          "vv_before_db": -8.48,
+          "vh_wetness_change_db": 0.87,
+          "vv_before_db": -8.39,
           "vv_after_db": -10.4,
+          "pre_event_change_db": -0.1,
+          "baseline_spread_db": 2.21,
           "flooded_pixel_fraction": 0.0,
           "mean_slope_deg": 0.71,
           "mean_elevation_m": 3.4,
           "polygon_area_ha": 2.1,
           "risk_zone_shares": {
+            "excluded_ha": 0.0,
+            "excluded_share": 0.0,
             "missing_ha": 0.0,
             "missing_share": 0.0,
-            "low_ha": 0.18,
-            "low_share": 0.1,
-            "watch_ha": 1.17,
-            "watch_share": 0.65,
-            "high_ha": 0.45,
-            "high_share": 0.25
+            "low_ha": 0.36,
+            "low_share": 0.2,
+            "watch_ha": 0.63,
+            "watch_share": 0.35,
+            "high_ha": 0.81,
+            "high_share": 0.45
           },
-          "missing_data_fraction": 0.0
+          "missing_data_fraction": 0.0,
+          "cropland_fraction": 1.0
         },
         "geometry": {
           "type": "Polygon",
@@ -321,7 +381,7 @@
           "households": 4,
           "risk_class": "watch",
           "risk_score": 40,
-          "sar_wetness_change_db": 1.34,
+          "sar_wetness_change_db": 0.13,
           "twi_value": 10.7,
           "current_crop": "Yellow Corn",
           "bare_field_days_per_year": 64,
@@ -330,24 +390,29 @@
           "s_sar": 0.0,
           "s_twi": 0.572,
           "s_rain": 1.0,
-          "vh_wetness_change_db": 1.87,
-          "vv_before_db": -8.98,
+          "vh_wetness_change_db": 2.94,
+          "vv_before_db": -7.77,
           "vv_after_db": -7.64,
+          "pre_event_change_db": -1.21,
+          "baseline_spread_db": 1.14,
           "flooded_pixel_fraction": 0.0,
           "mean_slope_deg": 0.94,
           "mean_elevation_m": 3.6,
           "polygon_area_ha": 1.9,
           "risk_zone_shares": {
+            "excluded_ha": 0.0,
+            "excluded_share": 0.0,
             "missing_ha": 0.0,
             "missing_share": 0.0,
-            "low_ha": 1.17,
-            "low_share": 0.65,
-            "watch_ha": 0.63,
-            "watch_share": 0.35,
+            "low_ha": 0.99,
+            "low_share": 0.55,
+            "watch_ha": 0.81,
+            "watch_share": 0.45,
             "high_ha": 0.0,
             "high_share": 0.0
           },
-          "missing_data_fraction": 0.0
+          "missing_data_fraction": 0.0,
+          "cropland_fraction": 1.0
         },
         "geometry": {
           "type": "Polygon",
@@ -387,33 +452,38 @@
           "households": 6,
           "risk_class": "low",
           "risk_score": 33,
-          "sar_wetness_change_db": 1.89,
+          "sar_wetness_change_db": 0.4,
           "twi_value": 8.7,
           "current_crop": "Upland Rice",
           "bare_field_days_per_year": 55,
-          "plain_language_action": "Low drowning risk: no ponding signal in Sentinel-1 (VV backscatter rose 1.9 dB) and moderate terrain wetness (TWI 8.7). Normal drainage is adequate; good candidate for a post-harvest legume rotation.",
+          "plain_language_action": "Low drowning risk: no ponding signal in Sentinel-1 (VV backscatter rose 0.4 dB) and moderate terrain wetness (TWI 8.7). Normal drainage is adequate; good candidate for a post-harvest legume rotation.",
           "sms_alert": "FIELD SHIFT CLEAR: PL-05 (3.5ha, Catanusan) LOW risk (33/100). No ponding seen by satellite; keep outlets clear, plan legume rotation.",
           "s_sar": 0.0,
           "s_twi": 0.367,
           "s_rain": 1.0,
-          "vh_wetness_change_db": 1.36,
-          "vv_before_db": -9.72,
+          "vh_wetness_change_db": 1.64,
+          "vv_before_db": -8.23,
           "vv_after_db": -7.83,
+          "pre_event_change_db": -1.49,
+          "baseline_spread_db": 1.54,
           "flooded_pixel_fraction": 0.0,
           "mean_slope_deg": 0.94,
           "mean_elevation_m": 5.1,
           "polygon_area_ha": 3.5,
           "risk_zone_shares": {
+            "excluded_ha": 0.0,
+            "excluded_share": 0.0,
             "missing_ha": 0.0,
             "missing_share": 0.0,
-            "low_ha": 2.79,
-            "low_share": 0.886,
-            "watch_ha": 0.36,
-            "watch_share": 0.114,
+            "low_ha": 2.34,
+            "low_share": 0.743,
+            "watch_ha": 0.81,
+            "watch_share": 0.257,
             "high_ha": 0.0,
             "high_share": 0.0
           },
-          "missing_data_fraction": 0.0
+          "missing_data_fraction": 0.0,
+          "cropland_fraction": 1.0
         },
         "geometry": {
           "type": "Polygon",
@@ -452,7 +522,7 @@
         "type": "Feature",
         "properties": {
           "label": "Observed Post-Storm Sentinel-1 SAR Flood Mask",
-          "rule": "VV_after < -15.0 dB AND ΔVV < -2.0 dB AND slope < 5.0°"
+          "rule": "VV_after < -15.0 dB AND ΔVV < -2.0 dB AND slope < 5.0° AND not permanent water (WorldCover)"
         },
         "geometry": {
           "type": "Polygon",
@@ -510,7 +580,7 @@
         "type": "Feature",
         "properties": {
           "label": "Observed Post-Storm Sentinel-1 SAR Flood Mask",
-          "rule": "VV_after < -15.0 dB AND ΔVV < -2.0 dB AND slope < 5.0°"
+          "rule": "VV_after < -15.0 dB AND ΔVV < -2.0 dB AND slope < 5.0° AND not permanent water (WorldCover)"
         },
         "geometry": {
           "type": "Polygon",
@@ -858,7 +928,111 @@
         "type": "Feature",
         "properties": {
           "label": "Observed Post-Storm Sentinel-1 SAR Flood Mask",
-          "rule": "VV_after < -15.0 dB AND ΔVV < -2.0 dB AND slope < 5.0°"
+          "rule": "VV_after < -15.0 dB AND ΔVV < -2.0 dB AND slope < 5.0° AND not permanent water (WorldCover)"
+        },
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                123.202492,
+                13.541242
+              ],
+              [
+                123.20166,
+                13.541243
+              ],
+              [
+                123.201661,
+                13.541514
+              ],
+              [
+                123.201383,
+                13.541514
+              ],
+              [
+                123.201384,
+                13.5426
+              ],
+              [
+                123.201661,
+                13.542599
+              ],
+              [
+                123.201662,
+                13.542871
+              ],
+              [
+                123.201939,
+                13.54287
+              ],
+              [
+                123.201939,
+                13.543142
+              ],
+              [
+                123.202494,
+                13.543141
+              ],
+              [
+                123.202493,
+                13.542327
+              ],
+              [
+                123.203048,
+                13.542327
+              ],
+              [
+                123.203047,
+                13.541784
+              ],
+              [
+                123.20277,
+                13.541785
+              ],
+              [
+                123.20277,
+                13.541513
+              ],
+              [
+                123.202492,
+                13.541514
+              ],
+              [
+                123.202492,
+                13.541242
+              ]
+            ],
+            [
+              [
+                123.201661,
+                13.542328
+              ],
+              [
+                123.201661,
+                13.542057
+              ],
+              [
+                123.201938,
+                13.542057
+              ],
+              [
+                123.201938,
+                13.542328
+              ],
+              [
+                123.201661,
+                13.542328
+              ]
+            ]
+          ]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "label": "Observed Post-Storm Sentinel-1 SAR Flood Mask",
+          "rule": "VV_after < -15.0 dB AND ΔVV < -2.0 dB AND slope < 5.0° AND not permanent water (WorldCover)"
         },
         "geometry": {
           "type": "Polygon",
@@ -932,7 +1106,7 @@
         "type": "Feature",
         "properties": {
           "label": "Observed Post-Storm Sentinel-1 SAR Flood Mask",
-          "rule": "VV_after < -15.0 dB AND ΔVV < -2.0 dB AND slope < 5.0°"
+          "rule": "VV_after < -15.0 dB AND ΔVV < -2.0 dB AND slope < 5.0° AND not permanent water (WorldCover)"
         },
         "geometry": {
           "type": "Polygon",
@@ -1175,110 +1349,6 @@
             ]
           ]
         }
-      },
-      {
-        "type": "Feature",
-        "properties": {
-          "label": "Observed Post-Storm Sentinel-1 SAR Flood Mask",
-          "rule": "VV_after < -15.0 dB AND ΔVV < -2.0 dB AND slope < 5.0°"
-        },
-        "geometry": {
-          "type": "Polygon",
-          "coordinates": [
-            [
-              [
-                123.202492,
-                13.541242
-              ],
-              [
-                123.20166,
-                13.541243
-              ],
-              [
-                123.201661,
-                13.541514
-              ],
-              [
-                123.201383,
-                13.541514
-              ],
-              [
-                123.201384,
-                13.5426
-              ],
-              [
-                123.201661,
-                13.542599
-              ],
-              [
-                123.201662,
-                13.542871
-              ],
-              [
-                123.201939,
-                13.54287
-              ],
-              [
-                123.201939,
-                13.543142
-              ],
-              [
-                123.202494,
-                13.543141
-              ],
-              [
-                123.202493,
-                13.542327
-              ],
-              [
-                123.203048,
-                13.542327
-              ],
-              [
-                123.203047,
-                13.541784
-              ],
-              [
-                123.20277,
-                13.541785
-              ],
-              [
-                123.20277,
-                13.541513
-              ],
-              [
-                123.202492,
-                13.541514
-              ],
-              [
-                123.202492,
-                13.541242
-              ]
-            ],
-            [
-              [
-                123.201661,
-                13.542328
-              ],
-              [
-                123.201661,
-                13.542057
-              ],
-              [
-                123.201938,
-                13.542057
-              ],
-              [
-                123.201938,
-                13.542328
-              ],
-              [
-                123.201661,
-                13.542328
-              ]
-            ]
-          ]
-        }
       }
     ]
   },
@@ -1294,7 +1364,7 @@
           "type": "Feature",
           "properties": {
             "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
-            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB vs baseline"
           },
           "geometry": {
             "type": "Polygon",
@@ -1309,22 +1379,6 @@
                   13.544767
                 ],
                 [
-                  123.204436,
-                  13.544496
-                ],
-                [
-                  123.204158,
-                  13.544496
-                ],
-                [
-                  123.204158,
-                  13.544225
-                ],
-                [
-                  123.204435,
-                  13.544225
-                ],
-                [
                   123.204435,
                   13.543953
                 ],
@@ -1343,42 +1397,58 @@
                 [
                   123.20499,
                   13.543953
+                ],
+                [
+                  123.205544,
+                  13.543953
+                ],
+                [
+                  123.205544,
+                  13.544224
+                ],
+                [
+                  123.206376,
+                  13.544223
                 ],
                 [
                   123.206376,
                   13.543952
                 ],
                 [
-                  123.206376,
-                  13.543409
+                  123.206099,
+                  13.543952
+                ],
+                [
+                  123.206099,
+                  13.543681
+                ],
+                [
+                  123.205821,
+                  13.543681
                 ],
                 [
                   123.205821,
                   13.54341
                 ],
                 [
-                  123.205821,
+                  123.206098,
+                  13.54341
+                ],
+                [
+                  123.206098,
                   13.543138
                 ],
                 [
-                  123.205266,
-                  13.543139
+                  123.206375,
+                  13.543138
                 ],
                 [
-                  123.205266,
-                  13.542868
-                ],
-                [
-                  123.205543,
+                  123.206375,
                   13.542867
                 ],
                 [
-                  123.205543,
-                  13.542325
-                ],
-                [
-                  123.206097,
-                  13.542324
+                  123.206098,
+                  13.542867
                 ],
                 [
                   123.206098,
@@ -1397,28 +1467,28 @@
                   13.541782
                 ],
                 [
-                  123.206097,
-                  13.541511
-                ],
-                [
-                  123.206374,
-                  13.54151
-                ],
-                [
-                  123.206374,
-                  13.541239
-                ],
-                [
                   123.206096,
                   13.541239
+                ],
+                [
+                  123.205265,
+                  13.54124
+                ],
+                [
+                  123.205264,
+                  13.540969
                 ],
                 [
                   123.206096,
                   13.540968
+                ],
+                [
+                  123.206096,
+                  13.540697
                 ],
                 [
                   123.206373,
-                  13.540968
+                  13.540697
                 ],
                 [
                   123.206373,
@@ -1433,24 +1503,32 @@
                   13.540154
                 ],
                 [
-                  123.207482,
+                  123.208036,
                   13.540153
                 ],
                 [
+                  123.208036,
+                  13.539881
+                ],
+                [
+                  123.207482,
+                  13.539882
+                ],
+                [
                   123.207481,
-                  13.539339
+                  13.539611
                 ],
                 [
-                  123.207758,
-                  13.539339
-                ],
-                [
-                  123.207759,
+                  123.208313,
                   13.53961
+                ],
+                [
+                  123.208313,
+                  13.539339
                 ],
                 [
                   123.208036,
-                  13.53961
+                  13.539339
                 ],
                 [
                   123.208035,
@@ -1462,6 +1540,46 @@
                 ],
                 [
                   123.208312,
+                  13.538525
+                ],
+                [
+                  123.208589,
+                  13.538525
+                ],
+                [
+                  123.208589,
+                  13.5384
+                ],
+                [
+                  123.201103,
+                  13.5384
+                ],
+                [
+                  123.201104,
+                  13.538531
+                ],
+                [
+                  123.200549,
+                  13.538531
+                ],
+                [
+                  123.200549,
+                  13.5384
+                ],
+                [
+                  123.199717,
+                  13.5384
+                ],
+                [
+                  123.199717,
+                  13.538532
+                ],
+                [
+                  123.19944,
+                  13.538532
+                ],
+                [
+                  123.19944,
                   13.5384
                 ],
                 [
@@ -1470,11 +1588,11 @@
                 ],
                 [
                   123.198054,
-                  13.538533
+                  13.538804
                 ],
                 [
                   123.197499,
-                  13.538534
+                  13.538805
                 ],
                 [
                   123.1975,
@@ -1486,14 +1604,22 @@
                 ],
                 [
                   123.197223,
-                  13.53989
+                  13.539619
                 ],
                 [
                   123.1975,
-                  13.53989
+                  13.539619
                 ],
                 [
                   123.197501,
+                  13.540161
+                ],
+                [
+                  123.197778,
+                  13.540161
+                ],
+                [
+                  123.197778,
                   13.540704
                 ],
                 [
@@ -1510,23 +1636,15 @@
                 ],
                 [
                   123.196946,
-                  13.539619
+                  13.53989
+                ],
+                [
+                  123.196669,
+                  13.539891
                 ],
                 [
                   123.196668,
                   13.539619
-                ],
-                [
-                  123.196668,
-                  13.539348
-                ],
-                [
-                  123.196391,
-                  13.539348
-                ],
-                [
-                  123.196391,
-                  13.53962
                 ],
                 [
                   123.1963,
@@ -1541,20 +1659,28 @@
                   13.542604
                 ],
                 [
+                  123.196393,
+                  13.542332
+                ],
+                [
+                  123.197225,
+                  13.542332
+                ],
+                [
+                  123.197225,
+                  13.542603
+                ],
+                [
+                  123.196948,
+                  13.542603
+                ],
+                [
+                  123.196948,
+                  13.542874
+                ],
+                [
                   123.196394,
                   13.542875
-                ],
-                [
-                  123.1963,
-                  13.542875
-                ],
-                [
-                  123.1963,
-                  13.543146
-                ],
-                [
-                  123.196394,
-                  13.543146
                 ],
                 [
                   123.196394,
@@ -1566,22 +1692,30 @@
                 ],
                 [
                   123.196672,
-                  13.54396
+                  13.544231
                 ],
                 [
-                  123.196395,
-                  13.54396
+                  123.196949,
+                  13.544231
                 ],
                 [
-                  123.196395,
-                  13.544502
+                  123.19695,
+                  13.544773
                 ],
                 [
-                  123.1963,
-                  13.544502
+                  123.199168,
+                  13.5448
                 ],
                 [
-                  123.1963,
+                  123.199168,
+                  13.5445
+                ],
+                [
+                  123.199445,
+                  13.5445
+                ],
+                [
+                  123.199445,
                   13.5448
                 ],
                 [
@@ -1606,10 +1740,6 @@
                 ],
                 [
                   123.203881,
-                  13.544768
-                ],
-                [
-                  123.203604,
                   13.5448
                 ],
                 [
@@ -1619,104 +1749,74 @@
               ],
               [
                 [
-                  123.204989,
-                  13.542868
+                  123.200277,
+                  13.544771
                 ],
                 [
-                  123.204989,
-                  13.542597
+                  123.200277,
+                  13.544499
                 ],
-                [
-                  123.205266,
-                  13.542596
-                ],
-                [
-                  123.205266,
-                  13.542868
-                ],
-                [
-                  123.204989,
-                  13.542868
-                ]
-              ],
-              [
-                [
-                  123.196672,
-                  13.544502
-                ],
-                [
-                  123.196673,
-                  13.544773
-                ],
-                [
-                  123.196395,
-                  13.544774
-                ],
-                [
-                  123.196395,
-                  13.544502
-                ],
-                [
-                  123.196672,
-                  13.544502
-                ]
-              ],
-              [
-                [
-                  123.196672,
-                  13.544231
-                ],
-                [
-                  123.196949,
-                  13.544231
-                ],
-                [
-                  123.19695,
-                  13.544502
-                ],
-                [
-                  123.196672,
-                  13.544502
-                ],
-                [
-                  123.196672,
-                  13.544231
-                ]
-              ],
-              [
-                [
-                  123.203326,
-                  13.543954
-                ],
-                [
-                  123.203881,
-                  13.543954
-                ],
-                [
-                  123.203881,
-                  13.544225
-                ],
-                [
-                  123.203326,
-                  13.544226
-                ],
-                [
-                  123.203326,
-                  13.543954
-                ]
-              ],
-              [
                 [
                   123.200554,
-                  13.543957
+                  13.544499
                 ],
                 [
-                  123.200276,
-                  13.543957
+                  123.200554,
+                  13.54477
+                ],
+                [
+                  123.200277,
+                  13.544771
+                ]
+              ],
+              [
+                [
+                  123.199722,
+                  13.5445
+                ],
+                [
+                  123.199722,
+                  13.544229
+                ],
+                [
+                  123.199999,
+                  13.544228
+                ],
+                [
+                  123.199999,
+                  13.543686
                 ],
                 [
                   123.200276,
                   13.543686
+                ],
+                [
+                  123.200276,
+                  13.543414
+                ],
+                [
+                  123.200553,
+                  13.543414
+                ],
+                [
+                  123.200553,
+                  13.543143
+                ],
+                [
+                  123.201107,
+                  13.543142
+                ],
+                [
+                  123.201108,
+                  13.543414
+                ],
+                [
+                  123.20083,
+                  13.543414
+                ],
+                [
+                  123.200831,
+                  13.543685
                 ],
                 [
                   123.200553,
@@ -1725,38 +1825,94 @@
                 [
                   123.200554,
                   13.543957
+                ],
+                [
+                  123.200276,
+                  13.543957
+                ],
+                [
+                  123.200277,
+                  13.544499
+                ],
+                [
+                  123.199722,
+                  13.5445
                 ]
               ],
               [
                 [
-                  123.203049,
-                  13.543955
+                  123.205544,
+                  13.543139
                 ],
-                [
-                  123.202494,
-                  13.543955
-                ],
-                [
-                  123.202494,
-                  13.543684
-                ],
-                [
-                  123.203049,
-                  13.543683
-                ],
-                [
-                  123.203049,
-                  13.543955
-                ]
-              ],
-              [
                 [
                   123.205266,
-                  13.542325
+                  13.543139
+                ],
+                [
+                  123.205266,
+                  13.542868
+                ],
+                [
+                  123.205543,
+                  13.542867
+                ],
+                [
+                  123.205544,
+                  13.543139
+                ]
+              ],
+              [
+                [
+                  123.200275,
+                  13.542872
+                ],
+                [
+                  123.199998,
+                  13.542872
+                ],
+                [
+                  123.199998,
+                  13.542601
+                ],
+                [
+                  123.200275,
+                  13.5426
+                ],
+                [
+                  123.200275,
+                  13.542872
+                ]
+              ],
+              [
+                [
+                  123.201384,
+                  13.542871
+                ],
+                [
+                  123.201107,
+                  13.542871
+                ],
+                [
+                  123.201107,
+                  13.5426
+                ],
+                [
+                  123.201384,
+                  13.5426
+                ],
+                [
+                  123.201384,
+                  13.542871
+                ]
+              ],
+              [
+                [
+                  123.204156,
+                  13.541784
                 ],
                 [
                   123.204711,
-                  13.542326
+                  13.541783
                 ],
                 [
                   123.204711,
@@ -1776,72 +1932,48 @@
                 ],
                 [
                   123.203879,
-                  13.541784
+                  13.541512
+                ],
+                [
+                  123.204156,
+                  13.541512
                 ],
                 [
                   123.204156,
                   13.541784
+                ]
+              ],
+              [
+                [
+                  123.20582,
+                  13.542596
                 ],
                 [
-                  123.204156,
-                  13.542055
+                  123.205543,
+                  13.542596
                 ],
                 [
-                  123.204434,
-                  13.542055
-                ],
-                [
-                  123.204433,
-                  13.541512
-                ],
-                [
-                  123.20471,
-                  13.541512
-                ],
-                [
-                  123.204711,
-                  13.542054
-                ],
-                [
-                  123.204988,
-                  13.542054
-                ],
-                [
-                  123.204988,
-                  13.541783
-                ],
-                [
-                  123.205265,
-                  13.541783
-                ],
-                [
-                  123.205266,
+                  123.205543,
                   13.542325
+                ],
+                [
+                  123.20582,
+                  13.542325
+                ],
+                [
+                  123.20582,
+                  13.542596
                 ]
               ],
               [
                 [
-                  123.196948,
-                  13.542603
+                  123.203601,
+                  13.541513
                 ],
                 [
-                  123.196671,
-                  13.542603
+                  123.203602,
+                  13.541784
                 ],
-                [
-                  123.196671,
-                  13.542332
-                ],
-                [
-                  123.196948,
-                  13.542332
-                ],
-                [
-                  123.196948,
-                  13.542603
-                ]
-              ],
-              [
                 [
                   123.203047,
                   13.541784
@@ -1850,20 +1982,6 @@
                   123.203047,
                   13.541513
                 ],
-                [
-                  123.203324,
-                  13.541513
-                ],
-                [
-                  123.203324,
-                  13.541784
-                ],
-                [
-                  123.203047,
-                  13.541784
-                ]
-              ],
-              [
                 [
                   123.20277,
                   13.541513
@@ -1873,38 +1991,38 @@
                   13.541242
                 ],
                 [
-                  123.203047,
+                  123.203324,
                   13.541242
                 ],
                 [
-                  123.203047,
+                  123.203324,
                   13.541513
                 ],
                 [
-                  123.20277,
+                  123.203601,
                   13.541513
                 ]
               ],
               [
                 [
-                  123.202215,
+                  123.201938,
                   13.541243
                 ],
                 [
-                  123.202215,
-                  13.540971
-                ],
-                [
-                  123.201937,
-                  13.540972
-                ],
-                [
                   123.201937,
                   13.5407
                 ],
                 [
-                  123.202492,
+                  123.202214,
                   13.5407
+                ],
+                [
+                  123.202214,
+                  13.540429
+                ],
+                [
+                  123.202491,
+                  13.540429
                 ],
                 [
                   123.202492,
@@ -1919,57 +2037,87 @@
                   13.541242
                 ],
                 [
-                  123.202215,
+                  123.201938,
                   13.541243
                 ]
               ],
               [
                 [
-                  123.205542,
-                  13.541511
+                  123.197224,
+                  13.541518
                 ],
                 [
-                  123.205265,
-                  13.541511
+                  123.196947,
+                  13.541518
+                ],
+                [
+                  123.196947,
+                  13.541247
+                ],
+                [
+                  123.197224,
+                  13.541247
+                ],
+                [
+                  123.197224,
+                  13.541518
+                ]
+              ],
+              [
+                [
+                  123.206096,
+                  13.540426
+                ],
+                [
+                  123.205818,
+                  13.540426
+                ],
+                [
+                  123.205818,
+                  13.540155
+                ],
+                [
+                  123.206096,
+                  13.540154
+                ],
+                [
+                  123.206096,
+                  13.540426
+                ]
+              ],
+              [
+                [
+                  123.205818,
+                  13.539883
                 ],
                 [
                   123.205264,
-                  13.540969
+                  13.539884
                 ],
                 [
-                  123.205542,
-                  13.540969
+                  123.205263,
+                  13.539612
                 ],
                 [
-                  123.205542,
-                  13.541511
+                  123.205541,
+                  13.539612
+                ],
+                [
+                  123.20554,
+                  13.539341
+                ],
+                [
+                  123.205818,
+                  13.539341
+                ],
+                [
+                  123.205818,
+                  13.539883
                 ]
               ],
               [
                 [
-                  123.202213,
-                  13.539344
-                ],
-                [
-                  123.202768,
-                  13.539343
-                ],
-                [
-                  123.202768,
-                  13.539615
-                ],
-                [
-                  123.202213,
-                  13.539615
-                ],
-                [
-                  123.202213,
-                  13.539344
-                ]
-              ],
-              [
-                [
-                  123.202768,
+                  123.20249,
                   13.539072
                 ],
                 [
@@ -1986,6 +2134,22 @@
                 ],
                 [
                   123.202768,
+                  13.539615
+                ],
+                [
+                  123.202213,
+                  13.539615
+                ],
+                [
+                  123.202213,
+                  13.539344
+                ],
+                [
+                  123.20249,
+                  13.539343
+                ],
+                [
+                  123.20249,
                   13.539072
                 ]
               ]
@@ -1996,39 +2160,327 @@
           "type": "Feature",
           "properties": {
             "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
-            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB vs baseline"
           },
           "geometry": {
             "type": "Polygon",
             "coordinates": [
               [
                 [
-                  123.21192,
-                  13.54232
+                  123.208868,
+                  13.540423
                 ],
                 [
-                  123.21192,
-                  13.542591
+                  123.208869,
+                  13.540695
                 ],
                 [
-                  123.212197,
-                  13.542591
+                  123.2097,
+                  13.540694
                 ],
                 [
-                  123.212197,
-                  13.542048
+                  123.209701,
+                  13.540965
+                ],
+                [
+                  123.209978,
+                  13.540965
+                ],
+                [
+                  123.209977,
+                  13.540151
+                ],
+                [
+                  123.210532,
+                  13.540151
+                ],
+                [
+                  123.210531,
+                  13.539879
+                ],
+                [
+                  123.2097,
+                  13.53988
+                ],
+                [
+                  123.209699,
+                  13.539338
+                ],
+                [
+                  123.209976,
+                  13.539337
+                ],
+                [
+                  123.209976,
+                  13.538795
+                ],
+                [
+                  123.209421,
+                  13.538795
+                ],
+                [
+                  123.209421,
+                  13.538524
+                ],
+                [
+                  123.208867,
+                  13.538524
+                ],
+                [
+                  123.208867,
+                  13.539067
+                ],
+                [
+                  123.20859,
+                  13.539067
+                ],
+                [
+                  123.20859,
+                  13.53961
+                ],
+                [
+                  123.209145,
+                  13.539609
+                ],
+                [
+                  123.209146,
+                  13.540423
+                ],
+                [
+                  123.208868,
+                  13.540423
+                ]
+              ],
+              [
+                [
+                  123.209145,
+                  13.539338
+                ],
+                [
+                  123.209144,
+                  13.539067
+                ],
+                [
+                  123.209699,
+                  13.539066
+                ],
+                [
+                  123.209699,
+                  13.539338
+                ],
+                [
+                  123.209145,
+                  13.539338
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB vs baseline"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.208314,
+                  13.540966
+                ],
+                [
+                  123.208315,
+                  13.541509
+                ],
+                [
+                  123.208592,
+                  13.541509
+                ],
+                [
+                  123.208592,
+                  13.540966
+                ],
+                [
+                  123.208314,
+                  13.540966
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB vs baseline"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.208871,
+                  13.543407
+                ],
+                [
+                  123.208871,
+                  13.543136
+                ],
+                [
+                  123.208316,
+                  13.543136
+                ],
+                [
+                  123.208316,
+                  13.543408
+                ],
+                [
+                  123.208594,
+                  13.543407
+                ],
+                [
+                  123.208594,
+                  13.543679
+                ],
+                [
+                  123.209148,
+                  13.543678
+                ],
+                [
+                  123.209148,
+                  13.543407
+                ],
+                [
+                  123.208871,
+                  13.543407
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB vs baseline"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.214412,
+                  13.538791
+                ],
+                [
+                  123.214412,
+                  13.539334
+                ],
+                [
+                  123.21469,
+                  13.539333
+                ],
+                [
+                  123.214689,
+                  13.538791
+                ],
+                [
+                  123.214412,
+                  13.538791
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB vs baseline"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.210808,
+                  13.539337
+                ],
+                [
+                  123.210808,
+                  13.539065
+                ],
+                [
+                  123.210531,
+                  13.539066
+                ],
+                [
+                  123.210531,
+                  13.539337
+                ],
+                [
+                  123.209976,
+                  13.539337
+                ],
+                [
+                  123.209977,
+                  13.539609
+                ],
+                [
+                  123.211363,
+                  13.539607
+                ],
+                [
+                  123.211363,
+                  13.539336
+                ],
+                [
+                  123.210808,
+                  13.539337
+                ]
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB vs baseline"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  123.211364,
+                  13.541235
+                ],
+                [
+                  123.211365,
+                  13.541778
+                ],
+                [
+                  123.211919,
+                  13.541777
+                ],
+                [
+                  123.211919,
+                  13.541506
                 ],
                 [
                   123.211642,
-                  13.542049
+                  13.541506
                 ],
                 [
-                  123.211643,
-                  13.54232
+                  123.211642,
+                  13.541235
                 ],
                 [
-                  123.21192,
-                  13.54232
+                  123.211364,
+                  13.541235
                 ]
               ]
             ]
@@ -2038,55 +2490,31 @@
           "type": "Feature",
           "properties": {
             "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
-            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB vs baseline"
           },
           "geometry": {
             "type": "Polygon",
             "coordinates": [
               [
                 [
-                  123.211643,
-                  13.54232
+                  123.213306,
+                  13.541776
                 ],
                 [
-                  123.211365,
-                  13.54232
+                  123.212751,
+                  13.541776
                 ],
                 [
-                  123.211365,
-                  13.542049
+                  123.212751,
+                  13.542048
                 ],
                 [
-                  123.211088,
-                  13.542049
+                  123.213306,
+                  13.542047
                 ],
                 [
-                  123.211088,
-                  13.54232
-                ],
-                [
-                  123.210811,
-                  13.542321
-                ],
-                [
-                  123.210811,
-                  13.542863
-                ],
-                [
-                  123.211089,
-                  13.542863
-                ],
-                [
-                  123.211088,
-                  13.542592
-                ],
-                [
-                  123.211643,
-                  13.542591
-                ],
-                [
-                  123.211643,
-                  13.54232
+                  123.213306,
+                  13.541776
                 ]
               ]
             ]
@@ -2096,262 +2524,124 @@
           "type": "Feature",
           "properties": {
             "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
-            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
+            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB vs baseline"
           },
           "geometry": {
             "type": "Polygon",
             "coordinates": [
               [
                 [
-                  123.21192,
-                  13.542591
+                  123.213306,
+                  13.54259
                 ],
                 [
-                  123.211643,
-                  13.542591
+                  123.212475,
+                  13.54259
                 ],
                 [
-                  123.211643,
-                  13.543134
-                ],
-                [
-                  123.211921,
+                  123.212475,
                   13.543133
                 ],
                 [
-                  123.21192,
-                  13.542591
-                ]
-              ]
-            ]
-          }
-        },
-        {
-          "type": "Feature",
-          "properties": {
-            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
-            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
-          },
-          "geometry": {
-            "type": "Polygon",
-            "coordinates": [
-              [
-                [
-                  123.210812,
-                  13.543134
+                  123.212198,
+                  13.543133
                 ],
                 [
-                  123.210811,
-                  13.542863
-                ],
-                [
-                  123.210257,
-                  13.542864
-                ],
-                [
-                  123.210257,
-                  13.543135
-                ],
-                [
-                  123.20998,
-                  13.543135
-                ],
-                [
-                  123.20998,
-                  13.543406
-                ],
-                [
-                  123.210534,
-                  13.543406
-                ],
-                [
-                  123.210534,
-                  13.543135
-                ],
-                [
-                  123.210812,
-                  13.543134
-                ]
-              ]
-            ]
-          }
-        },
-        {
-          "type": "Feature",
-          "properties": {
-            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
-            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
-          },
-          "geometry": {
-            "type": "Polygon",
-            "coordinates": [
-              [
-                [
-                  123.214135,
-                  13.53852
-                ],
-                [
-                  123.214689,
-                  13.538519
-                ],
-                [
-                  123.214689,
-                  13.538791
-                ],
-                [
-                  123.214135,
-                  13.538791
-                ],
-                [
-                  123.214135,
-                  13.539062
-                ],
-                [
-                  123.214412,
-                  13.539062
-                ],
-                [
-                  123.214412,
-                  13.539334
-                ],
-                [
-                  123.213858,
-                  13.539334
-                ],
-                [
-                  123.213858,
-                  13.539063
-                ],
-                [
-                  123.213303,
-                  13.539063
-                ],
-                [
-                  123.213304,
-                  13.539877
-                ],
-                [
-                  123.213858,
-                  13.539877
-                ],
-                [
-                  123.213859,
-                  13.540148
-                ],
-                [
-                  123.214136,
-                  13.540148
-                ],
-                [
-                  123.214136,
-                  13.539876
-                ],
-                [
-                  123.214413,
-                  13.539876
-                ],
-                [
-                  123.214413,
-                  13.539605
-                ],
-                [
-                  123.21469,
-                  13.539605
-                ],
-                [
-                  123.21469,
-                  13.539062
-                ],
-                [
-                  123.214967,
-                  13.539062
-                ],
-                [
-                  123.214966,
-                  13.5384
-                ],
-                [
-                  123.214134,
-                  13.5384
-                ],
-                [
-                  123.214135,
-                  13.53852
-                ]
-              ]
-            ]
-          }
-        },
-        {
-          "type": "Feature",
-          "properties": {
-            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
-            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
-          },
-          "geometry": {
-            "type": "Polygon",
-            "coordinates": [
-              [
-                [
-                  123.21303,
+                  123.212198,
                   13.543404
                 ],
                 [
-                  123.21303,
-                  13.543946
+                  123.211921,
+                  13.543405
+                ],
+                [
+                  123.211921,
+                  13.543676
+                ],
+                [
+                  123.211644,
+                  13.543676
+                ],
+                [
+                  123.211644,
+                  13.543947
+                ],
+                [
+                  123.211367,
+                  13.543948
+                ],
+                [
+                  123.211367,
+                  13.544219
+                ],
+                [
+                  123.212199,
+                  13.544218
+                ],
+                [
+                  123.212199,
+                  13.54449
+                ],
+                [
+                  123.212754,
+                  13.544489
+                ],
+                [
+                  123.212754,
+                  13.54476
+                ],
+                [
+                  123.213031,
+                  13.54476
+                ],
+                [
+                  123.213031,
+                  13.544218
                 ],
                 [
                   123.213308,
-                  13.543946
+                  13.544217
                 ],
                 [
                   123.213307,
-                  13.543403
+                  13.543675
                 ],
                 [
-                  123.21303,
-                  13.543404
+                  123.212753,
+                  13.543675
+                ],
+                [
+                  123.212752,
+                  13.543133
+                ],
+                [
+                  123.213307,
+                  13.543132
+                ],
+                [
+                  123.213306,
+                  13.54259
                 ]
-              ]
-            ]
-          }
-        },
-        {
-          "type": "Feature",
-          "properties": {
-            "mode": "Post-Storm Surface Wetness Shift (ΔdB)",
-            "description": "Cells where VV backscatter dropped by ≥ 1.0 dB"
-          },
-          "geometry": {
-            "type": "Polygon",
-            "coordinates": [
+              ],
               [
                 [
+                  123.212199,
+                  13.543947
+                ],
+                [
                   123.212476,
                   13.543947
                 ],
                 [
                   123.212476,
-                  13.544489
-                ],
-                [
-                  123.213031,
-                  13.544489
-                ],
-                [
-                  123.213031,
                   13.544218
                 ],
                 [
-                  123.212753,
+                  123.212199,
                   13.544218
                 ],
                 [
-                  123.212753,
-                  13.543947
-                ],
-                [
-                  123.212476,
+                  123.212199,
                   13.543947
                 ]
               ]
@@ -2457,32 +2747,56 @@
           "coordinates": [
             [
               [
-                123.196394,
-                13.542604
+                123.196392,
+                13.540705
               ],
               [
-                123.196393,
+                123.196392,
+                13.540976
+              ],
+              [
+                123.1963,
+                13.540976
+              ],
+              [
+                123.1963,
                 13.542332
-              ],
-              [
-                123.196948,
-                13.542332
-              ],
-              [
-                123.196948,
-                13.542874
-              ],
-              [
-                123.196394,
-                13.542875
-              ],
-              [
-                123.196394,
-                13.543146
               ],
               [
                 123.196671,
-                13.543146
+                13.542332
+              ],
+              [
+                123.19667,
+                13.542061
+              ],
+              [
+                123.198057,
+                13.54206
+              ],
+              [
+                123.198057,
+                13.542331
+              ],
+              [
+                123.197502,
+                13.542331
+              ],
+              [
+                123.197503,
+                13.542603
+              ],
+              [
+                123.197225,
+                13.542603
+              ],
+              [
+                123.197226,
+                13.542874
+              ],
+              [
+                123.196671,
+                13.542875
               ],
               [
                 123.196672,
@@ -2493,12 +2807,112 @@
                 13.543688
               ],
               [
-                123.19695,
+                123.196949,
+                13.544231
+              ],
+              [
+                123.197227,
+                13.54423
+              ],
+              [
+                123.197227,
                 13.544773
+              ],
+              [
+                123.199168,
+                13.5448
+              ],
+              [
+                123.199168,
+                13.5445
+              ],
+              [
+                123.199722,
+                13.5445
+              ],
+              [
+                123.199722,
+                13.543957
+              ],
+              [
+                123.199999,
+                13.543957
+              ],
+              [
+                123.199999,
+                13.543686
+              ],
+              [
+                123.200276,
+                13.543686
+              ],
+              [
+                123.200276,
+                13.543414
+              ],
+              [
+                123.200553,
+                13.543414
+              ],
+              [
+                123.200553,
+                13.543143
+              ],
+              [
+                123.201385,
+                13.543142
+              ],
+              [
+                123.201385,
+                13.543413
+              ],
+              [
+                123.20083,
+                13.543414
+              ],
+              [
+                123.200831,
+                13.543956
+              ],
+              [
+                123.200554,
+                13.543957
+              ],
+              [
+                123.200554,
+                13.544228
+              ],
+              [
+                123.200277,
+                13.544228
+              ],
+              [
+                123.200277,
+                13.544499
+              ],
+              [
+                123.200554,
+                13.544499
+              ],
+              [
+                123.200554,
+                13.54477
               ],
               [
                 123.202772,
                 13.5448
+              ],
+              [
+                123.202495,
+                13.544769
+              ],
+              [
+                123.202495,
+                13.544498
+              ],
+              [
+                123.202772,
+                13.544497
               ],
               [
                 123.202772,
@@ -2542,7 +2956,7 @@
               ],
               [
                 123.203881,
-                13.5448
+                13.544768
               ],
               [
                 123.20499,
@@ -2562,15 +2976,31 @@
               ],
               [
                 123.204158,
-                13.543954
+                13.544225
               ],
               [
                 123.204435,
-                13.543953
+                13.544225
               ],
               [
                 123.204435,
                 13.543682
+              ],
+              [
+                123.20499,
+                13.543682
+              ],
+              [
+                123.20499,
+                13.543953
+              ],
+              [
+                123.205544,
+                13.543953
+              ],
+              [
+                123.205544,
+                13.543681
               ],
               [
                 123.205267,
@@ -2653,28 +3083,12 @@
                 13.541242
               ],
               [
-                123.203324,
-                13.541242
-              ],
-              [
-                123.203324,
-                13.541513
+                123.203601,
+                13.541241
               ],
               [
                 123.203601,
                 13.541513
-              ],
-              [
-                123.203602,
-                13.541784
-              ],
-              [
-                123.203879,
-                13.541784
-              ],
-              [
-                123.203879,
-                13.541512
               ],
               [
                 123.204156,
@@ -2709,11 +3123,67 @@
                 13.540969
               ],
               [
+                123.205542,
+                13.540969
+              ],
+              [
+                123.205541,
+                13.540697
+              ],
+              [
                 123.205819,
-                13.540968
+                13.540697
               ],
               [
                 123.205818,
+                13.539883
+              ],
+              [
+                123.205541,
+                13.539884
+              ],
+              [
+                123.205541,
+                13.540155
+              ],
+              [
+                123.205264,
+                13.540155
+              ],
+              [
+                123.205264,
+                13.539884
+              ],
+              [
+                123.204709,
+                13.539884
+              ],
+              [
+                123.204709,
+                13.539613
+              ],
+              [
+                123.205541,
+                13.539612
+              ],
+              [
+                123.20554,
+                13.539341
+              ],
+              [
+                123.205818,
+                13.539341
+              ],
+              [
+                123.205818,
+                13.539612
+              ],
+              [
+                123.206095,
+                13.539612
+              ],
+              [
+                123.206096,
                 13.540426
               ],
               [
@@ -2722,81 +3192,49 @@
               ],
               [
                 123.206373,
-                13.539883
-              ],
-              [
-                123.20665,
-                13.539883
-              ],
-              [
-                123.20665,
                 13.540154
               ],
               [
-                123.207205,
+                123.207482,
                 13.540153
               ],
               [
-                123.207204,
-                13.539882
-              ],
-              [
-                123.207482,
-                13.539882
-              ],
-              [
                 123.207481,
-                13.539611
-              ],
-              [
-                123.207204,
-                13.539611
-              ],
-              [
-                123.207204,
-                13.53934
-              ],
-              [
-                123.208036,
                 13.539339
               ],
               [
+                123.207758,
+                13.539339
+              ],
+              [
+                123.207759,
+                13.53961
+              ],
+              [
+                123.208036,
+                13.53961
+              ],
+              [
                 123.208035,
-                13.538796
+                13.539068
               ],
               [
-                123.208312,
-                13.538796
+                123.208313,
+                13.539067
               ],
               [
                 123.208312,
                 13.5384
               ],
               [
-                123.202767,
+                123.203044,
                 13.5384
               ],
               [
-                123.202767,
+                123.203044,
                 13.538529
               ],
               [
-                123.20249,
-                13.53853
-              ],
-              [
-                123.20249,
-                13.5384
-              ],
-              [
-                123.201935,
-                13.5384
-              ],
-              [
-                123.201935,
-                13.53853
-              ],
-              [
                 123.201658,
                 13.53853
               ],
@@ -2805,19 +3243,51 @@
                 13.5384
               ],
               [
+                123.201103,
+                13.5384
+              ],
+              [
+                123.201104,
+                13.538531
+              ],
+              [
+                123.200549,
+                13.538531
+              ],
+              [
+                123.200549,
+                13.5384
+              ],
+              [
+                123.200272,
+                13.5384
+              ],
+              [
+                123.200272,
+                13.538531
+              ],
+              [
+                123.19944,
+                13.538532
+              ],
+              [
                 123.19944,
                 13.5384
               ],
               [
-                123.19944,
-                13.538532
+                123.198608,
+                13.5384
               ],
               [
-                123.199163,
-                13.538532
+                123.198608,
+                13.538533
               ],
               [
-                123.199163,
+                123.198331,
+                13.538533
+              ],
+              [
+                123.198331,
                 13.5384
               ],
               [
@@ -2841,23 +3311,31 @@
                 13.539076
               ],
               [
-                123.197501,
-                13.540161
+                123.1975,
+                13.539347
+              ],
+              [
+                123.197777,
+                13.539347
+              ],
+              [
+                123.197777,
+                13.539618
+              ],
+              [
+                123.198055,
+                13.539618
+              ],
+              [
+                123.198055,
+                13.53989
               ],
               [
                 123.197778,
-                13.540161
+                13.53989
               ],
               [
                 123.197778,
-                13.540704
-              ],
-              [
-                123.197501,
-                13.540704
-              ],
-              [
-                123.197501,
                 13.540975
               ],
               [
@@ -2877,12 +3355,12 @@
                 13.53989
               ],
               [
-                123.196669,
+                123.196391,
                 13.539891
               ],
               [
-                123.196668,
-                13.539619
+                123.196391,
+                13.53962
               ],
               [
                 123.1963,
@@ -2890,81 +3368,87 @@
               ],
               [
                 123.1963,
-                13.542604
+                13.540705
               ],
               [
-                123.196394,
-                13.542604
+                123.196392,
+                13.540705
               ]
             ],
             [
               [
-                123.199445,
-                13.5445
+                123.201384,
+                13.542871
               ],
               [
-                123.199722,
-                13.5445
+                123.201107,
+                13.542871
               ],
               [
-                123.199722,
-                13.544229
+                123.201107,
+                13.542329
               ],
               [
-                123.199999,
-                13.544228
+                123.201384,
+                13.542328
               ],
               [
-                123.199999,
-                13.543686
+                123.201384,
+                13.5426
               ],
               [
-                123.200553,
-                13.543685
+                123.201661,
+                13.542599
               ],
               [
-                123.200553,
-                13.543143
+                123.201662,
+                13.543142
               ],
               [
                 123.201385,
                 13.543142
               ],
               [
-                123.201385,
-                13.543413
+                123.201384,
+                13.542871
+              ]
+            ],
+            [
+              [
+                123.200829,
+                13.542329
               ],
               [
                 123.20083,
-                13.543414
+                13.5426
               ],
               [
-                123.200831,
-                13.543956
+                123.200552,
+                13.5426
               ],
               [
-                123.200276,
-                13.543957
+                123.200552,
+                13.542058
               ],
               [
-                123.200277,
-                13.544499
+                123.200829,
+                13.542057
               ],
               [
-                123.200554,
-                13.544499
+                123.200829,
+                13.541786
               ],
               [
-                123.200554,
-                13.54477
+                123.201106,
+                13.541786
               ],
               [
-                123.199445,
-                13.544771
+                123.201107,
+                13.542329
               ],
               [
-                123.199445,
-                13.5445
+                123.200829,
+                13.542329
               ]
             ],
             [
@@ -3040,27 +3524,19 @@
               ],
               [
                 123.201937,
-                13.540972
-              ],
-              [
-                123.20166,
-                13.540972
-              ],
-              [
-                123.20166,
-                13.5407
-              ],
-              [
-                123.202214,
-                13.5407
+                13.540429
               ],
               [
                 123.202214,
                 13.540429
+              ],
+              [
+                123.202214,
+                13.540157
               ],
               [
                 123.202491,
-                13.540429
+                13.540157
               ],
               [
                 123.202492,
@@ -3081,174 +3557,12 @@
             ],
             [
               [
-                123.20166,
-                13.541243
+                123.202491,
+                13.539886
               ],
               [
-                123.201383,
-                13.541243
-              ],
-              [
-                123.201383,
-                13.540972
-              ],
-              [
-                123.20166,
-                13.540972
-              ],
-              [
-                123.20166,
-                13.541243
-              ]
-            ],
-            [
-              [
-                123.197224,
-                13.541247
-              ],
-              [
-                123.197779,
-                13.541246
-              ],
-              [
-                123.197779,
-                13.541789
-              ],
-              [
-                123.196947,
-                13.541789
-              ],
-              [
-                123.196947,
-                13.540975
-              ],
-              [
-                123.197224,
-                13.540975
-              ],
-              [
-                123.197224,
-                13.541247
-              ]
-            ],
-            [
-              [
-                123.203325,
-                13.542869
-              ],
-              [
-                123.203603,
-                13.542869
-              ],
-              [
-                123.203603,
-                13.543412
-              ],
-              [
-                123.203326,
-                13.543412
-              ],
-              [
-                123.203325,
-                13.542869
-              ]
-            ],
-            [
-              [
-                123.198335,
-                13.542873
-              ],
-              [
-                123.198612,
-                13.542873
-              ],
-              [
-                123.198612,
-                13.543144
-              ],
-              [
-                123.198335,
-                13.543145
-              ],
-              [
-                123.198335,
-                13.542873
-              ]
-            ],
-            [
-              [
-                123.201384,
-                13.542328
-              ],
-              [
-                123.201384,
-                13.542871
-              ],
-              [
-                123.201107,
-                13.542871
-              ],
-              [
-                123.201107,
-                13.542329
-              ],
-              [
-                123.201384,
-                13.542328
-              ]
-            ],
-            [
-              [
-                123.200552,
-                13.542329
-              ],
-              [
-                123.200552,
-                13.542058
-              ],
-              [
-                123.201106,
-                13.542057
-              ],
-              [
-                123.201107,
-                13.542329
-              ],
-              [
-                123.200552,
-                13.542329
-              ]
-            ],
-            [
-              [
-                123.20277,
-                13.542598
-              ],
-              [
-                123.203048,
-                13.542598
-              ],
-              [
-                123.203048,
-                13.542869
-              ],
-              [
-                123.202771,
-                13.54287
-              ],
-              [
-                123.20277,
-                13.542598
-              ]
-            ],
-            [
-              [
-                123.202768,
-                13.539615
-              ],
-              [
-                123.202213,
-                13.539615
+                123.202214,
+                13.539886
               ],
               [
                 123.202213,
@@ -3284,29 +3598,185 @@
               ],
               [
                 123.202768,
-                13.539615
+                13.540157
+              ],
+              [
+                123.202491,
+                13.540157
+              ],
+              [
+                123.202491,
+                13.539886
               ]
             ],
             [
               [
-                123.20554,
-                13.539341
+                123.203878,
+                13.541241
               ],
               [
-                123.205818,
-                13.539341
+                123.203878,
+                13.54097
               ],
               [
-                123.205818,
-                13.539612
+                123.204155,
+                13.54097
               ],
               [
-                123.205541,
-                13.539612
+                123.204156,
+                13.541241
               ],
               [
-                123.20554,
-                13.539341
+                123.203878,
+                13.541241
+              ]
+            ],
+            [
+              [
+                123.197224,
+                13.541247
+              ],
+              [
+                123.197779,
+                13.541246
+              ],
+              [
+                123.197779,
+                13.541789
+              ],
+              [
+                123.19667,
+                13.54179
+              ],
+              [
+                123.19667,
+                13.541247
+              ],
+              [
+                123.196947,
+                13.541247
+              ],
+              [
+                123.196947,
+                13.540975
+              ],
+              [
+                123.197224,
+                13.540975
+              ],
+              [
+                123.197224,
+                13.541247
+              ]
+            ],
+            [
+              [
+                123.198613,
+                13.544501
+              ],
+              [
+                123.198336,
+                13.544501
+              ],
+              [
+                123.198336,
+                13.54423
+              ],
+              [
+                123.198613,
+                13.544229
+              ],
+              [
+                123.198613,
+                13.544501
+              ]
+            ],
+            [
+              [
+                123.198058,
+                13.54423
+              ],
+              [
+                123.198058,
+                13.543959
+              ],
+              [
+                123.198335,
+                13.543958
+              ],
+              [
+                123.198336,
+                13.54423
+              ],
+              [
+                123.198058,
+                13.54423
+              ]
+            ],
+            [
+              [
+                123.198612,
+                13.542873
+              ],
+              [
+                123.198612,
+                13.543144
+              ],
+              [
+                123.198335,
+                13.543145
+              ],
+              [
+                123.198335,
+                13.542873
+              ],
+              [
+                123.198612,
+                13.542873
+              ]
+            ],
+            [
+              [
+                123.200275,
+                13.5426
+              ],
+              [
+                123.200275,
+                13.542872
+              ],
+              [
+                123.199998,
+                13.542872
+              ],
+              [
+                123.199998,
+                13.542601
+              ],
+              [
+                123.200275,
+                13.5426
+              ]
+            ],
+            [
+              [
+                123.20166,
+                13.540972
+              ],
+              [
+                123.20166,
+                13.541243
+              ],
+              [
+                123.201383,
+                13.541243
+              ],
+              [
+                123.201383,
+                13.540972
+              ],
+              [
+                123.20166,
+                13.540972
               ]
             ]
           ]
@@ -3322,61 +3792,8 @@
           "coordinates": [
             [
               [
-                123.206097,
-                13.541782
-              ],
-              [
-                123.206097,
-                13.541511
-              ],
-              [
                 123.205265,
-                13.541511
-              ],
-              [
-                123.205265,
-                13.541783
-              ],
-              [
-                123.205542,
-                13.541782
-              ],
-              [
-                123.205543,
                 13.542054
-              ],
-              [
-                123.20582,
-                13.542053
-              ],
-              [
-                123.20582,
-                13.541782
-              ],
-              [
-                123.206097,
-                13.541782
-              ]
-            ]
-          ]
-        }
-      },
-      {
-        "type": "Feature",
-        "properties": {
-          "risk_class": "high"
-        },
-        "geometry": {
-          "type": "Polygon",
-          "coordinates": [
-            [
-              [
-                123.206375,
-                13.542324
-              ],
-              [
-                123.206374,
-                13.542053
               ],
               [
                 123.20582,
@@ -3387,8 +3804,44 @@
                 13.542325
               ],
               [
-                123.206375,
+                123.206097,
                 13.542324
+              ],
+              [
+                123.206097,
+                13.541511
+              ],
+              [
+                123.205819,
+                13.541511
+              ],
+              [
+                123.205819,
+                13.54124
+              ],
+              [
+                123.205542,
+                13.54124
+              ],
+              [
+                123.205542,
+                13.541511
+              ],
+              [
+                123.204988,
+                13.541512
+              ],
+              [
+                123.204988,
+                13.541783
+              ],
+              [
+                123.205265,
+                13.541783
+              ],
+              [
+                123.205265,
+                13.542054
               ]
             ]
           ]
@@ -3404,73 +3857,32 @@
           "coordinates": [
             [
               [
-                123.210811,
-                13.542863
+                123.210254,
+                13.53988
               ],
               [
-                123.210257,
-                13.542864
+                123.209422,
+                13.53988
               ],
               [
-                123.210257,
-                13.543135
+                123.209423,
+                13.540694
               ],
               [
-                123.210812,
-                13.543134
+                123.2097,
+                13.540694
               ],
               [
-                123.210811,
-                13.542863
-              ]
-            ]
-          ]
-        }
-      },
-      {
-        "type": "Feature",
-        "properties": {
-          "risk_class": "watch"
-        },
-        "geometry": {
-          "type": "Polygon",
-          "coordinates": [
-            [
-              [
-                123.198054,
-                13.5384
+                123.2097,
+                13.540151
               ],
               [
-                123.197776,
-                13.5384
+                123.210254,
+                13.540151
               ],
               [
-                123.197776,
-                13.538533
-              ],
-              [
-                123.197499,
-                13.538534
-              ],
-              [
-                123.1975,
-                13.539076
-              ],
-              [
-                123.197777,
-                13.539076
-              ],
-              [
-                123.197777,
-                13.538805
-              ],
-              [
-                123.198054,
-                13.538804
-              ],
-              [
-                123.198054,
-                13.5384
+                123.210254,
+                13.53988
               ]
             ]
           ]
@@ -3487,14 +3899,22 @@
             [
               [
                 123.197778,
-                13.540161
+                13.53989
               ],
               [
-                123.197501,
-                13.540161
+                123.198055,
+                13.53989
               ],
               [
-                123.1975,
+                123.198055,
+                13.539618
+              ],
+              [
+                123.197777,
+                13.539618
+              ],
+              [
+                123.197777,
                 13.539347
               ],
               [
@@ -3502,24 +3922,24 @@
                 13.539348
               ],
               [
-                123.197224,
-                13.540975
+                123.197223,
+                13.539619
+              ],
+              [
+                123.1975,
+                13.539619
               ],
               [
                 123.197501,
-                13.540975
-              ],
-              [
-                123.197501,
-                13.540704
-              ],
-              [
-                123.197778,
-                13.540704
+                13.540161
               ],
               [
                 123.197778,
                 13.540161
+              ],
+              [
+                123.197778,
+                13.53989
               ]
             ]
           ]
@@ -3539,12 +3959,37 @@
                 13.540975
               ],
               [
-                123.196947,
+                123.197778,
                 13.540975
               ],
               [
-                123.196947,
-                13.541789
+                123.197778,
+                13.540432
+              ],
+              [
+                123.197224,
+                13.540433
+              ],
+              [
+                123.197224,
+                13.540975
+              ]
+            ]
+          ]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "risk_class": "watch"
+        },
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                123.19667,
+                13.54179
               ],
               [
                 123.197779,
@@ -3561,6 +4006,71 @@
               [
                 123.197224,
                 13.540975
+              ],
+              [
+                123.196947,
+                13.540975
+              ],
+              [
+                123.196947,
+                13.541247
+              ],
+              [
+                123.19667,
+                13.541247
+              ],
+              [
+                123.19667,
+                13.54179
+              ]
+            ]
+          ]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "risk_class": "watch"
+        },
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                123.198057,
+                13.54206
+              ],
+              [
+                123.19667,
+                13.542061
+              ],
+              [
+                123.196671,
+                13.542332
+              ],
+              [
+                123.197225,
+                13.542332
+              ],
+              [
+                123.197225,
+                13.542603
+              ],
+              [
+                123.197503,
+                13.542603
+              ],
+              [
+                123.197502,
+                13.542331
+              ],
+              [
+                123.198057,
+                13.542331
+              ],
+              [
+                123.198057,
+                13.54206
               ]
             ]
           ]
@@ -3577,31 +4087,23 @@
             [
               [
                 123.196394,
+                13.543689
+              ],
+              [
+                123.196672,
+                13.543688
+              ],
+              [
+                123.196671,
                 13.542875
-              ],
-              [
-                123.196948,
-                13.542874
-              ],
-              [
-                123.196948,
-                13.542603
-              ],
-              [
-                123.196671,
-                13.542603
-              ],
-              [
-                123.196671,
-                13.542332
-              ],
-              [
-                123.196393,
-                13.542332
               ],
               [
                 123.196394,
                 13.542875
+              ],
+              [
+                123.196394,
+                13.543689
               ]
             ]
           ]
@@ -3617,30 +4119,6 @@
           "coordinates": [
             [
               [
-                123.196949,
-                13.543688
-              ],
-              [
-                123.196672,
-                13.543688
-              ],
-              [
-                123.196672,
-                13.54396
-              ],
-              [
-                123.196395,
-                13.54396
-              ],
-              [
-                123.196395,
-                13.544502
-              ],
-              [
-                123.196672,
-                13.544502
-              ],
-              [
                 123.196672,
                 13.544231
               ],
@@ -3651,6 +4129,80 @@
               [
                 123.196949,
                 13.543688
+              ],
+              [
+                123.196672,
+                13.543688
+              ],
+              [
+                123.196672,
+                13.544231
+              ]
+            ]
+          ]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "risk_class": "watch"
+        },
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                123.19695,
+                13.544773
+              ],
+              [
+                123.197227,
+                13.544773
+              ],
+              [
+                123.197227,
+                13.54423
+              ],
+              [
+                123.196949,
+                13.544231
+              ],
+              [
+                123.19695,
+                13.544773
+              ]
+            ]
+          ]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "risk_class": "watch"
+        },
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                123.201658,
+                13.53853
+              ],
+              [
+                123.203044,
+                13.538529
+              ],
+              [
+                123.203044,
+                13.5384
+              ],
+              [
+                123.201658,
+                13.5384
+              ],
+              [
+                123.201658,
+                13.53853
               ]
             ]
           ]
@@ -3707,32 +4259,32 @@
           "coordinates": [
             [
               [
-                123.20277,
-                13.541785
+                123.202491,
+                13.540157
               ],
               [
-                123.203047,
-                13.541784
+                123.202768,
+                13.540157
               ],
               [
-                123.203047,
-                13.541513
+                123.202768,
+                13.539615
               ],
               [
-                123.203324,
-                13.541513
+                123.202213,
+                13.539615
               ],
               [
-                123.203324,
-                13.541242
+                123.202214,
+                13.539886
               ],
               [
-                123.202769,
-                13.541242
+                123.202491,
+                13.539886
               ],
               [
-                123.20277,
-                13.541785
+                123.202491,
+                13.540157
               ]
             ]
           ]
@@ -3748,11 +4300,7 @@
           "coordinates": [
             [
               [
-                123.201107,
-                13.542329
-              ],
-              [
-                123.201106,
+                123.200829,
                 13.542057
               ],
               [
@@ -3761,11 +4309,31 @@
               ],
               [
                 123.200552,
+                13.5426
+              ],
+              [
+                123.20083,
+                13.5426
+              ],
+              [
+                123.200829,
                 13.542329
               ],
               [
                 123.201107,
                 13.542329
+              ],
+              [
+                123.201106,
+                13.541786
+              ],
+              [
+                123.200829,
+                13.541786
+              ],
+              [
+                123.200829,
+                13.542057
               ]
             ]
           ]
@@ -3780,18 +4348,6 @@
           "type": "Polygon",
           "coordinates": [
             [
-              [
-                123.201107,
-                13.542329
-              ],
-              [
-                123.201107,
-                13.542871
-              ],
-              [
-                123.201384,
-                13.542871
-              ],
               [
                 123.201384,
                 13.542328
@@ -3799,6 +4355,34 @@
               [
                 123.201107,
                 13.542329
+              ],
+              [
+                123.201107,
+                13.542871
+              ],
+              [
+                123.201384,
+                13.542871
+              ],
+              [
+                123.201385,
+                13.543142
+              ],
+              [
+                123.201662,
+                13.543142
+              ],
+              [
+                123.201661,
+                13.542599
+              ],
+              [
+                123.201384,
+                13.5426
+              ],
+              [
+                123.201384,
+                13.542328
               ]
             ]
           ]
@@ -3814,24 +4398,24 @@
           "coordinates": [
             [
               [
-                123.203326,
-                13.543412
+                123.202494,
+                13.543955
               ],
               [
-                123.203603,
-                13.543412
+                123.203049,
+                13.543955
               ],
               [
-                123.203603,
-                13.542869
+                123.203049,
+                13.543683
               ],
               [
-                123.203325,
-                13.542869
+                123.202494,
+                13.543684
               ],
               [
-                123.203326,
-                13.543412
+                123.202494,
+                13.543955
               ]
             ]
           ]
@@ -3846,25 +4430,49 @@
           "type": "Polygon",
           "coordinates": [
             [
+              [
+                123.200553,
+                13.543414
+              ],
+              [
+                123.200276,
+                13.543414
+              ],
+              [
+                123.200276,
+                13.543686
+              ],
               [
                 123.199999,
-                13.544228
+                13.543686
+              ],
+              [
+                123.199999,
+                13.543957
+              ],
+              [
+                123.199722,
+                13.543957
               ],
               [
                 123.199722,
                 13.544229
               ],
               [
-                123.199722,
+                123.199999,
+                13.544228
+              ],
+              [
+                123.199999,
                 13.5445
               ],
               [
-                123.199445,
+                123.199168,
                 13.5445
               ],
               [
-                123.199445,
-                13.544771
+                123.199168,
+                13.5448
               ],
               [
                 123.200554,
@@ -3879,7 +4487,15 @@
                 13.544499
               ],
               [
-                123.200276,
+                123.200277,
+                13.544228
+              ],
+              [
+                123.200554,
+                13.544228
+              ],
+              [
+                123.200554,
                 13.543957
               ],
               [
@@ -3888,15 +4504,7 @@
               ],
               [
                 123.20083,
-                13.543414
-              ],
-              [
-                123.201385,
-                13.543413
-              ],
-              [
-                123.201385,
-                13.543142
+                13.543143
               ],
               [
                 123.200553,
@@ -3904,15 +4512,7 @@
               ],
               [
                 123.200553,
-                13.543685
-              ],
-              [
-                123.199999,
-                13.543686
-              ],
-              [
-                123.199999,
-                13.544228
+                13.543414
               ]
             ]
           ]
@@ -3928,24 +4528,64 @@
           "coordinates": [
             [
               [
-                123.206373,
-                13.540425
+                123.204709,
+                13.539884
               ],
               [
-                123.20665,
-                13.540425
+                123.205264,
+                13.539884
               ],
               [
-                123.20665,
+                123.205264,
+                13.540155
+              ],
+              [
+                123.205541,
+                13.540155
+              ],
+              [
+                123.205541,
+                13.539884
+              ],
+              [
+                123.205818,
                 13.539883
               ],
               [
-                123.206373,
-                13.539883
+                123.205818,
+                13.540155
               ],
               [
-                123.206373,
-                13.540425
+                123.206096,
+                13.540154
+              ],
+              [
+                123.206095,
+                13.539612
+              ],
+              [
+                123.205818,
+                13.539612
+              ],
+              [
+                123.205818,
+                13.539341
+              ],
+              [
+                123.20554,
+                13.539341
+              ],
+              [
+                123.205541,
+                13.539612
+              ],
+              [
+                123.204709,
+                13.539613
+              ],
+              [
+                123.204709,
+                13.539884
               ]
             ]
           ]
@@ -3961,24 +4601,105 @@
           "coordinates": [
             [
               [
-                123.20582,
-                13.542053
+                123.205542,
+                13.540969
               ],
               [
-                123.206374,
-                13.542053
+                123.205264,
+                13.540969
+              ],
+              [
+                123.205265,
+                13.54124
+              ],
+              [
+                123.204987,
+                13.54124
+              ],
+              [
+                123.204988,
+                13.541512
+              ],
+              [
+                123.205542,
+                13.541511
+              ],
+              [
+                123.205542,
+                13.54124
+              ],
+              [
+                123.205819,
+                13.54124
+              ],
+              [
+                123.205819,
+                13.540968
+              ],
+              [
+                123.206096,
+                13.540968
+              ],
+              [
+                123.206096,
+                13.540697
+              ],
+              [
+                123.206373,
+                13.540697
+              ],
+              [
+                123.206373,
+                13.540425
+              ],
+              [
+                123.205818,
+                13.540426
+              ],
+              [
+                123.205819,
+                13.540697
+              ],
+              [
+                123.205541,
+                13.540697
+              ],
+              [
+                123.205542,
+                13.540969
+              ]
+            ]
+          ]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "risk_class": "watch"
+        },
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                123.206097,
+                13.542324
+              ],
+              [
+                123.206375,
+                13.542324
               ],
               [
                 123.206374,
                 13.541782
               ],
               [
-                123.20582,
+                123.206097,
                 13.541782
               ],
               [
-                123.20582,
-                13.542053
+                123.206097,
+                13.542324
               ]
             ]
           ]
@@ -3993,14 +4714,6 @@
           "type": "Polygon",
           "coordinates": [
             [
-              [
-                123.203324,
-                13.541784
-              ],
-              [
-                123.203047,
-                13.541784
-              ],
               [
                 123.203047,
                 13.542056
@@ -4043,23 +4756,23 @@
               ],
               [
                 123.203879,
-                13.541784
-              ],
-              [
-                123.203602,
-                13.541784
+                13.541512
               ],
               [
                 123.203601,
                 13.541513
               ],
               [
-                123.203324,
-                13.541513
+                123.203602,
+                13.541784
               ],
               [
-                123.203324,
+                123.203047,
                 13.541784
+              ],
+              [
+                123.203047,
+                13.542056
               ]
             ]
           ]
@@ -4075,251 +4788,84 @@
           "coordinates": [
             [
               [
-                123.207204,
-                13.539611
-              ],
-              [
-                123.207481,
-                13.539611
-              ],
-              [
-                123.207482,
-                13.539882
-              ],
-              [
-                123.207204,
-                13.539882
-              ],
-              [
-                123.207206,
-                13.542052
-              ],
-              [
-                123.206929,
-                13.542053
-              ],
-              [
-                123.20693,
-                13.542866
-              ],
-              [
-                123.207207,
-                13.542866
-              ],
-              [
-                123.207206,
-                13.542324
-              ],
-              [
-                123.207484,
-                13.542323
-              ],
-              [
-                123.207483,
-                13.542052
-              ],
-              [
-                123.207761,
-                13.542052
-              ],
-              [
-                123.207761,
-                13.542323
-              ],
-              [
-                123.208038,
-                13.542323
-              ],
-              [
-                123.20804,
-                13.544222
-              ],
-              [
-                123.207763,
-                13.544222
-              ],
-              [
-                123.207762,
-                13.543679
-              ],
-              [
-                123.207208,
-                13.54368
-              ],
-              [
-                123.207208,
-                13.543951
-              ],
-              [
-                123.207485,
-                13.543951
-              ],
-              [
-                123.207485,
-                13.544222
-              ],
-              [
-                123.207208,
-                13.544222
-              ],
-              [
-                123.207208,
+                123.206377,
                 13.544494
               ],
               [
-                123.207486,
-                13.544493
+                123.206099,
+                13.544495
               ],
               [
-                123.207486,
-                13.544765
+                123.206099,
+                13.544223
               ],
               [
-                123.208318,
-                13.5448
+                123.206654,
+                13.544223
               ],
               [
-                123.208315,
-                13.542323
+                123.206653,
+                13.543952
               ],
               [
-                123.208593,
-                13.542322
+                123.206099,
+                13.543952
               ],
               [
-                123.208592,
-                13.541509
+                123.206099,
+                13.543681
               ],
               [
-                123.208315,
-                13.541509
+                123.206376,
+                13.543681
               ],
               [
-                123.208315,
-                13.541238
+                123.206376,
+                13.543409
               ],
               [
-                123.208037,
-                13.541238
+                123.206098,
+                13.54341
               ],
               [
-                123.208036,
-                13.539339
+                123.206098,
+                13.543138
               ],
               [
-                123.207204,
-                13.53934
+                123.206375,
+                13.543138
               ],
               [
-                123.207204,
-                13.539611
-              ]
-            ],
-            [
-              [
-                123.207483,
-                13.540967
-              ],
-              [
-                123.207482,
-                13.540424
-              ],
-              [
-                123.207759,
-                13.540424
-              ],
-              [
-                123.20776,
-                13.540967
-              ],
-              [
-                123.207483,
-                13.540967
-              ]
-            ]
-          ]
-        }
-      },
-      {
-        "type": "Feature",
-        "properties": {
-          "risk_class": "watch"
-        },
-        "geometry": {
-          "type": "Polygon",
-          "coordinates": [
-            [
-              [
-                123.205543,
+                123.206375,
                 13.542867
               ],
               [
-                123.205821,
+                123.206098,
                 13.542867
+              ],
+              [
+                123.206097,
+                13.542324
+              ],
+              [
+                123.20582,
+                13.542325
               ],
               [
                 123.20582,
                 13.542053
               ],
               [
-                123.205543,
+                123.205265,
                 13.542054
-              ],
-              [
-                123.205542,
-                13.541782
               ],
               [
                 123.205265,
                 13.541783
               ],
               [
-                123.205265,
-                13.541511
-              ],
-              [
-                123.206374,
-                13.54151
-              ],
-              [
-                123.206374,
-                13.541239
-              ],
-              [
-                123.206096,
-                13.541239
-              ],
-              [
-                123.206096,
-                13.540968
-              ],
-              [
-                123.206373,
-                13.540968
-              ],
-              [
-                123.206373,
-                13.540425
-              ],
-              [
-                123.205818,
-                13.540426
-              ],
-              [
-                123.205819,
-                13.540968
-              ],
-              [
-                123.205264,
-                13.540969
-              ],
-              [
-                123.205265,
-                13.54124
-              ],
-              [
-                123.204987,
-                13.54124
+                123.204988,
+                13.541783
               ],
               [
                 123.204988,
@@ -4336,22 +4882,6 @@
               [
                 123.204156,
                 13.541241
-              ],
-              [
-                123.204156,
-                13.541512
-              ],
-              [
-                123.203879,
-                13.541512
-              ],
-              [
-                123.203879,
-                13.541784
-              ],
-              [
-                123.204156,
-                13.541784
               ],
               [
                 123.204156,
@@ -4422,52 +4952,34 @@
                 13.5448
               ],
               [
-                123.205545,
+                123.206377,
                 13.5448
               ],
               [
-                123.205544,
-                13.544224
+                123.206377,
+                13.544494
+              ]
+            ],
+            [
+              [
+                123.205822,
+                13.543952
               ],
               [
                 123.205822,
-                13.544224
+                13.544766
               ],
               [
-                123.205821,
-                13.543681
-              ],
-              [
-                123.206099,
-                13.543681
-              ],
-              [
-                123.206099,
-                13.543952
-              ],
-              [
-                123.206376,
-                13.543952
-              ],
-              [
-                123.206376,
-                13.543409
-              ],
-              [
-                123.205821,
-                13.54341
-              ],
-              [
-                123.205821,
-                13.543138
+                123.205545,
+                13.544766
               ],
               [
                 123.205544,
-                13.543139
+                13.543953
               ],
               [
-                123.205543,
-                13.542867
+                123.205822,
+                13.543952
               ]
             ]
           ]
@@ -4499,6 +5011,30 @@
                 13.543683
               ],
               [
+                123.203603,
+                13.543954
+              ],
+              [
+                123.203049,
+                13.543955
+              ],
+              [
+                123.203049,
+                13.544226
+              ],
+              [
+                123.203326,
+                13.544226
+              ],
+              [
+                123.203327,
+                13.544497
+              ],
+              [
+                123.203604,
+                13.544497
+              ],
+              [
                 123.203604,
                 13.544225
               ]
@@ -4516,8 +5052,12 @@
           "coordinates": [
             [
               [
+                123.204435,
+                13.544225
+              ],
+              [
                 123.204158,
-                13.543954
+                13.544225
               ],
               [
                 123.204158,
@@ -4537,15 +5077,7 @@
               ],
               [
                 123.20499,
-                13.543953
-              ],
-              [
-                123.205267,
-                13.543953
-              ],
-              [
-                123.205267,
-                13.543681
+                13.543682
               ],
               [
                 123.204435,
@@ -4553,33 +5085,7 @@
               ],
               [
                 123.204435,
-                13.543953
-              ],
-              [
-                123.204158,
-                13.543954
-              ]
-            ],
-            [
-              [
-                123.204712,
-                13.543953
-              ],
-              [
-                123.204713,
-                13.544224
-              ],
-              [
-                123.204435,
                 13.544225
-              ],
-              [
-                123.204435,
-                13.543953
-              ],
-              [
-                123.204712,
-                13.543953
               ]
             ]
           ]
@@ -4595,119 +5101,12 @@
           "coordinates": [
             [
               [
-                123.206099,
-                13.544495
+                123.210254,
+                13.53988
               ],
               [
-                123.206099,
-                13.544223
-              ],
-              [
-                123.205822,
-                13.544224
-              ],
-              [
-                123.205822,
-                13.5448
-              ],
-              [
-                123.206377,
-                13.5448
-              ],
-              [
-                123.206377,
-                13.544494
-              ],
-              [
-                123.206099,
-                13.544495
-              ]
-            ]
-          ]
-        }
-      },
-      {
-        "type": "Feature",
-        "properties": {
-          "risk_class": "watch"
-        },
-        "geometry": {
-          "type": "Polygon",
-          "coordinates": [
-            [
-              [
-                123.209144,
-                13.538524
-              ],
-              [
-                123.209144,
-                13.538795
-              ],
-              [
-                123.210253,
-                13.538795
-              ],
-              [
-                123.210253,
-                13.538523
-              ],
-              [
-                123.209144,
-                13.538524
-              ]
-            ]
-          ]
-        }
-      },
-      {
-        "type": "Feature",
-        "properties": {
-          "risk_class": "watch"
-        },
-        "geometry": {
-          "type": "Polygon",
-          "coordinates": [
-            [
-              [
-                123.208868,
-                13.539881
-              ],
-              [
-                123.208867,
-                13.539338
-              ],
-              [
-                123.20859,
-                13.539338
-              ],
-              [
-                123.208591,
-                13.539881
-              ],
-              [
-                123.208868,
-                13.539881
-              ]
-            ]
-          ]
-        }
-      },
-      {
-        "type": "Feature",
-        "properties": {
-          "risk_class": "watch"
-        },
-        "geometry": {
-          "type": "Polygon",
-          "coordinates": [
-            [
-              [
-                123.209423,
-                13.540423
-              ],
-              [
-                123.209423,
-                13.540152
+                123.210254,
+                13.540151
               ],
               [
                 123.212195,
@@ -4716,6 +5115,86 @@
               [
                 123.212195,
                 13.539878
+              ],
+              [
+                123.211086,
+                13.539879
+              ],
+              [
+                123.211086,
+                13.539608
+              ],
+              [
+                123.211363,
+                13.539607
+              ],
+              [
+                123.211363,
+                13.539336
+              ],
+              [
+                123.210808,
+                13.539337
+              ],
+              [
+                123.210808,
+                13.538794
+              ],
+              [
+                123.21053,
+                13.538794
+              ],
+              [
+                123.21053,
+                13.538523
+              ],
+              [
+                123.209976,
+                13.538523
+              ],
+              [
+                123.209976,
+                13.5384
+              ],
+              [
+                123.208867,
+                13.5384
+              ],
+              [
+                123.208867,
+                13.539067
+              ],
+              [
+                123.208035,
+                13.539068
+              ],
+              [
+                123.208036,
+                13.53961
+              ],
+              [
+                123.208313,
+                13.53961
+              ],
+              [
+                123.208313,
+                13.539339
+              ],
+              [
+                123.208867,
+                13.539338
+              ],
+              [
+                123.208868,
+                13.539609
+              ],
+              [
+                123.209145,
+                13.539609
+              ],
+              [
+                123.209145,
+                13.539881
               ],
               [
                 123.208868,
@@ -4734,8 +5213,92 @@
                 13.540423
               ],
               [
-                123.209423,
+                123.208868,
                 13.540423
+              ],
+              [
+                123.208869,
+                13.540695
+              ],
+              [
+                123.209423,
+                13.540694
+              ],
+              [
+                123.209422,
+                13.53988
+              ],
+              [
+                123.2097,
+                13.53988
+              ],
+              [
+                123.209699,
+                13.539609
+              ],
+              [
+                123.210531,
+                13.539608
+              ],
+              [
+                123.210531,
+                13.539879
+              ],
+              [
+                123.210254,
+                13.53988
+              ]
+            ],
+            [
+              [
+                123.209145,
+                13.539338
+              ],
+              [
+                123.209144,
+                13.539067
+              ],
+              [
+                123.209699,
+                13.539066
+              ],
+              [
+                123.209699,
+                13.539338
+              ],
+              [
+                123.209145,
+                13.539338
+              ]
+            ],
+            [
+              [
+                123.209976,
+                13.539337
+              ],
+              [
+                123.209976,
+                13.538795
+              ],
+              [
+                123.210253,
+                13.538795
+              ],
+              [
+                123.210253,
+                13.539066
+              ],
+              [
+                123.210531,
+                13.539066
+              ],
+              [
+                123.210531,
+                13.539337
+              ],
+              [
+                123.209976,
+                13.539337
               ]
             ]
           ]
@@ -4751,185 +5314,39 @@
           "coordinates": [
             [
               [
-                123.21192,
-                13.542591
+                123.21081,
+                13.541507
               ],
               [
-                123.212197,
-                13.542591
+                123.211087,
+                13.541506
               ],
               [
-                123.212197,
-                13.542048
+                123.211088,
+                13.541778
+              ],
+              [
+                123.211919,
+                13.541777
+              ],
+              [
+                123.211919,
+                13.541506
               ],
               [
                 123.211642,
-                13.542049
+                13.541506
               ],
               [
-                123.211643,
-                13.54232
+                123.211642,
+                13.541235
               ],
               [
-                123.21192,
-                13.54232
+                123.211364,
+                13.541235
               ],
               [
-                123.21192,
-                13.542591
-              ]
-            ]
-          ]
-        }
-      },
-      {
-        "type": "Feature",
-        "properties": {
-          "risk_class": "watch"
-        },
-        "geometry": {
-          "type": "Polygon",
-          "coordinates": [
-            [
-              [
-                123.208593,
-                13.542322
-              ],
-              [
-                123.208593,
-                13.542865
-              ],
-              [
-                123.20887,
-                13.542865
-              ],
-              [
-                123.20887,
-                13.542322
-              ],
-              [
-                123.208593,
-                13.542322
-              ]
-            ]
-          ]
-        }
-      },
-      {
-        "type": "Feature",
-        "properties": {
-          "risk_class": "watch"
-        },
-        "geometry": {
-          "type": "Polygon",
-          "coordinates": [
-            [
-              [
-                123.20998,
-                13.543678
-              ],
-              [
-                123.210257,
-                13.543677
-              ],
-              [
-                123.210257,
-                13.543406
-              ],
-              [
-                123.210534,
-                13.543406
-              ],
-              [
-                123.210535,
-                13.543948
-              ],
-              [
-                123.210812,
-                13.543948
-              ],
-              [
-                123.210812,
-                13.543677
-              ],
-              [
-                123.211089,
-                13.543677
-              ],
-              [
-                123.211089,
-                13.543405
-              ],
-              [
-                123.210812,
-                13.543406
-              ],
-              [
-                123.210812,
-                13.543134
-              ],
-              [
-                123.20998,
-                13.543135
-              ],
-              [
-                123.209979,
-                13.541779
-              ],
-              [
-                123.210533,
-                13.541778
-              ],
-              [
-                123.210533,
-                13.54205
-              ],
-              [
-                123.210256,
-                13.54205
-              ],
-              [
-                123.210257,
-                13.542864
-              ],
-              [
-                123.210811,
-                13.542863
-              ],
-              [
-                123.210811,
-                13.542592
-              ],
-              [
-                123.211643,
-                13.542591
-              ],
-              [
-                123.211643,
-                13.54232
-              ],
-              [
-                123.211365,
-                13.54232
-              ],
-              [
-                123.211365,
-                13.542049
-              ],
-              [
-                123.211088,
-                13.542049
-              ],
-              [
-                123.211088,
-                13.541778
-              ],
-              [
-                123.21081,
-                13.541778
-              ],
-              [
-                123.21081,
+                123.211364,
                 13.540964
               ],
               [
@@ -4941,24 +5358,24 @@
                 13.540691
               ],
               [
-                123.210255,
-                13.540693
-              ],
-              [
-                123.210255,
-                13.540422
+                123.209978,
+                13.540694
               ],
               [
                 123.209977,
                 13.540422
               ],
               [
-                123.209978,
-                13.540694
+                123.210255,
+                13.540422
+              ],
+              [
+                123.210254,
+                13.540151
               ],
               [
                 123.2097,
-                13.540694
+                13.540151
               ],
               [
                 123.209704,
@@ -4969,30 +5386,329 @@
                 13.5448
               ],
               [
-                123.20998,
-                13.543678
+                123.209979,
+                13.541779
+              ],
+              [
+                123.210256,
+                13.541778
+              ],
+              [
+                123.210256,
+                13.541507
+              ],
+              [
+                123.210533,
+                13.541507
+              ],
+              [
+                123.210533,
+                13.54205
+              ],
+              [
+                123.210256,
+                13.54205
+              ],
+              [
+                123.210257,
+                13.543135
+              ],
+              [
+                123.210534,
+                13.543135
+              ],
+              [
+                123.210535,
+                13.543948
+              ],
+              [
+                123.210812,
+                13.543948
+              ],
+              [
+                123.21081,
+                13.541507
               ]
             ],
             [
               [
-                123.211088,
-                13.54232
+                123.21081,
+                13.541235
               ],
               [
-                123.210811,
-                13.542321
+                123.21081,
+                13.540964
               ],
               [
-                123.210811,
-                13.542049
+                123.211087,
+                13.540964
               ],
               [
-                123.211088,
-                13.542049
+                123.211087,
+                13.541235
               ],
               [
-                123.211088,
-                13.54232
+                123.21081,
+                13.541235
+              ]
+            ]
+          ]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "risk_class": "watch"
+        },
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                123.207759,
+                13.53961
+              ],
+              [
+                123.207758,
+                13.539339
+              ],
+              [
+                123.207481,
+                13.539339
+              ],
+              [
+                123.207482,
+                13.540153
+              ],
+              [
+                123.207205,
+                13.540153
+              ],
+              [
+                123.207206,
+                13.542052
+              ],
+              [
+                123.206929,
+                13.542053
+              ],
+              [
+                123.20693,
+                13.542866
+              ],
+              [
+                123.207207,
+                13.542866
+              ],
+              [
+                123.207206,
+                13.542324
+              ],
+              [
+                123.207484,
+                13.542323
+              ],
+              [
+                123.207483,
+                13.542052
+              ],
+              [
+                123.207761,
+                13.542052
+              ],
+              [
+                123.207761,
+                13.542323
+              ],
+              [
+                123.208038,
+                13.542323
+              ],
+              [
+                123.208039,
+                13.543679
+              ],
+              [
+                123.207208,
+                13.54368
+              ],
+              [
+                123.207208,
+                13.543951
+              ],
+              [
+                123.207485,
+                13.543951
+              ],
+              [
+                123.207485,
+                13.544222
+              ],
+              [
+                123.207208,
+                13.544222
+              ],
+              [
+                123.207208,
+                13.544494
+              ],
+              [
+                123.207486,
+                13.544493
+              ],
+              [
+                123.207486,
+                13.544765
+              ],
+              [
+                123.208318,
+                13.5448
+              ],
+              [
+                123.208317,
+                13.54395
+              ],
+              [
+                123.208594,
+                13.54395
+              ],
+              [
+                123.208594,
+                13.543679
+              ],
+              [
+                123.209148,
+                13.543678
+              ],
+              [
+                123.209148,
+                13.543407
+              ],
+              [
+                123.208871,
+                13.543407
+              ],
+              [
+                123.20887,
+                13.542322
+              ],
+              [
+                123.208593,
+                13.542322
+              ],
+              [
+                123.208592,
+                13.542051
+              ],
+              [
+                123.20887,
+                13.542051
+              ],
+              [
+                123.20887,
+                13.54178
+              ],
+              [
+                123.209147,
+                13.541779
+              ],
+              [
+                123.209147,
+                13.541508
+              ],
+              [
+                123.208592,
+                13.541509
+              ],
+              [
+                123.208592,
+                13.540966
+              ],
+              [
+                123.208314,
+                13.540966
+              ],
+              [
+                123.208315,
+                13.541238
+              ],
+              [
+                123.208037,
+                13.541238
+              ],
+              [
+                123.208036,
+                13.53961
+              ],
+              [
+                123.207759,
+                13.53961
+              ]
+            ],
+            [
+              [
+                123.208593,
+                13.542594
+              ],
+              [
+                123.208316,
+                13.542594
+              ],
+              [
+                123.208315,
+                13.542323
+              ],
+              [
+                123.208593,
+                13.542322
+              ],
+              [
+                123.208593,
+                13.542594
+              ]
+            ],
+            [
+              [
+                123.207763,
+                13.544222
+              ],
+              [
+                123.207762,
+                13.543951
+              ],
+              [
+                123.20804,
+                13.54395
+              ],
+              [
+                123.20804,
+                13.544222
+              ],
+              [
+                123.207763,
+                13.544222
+              ]
+            ],
+            [
+              [
+                123.207483,
+                13.540967
+              ],
+              [
+                123.207482,
+                13.540424
+              ],
+              [
+                123.207759,
+                13.540424
+              ],
+              [
+                123.20776,
+                13.540967
+              ],
+              [
+                123.207483,
+                13.540967
               ]
             ]
           ]
@@ -5041,71 +5757,7 @@
           "coordinates": [
             [
               [
-                123.213858,
-                13.539063
-              ],
-              [
-                123.213303,
-                13.539063
-              ],
-              [
-                123.213304,
-                13.539877
-              ],
-              [
-                123.213027,
-                13.539877
-              ],
-              [
-                123.213027,
-                13.540149
-              ],
-              [
-                123.213304,
-                13.540148
-              ],
-              [
-                123.213304,
-                13.54042
-              ],
-              [
-                123.213859,
-                13.540419
-              ],
-              [
-                123.213859,
-                13.540148
-              ],
-              [
-                123.214413,
-                13.540147
-              ],
-              [
-                123.214413,
-                13.539876
-              ],
-              [
-                123.214967,
-                13.539876
-              ],
-              [
-                123.214967,
-                13.539604
-              ],
-              [
-                123.21469,
-                13.539605
-              ],
-              [
-                123.21469,
-                13.539062
-              ],
-              [
-                123.214967,
-                13.539062
-              ],
-              [
-                123.214966,
+                123.214412,
                 13.5384
               ],
               [
@@ -5114,51 +5766,19 @@
               ],
               [
                 123.214135,
-                13.539334
-              ],
-              [
-                123.213858,
-                13.539334
-              ],
-              [
-                123.213858,
-                13.539063
-              ]
-            ],
-            [
-              [
-                123.214136,
-                13.539876
-              ],
-              [
-                123.214135,
-                13.539605
-              ],
-              [
-                123.214413,
-                13.539605
-              ],
-              [
-                123.214413,
-                13.539876
-              ],
-              [
-                123.214136,
-                13.539876
-              ]
-            ],
-            [
-              [
-                123.214412,
-                13.538791
+                13.539062
               ],
               [
                 123.214412,
-                13.53852
+                13.539062
               ],
               [
-                123.214689,
-                13.538519
+                123.214412,
+                13.539334
+              ],
+              [
+                123.21469,
+                13.539333
               ],
               [
                 123.214689,
@@ -5167,6 +5787,10 @@
               [
                 123.214412,
                 13.538791
+              ],
+              [
+                123.214412,
+                13.5384
               ]
             ]
           ]
@@ -5215,6 +5839,243 @@
           "coordinates": [
             [
               [
+                123.213305,
+                13.540691
+              ],
+              [
+                123.213582,
+                13.540691
+              ],
+              [
+                123.213582,
+                13.540419
+              ],
+              [
+                123.213859,
+                13.540419
+              ],
+              [
+                123.213859,
+                13.540148
+              ],
+              [
+                123.214968,
+                13.540147
+              ],
+              [
+                123.214967,
+                13.539604
+              ],
+              [
+                123.214413,
+                13.539605
+              ],
+              [
+                123.214413,
+                13.539876
+              ],
+              [
+                123.213027,
+                13.539877
+              ],
+              [
+                123.213027,
+                13.540149
+              ],
+              [
+                123.213304,
+                13.540148
+              ],
+              [
+                123.213305,
+                13.540691
+              ]
+            ]
+          ]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "risk_class": "watch"
+        },
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                123.212751,
+                13.541505
+              ],
+              [
+                123.213305,
+                13.541505
+              ],
+              [
+                123.213305,
+                13.541233
+              ],
+              [
+                123.213028,
+                13.541234
+              ],
+              [
+                123.213028,
+                13.540962
+              ],
+              [
+                123.21275,
+                13.540963
+              ],
+              [
+                123.212751,
+                13.541505
+              ]
+            ]
+          ]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "risk_class": "watch"
+        },
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                123.213306,
+                13.541776
+              ],
+              [
+                123.214137,
+                13.541775
+              ],
+              [
+                123.214137,
+                13.541504
+              ],
+              [
+                123.213305,
+                13.541505
+              ],
+              [
+                123.213306,
+                13.541776
+              ]
+            ]
+          ]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "risk_class": "watch"
+        },
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                123.213029,
+                13.542319
+              ],
+              [
+                123.213306,
+                13.542318
+              ],
+              [
+                123.213306,
+                13.541776
+              ],
+              [
+                123.212751,
+                13.541776
+              ],
+              [
+                123.212751,
+                13.542048
+              ],
+              [
+                123.213029,
+                13.542047
+              ],
+              [
+                123.213029,
+                13.542319
+              ]
+            ]
+          ]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "risk_class": "watch"
+        },
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                123.213306,
+                13.54259
+              ],
+              [
+                123.212475,
+                13.54259
+              ],
+              [
+                123.212475,
+                13.542862
+              ],
+              [
+                123.212752,
+                13.542861
+              ],
+              [
+                123.212752,
+                13.543133
+              ],
+              [
+                123.21303,
+                13.543132
+              ],
+              [
+                123.213029,
+                13.542861
+              ],
+              [
+                123.213307,
+                13.542861
+              ],
+              [
+                123.213306,
+                13.54259
+              ]
+            ]
+          ]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "risk_class": "watch"
+        },
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                123.214416,
+                13.543131
+              ],
+              [
+                123.21497,
+                13.543131
+              ],
+              [
                 123.21497,
                 13.542588
               ],
@@ -5233,14 +6094,6 @@
               [
                 123.214416,
                 13.543131
-              ],
-              [
-                123.21497,
-                13.543131
-              ],
-              [
-                123.21497,
-                13.542588
               ]
             ]
           ]
@@ -5256,20 +6109,8 @@
           "coordinates": [
             [
               [
-                123.211643,
-                13.542591
-              ],
-              [
-                123.211644,
-                13.543405
-              ],
-              [
-                123.211921,
-                13.543405
-              ],
-              [
-                123.211921,
-                13.543133
+                123.213307,
+                13.543132
               ],
               [
                 123.213861,
@@ -5280,16 +6121,12 @@
                 13.54286
               ],
               [
-                123.21192,
-                13.542862
+                123.213307,
+                13.542861
               ],
               [
-                123.21192,
-                13.542591
-              ],
-              [
-                123.211643,
-                13.542591
+                123.213307,
+                13.543132
               ]
             ]
           ]
@@ -5304,10 +6141,6 @@
           "type": "Polygon",
           "coordinates": [
             [
-              [
-                123.213861,
-                13.543132
-              ],
               [
                 123.213862,
                 13.543403
@@ -5323,6 +6156,10 @@
               [
                 123.213861,
                 13.543132
+              ],
+              [
+                123.213862,
+                13.543403
               ]
             ]
           ]
@@ -5338,7 +6175,19 @@
           "coordinates": [
             [
               [
-                123.21303,
+                123.213308,
+                13.54476
+              ],
+              [
+                123.213308,
+                13.544217
+              ],
+              [
+                123.213585,
+                13.544217
+              ],
+              [
+                123.213585,
                 13.543946
               ],
               [
@@ -5347,35 +6196,100 @@
               ],
               [
                 123.213307,
-                13.543403
+                13.543675
+              ],
+              [
+                123.21303,
+                13.543675
               ],
               [
                 123.21303,
                 13.543404
               ],
               [
-                123.21303,
-                13.543946
+                123.212753,
+                13.543404
+              ],
+              [
+                123.212752,
+                13.543133
+              ],
+              [
+                123.212475,
+                13.543133
+              ],
+              [
+                123.212475,
+                13.542862
+              ],
+              [
+                123.212198,
+                13.542862
+              ],
+              [
+                123.212198,
+                13.543133
+              ],
+              [
+                123.211643,
+                13.543134
+              ],
+              [
+                123.211644,
+                13.543405
+              ],
+              [
+                123.211921,
+                13.543405
+              ],
+              [
+                123.211921,
+                13.543676
+              ],
+              [
+                123.211644,
+                13.543676
+              ],
+              [
+                123.211644,
+                13.543947
+              ],
+              [
+                123.211367,
+                13.543948
+              ],
+              [
+                123.211367,
+                13.544219
+              ],
+              [
+                123.212199,
+                13.544218
+              ],
+              [
+                123.212199,
+                13.54449
+              ],
+              [
+                123.212476,
+                13.544489
+              ],
+              [
+                123.212477,
+                13.544761
+              ],
+              [
+                123.212199,
+                13.5448
+              ],
+              [
+                123.213308,
+                13.54476
               ]
-            ]
-          ]
-        }
-      },
-      {
-        "type": "Feature",
-        "properties": {
-          "risk_class": "watch"
-        },
-        "geometry": {
-          "type": "Polygon",
-          "coordinates": [
+            ],
             [
               [
-                123.212753,
-                13.544218
-              ],
-              [
-                123.212753,
+                123.212199,
                 13.543947
               ],
               [
@@ -5384,27 +6298,15 @@
               ],
               [
                 123.212476,
-                13.544489
-              ],
-              [
-                123.212754,
-                13.544489
-              ],
-              [
-                123.212754,
-                13.54476
-              ],
-              [
-                123.213031,
-                13.54476
-              ],
-              [
-                123.213031,
                 13.544218
               ],
               [
-                123.212753,
+                123.212199,
                 13.544218
+              ],
+              [
+                123.212199,
+                13.543947
               ]
             ]
           ]

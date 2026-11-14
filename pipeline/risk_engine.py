@@ -40,7 +40,16 @@ def risk_class(score: int) -> str:
     return "high" if score >= 70 else "watch" if score >= 40 else "low"
 
 
-CLASS_CODES = {"missing": -1, "low": 0, "watch": 1, "high": 2}
+CLASS_CODES = {"excluded": -2, "missing": -1, "low": 0, "watch": 1, "high": 2}
+
+
+def exclude_non_farmland(cls: np.ndarray, landcover: np.ndarray | None) -> np.ndarray:
+    """Built-up and permanent-water cells are not farmland: flag them (-2) instead of scoring them."""
+    if landcover is None:
+        return cls
+    out = cls.copy()
+    out[(landcover == C.WC_BUILT) | (landcover == C.WC_WATER)] = CLASS_CODES["excluded"]
+    return out
 
 
 def classify_grid(score: np.ndarray) -> np.ndarray:
@@ -143,6 +152,22 @@ def farmer_text(p: dict, rain_mm: float) -> tuple[str, str]:
     return action, sms
 
 
+LAYERS_DIR = C.DATA_DIR / "layers"
+
+
+def export_layers(g_sar: dict, g_ter: dict, grids: dict, landcover) -> None:
+    """Write the stacked 30 m grid as GeoTIFFs (open in QGIS to inspect any layer)."""
+    f32 = lambda a: np.asarray(a, dtype="float32")  # noqa: E731
+    C.write_geotiff(LAYERS_DIR / "wetness_change_vv_db.tif", f32(g_sar["d_vv_db"]), nodata=np.nan)
+    C.write_geotiff(LAYERS_DIR / "observed_flood.tif", g_sar["flood"].astype("uint8"), nodata=255)
+    C.write_geotiff(LAYERS_DIR / "twi.tif", f32(g_ter["twi"]), nodata=np.nan)
+    C.write_geotiff(LAYERS_DIR / "slope_deg.tif", f32(g_ter["slope_deg"]), nodata=np.nan)
+    C.write_geotiff(LAYERS_DIR / "risk_score.tif", f32(grids["score"]), nodata=np.nan)
+    C.write_geotiff(LAYERS_DIR / "risk_class.tif", grids["class"].astype("int8"), nodata=-1)
+    if landcover is not None:
+        C.write_geotiff(LAYERS_DIR / "landcover.tif", landcover.astype("uint8"), nodata=0)
+
+
 # ----------------------------------------------------------------------------- run
 
 def run(refresh: bool = False) -> dict:
@@ -154,7 +179,11 @@ def run(refresh: bool = False) -> dict:
     terr_by_id = {p["plot_id"]: p for p in terr["plots"]}
     g_sar, g_ter = sar.pop("_grids"), terr.pop("_grids")
     grids = risk_grids(g_sar["d_vv_db"], g_ter["twi"], rain["s_rain"])
+    landcover = g_sar["landcover"]
+    grids["class"] = exclude_non_farmland(grids["class"], landcover)
+    grids["terrain_class"] = exclude_non_farmland(grids["terrain_class"], landcover)
     bbox_mask = C.plot_mask(C.bbox_polygon_wgs())
+    cell_ha = C.CELL * C.CELL / 10_000
 
     features, high_geoms = [], []
     for f in C.load_plots():
@@ -178,6 +207,8 @@ def run(refresh: bool = False) -> dict:
             "vh_wetness_change_db": s.get("vh_wetness_change_db"),
             "vv_before_db": s["vv_before_db"],
             "vv_after_db": s["vv_after_db"],
+            "pre_event_change_db": s["pre_event_change_db"],
+            "baseline_spread_db": s["baseline_spread_db"],
             "flooded_pixel_fraction": s["flooded_pixel_fraction"],
             "mean_slope_deg": t["mean_slope_deg"],
             "mean_elevation_m": t["mean_elevation_m"],
@@ -187,6 +218,8 @@ def run(refresh: bool = False) -> dict:
         shares = class_shares(grids["class"], pmask)
         p["risk_zone_shares"] = shares
         p["missing_data_fraction"] = shares["missing_share"]
+        if landcover is not None:
+            p["cropland_fraction"] = round(float((landcover[pmask] == C.WC_CROP).mean()), 3)
         ordered = {k: p[k] for k in ("plot_id", "name", "barangay", "hectares", "households", "risk_class",
                                      "risk_score", "sar_wetness_change_db", "twi_value", "current_crop",
                                      "bare_field_days_per_year", "plain_language_action", "sms_alert")}
@@ -197,8 +230,9 @@ def run(refresh: bool = False) -> dict:
 
     flood_geoms = [shape(ft["geometry"]) for ft in sar["observed_flood_extent"]["features"]]
     plot_rate, flood_ha = hit_rate(flood_geoms, high_geoms)
-    rate = pixel_hit_rate(g_sar["flood"], grids["class"], bbox_mask)
-    rate_terrain = pixel_hit_rate(g_sar["flood"], grids["terrain_class"], bbox_mask)
+    scored = bbox_mask & (grids["class"] != CLASS_CODES["excluded"])  # hit rate over farmland the map rates
+    rate = pixel_hit_rate(g_sar["flood"], grids["class"], scored)
+    rate_terrain = pixel_hit_rate(g_sar["flood"], grids["terrain_class"], scored)
     fmt = lambda r: f"{r:.0f}%" if r is not None else "n/a"  # noqa: E731
 
     by_brgy: dict = defaultdict(lambda: {"plots": 0, "high_risk_ha": 0.0, "watch_ha": 0.0,
@@ -230,7 +264,16 @@ def run(refresh: bool = False) -> dict:
     sp = sar["provenance"]
     data_modes = {sp["data_mode"], sp["dem"]["data_mode"], rain["data_mode"]}
     synthetic = any("synthetic" in m for m in data_modes)
-    bdate, adate = (sp["before_scene"].get("datetime") or "")[:10], (sp["after_scene"].get("datetime") or "")[:10]
+    day = lambda m: (m.get("datetime") or "")[:10]  # noqa: E731
+    base_dates = [day(m) for m in sp["baseline_scenes"]]
+    jbdate, adate = day(sp["just_before_scene"]), day(sp["after_scene"])
+    flood_bbox = g_sar["flood"] & bbox_mask
+    flooded_farmland_ha = (float((flood_bbox & (landcover == C.WC_CROP)).sum()) * cell_ha
+                           if landcover is not None else None)
+    landcover_bbox = ({C.WC_NAMES.get(int(k), str(int(k))): round(float(v) * cell_ha, 1)
+                       for k, v in zip(*np.unique(landcover[bbox_mask], return_counts=True))}
+                      if landcover is not None else None)
+    export_layers(g_sar, g_ter, grids, landcover)
 
     provenance = {
         "pilot_area": C.PILOT_AREA,
@@ -245,9 +288,11 @@ def run(refresh: bool = False) -> dict:
         "households_affected": sum(p["households"] for p in high),
         "avg_bare_field_days": round(sum(ft["properties"]["bare_field_days_per_year"] for ft in features) / len(features)),
         "datasets_used": [
-            f"Sentinel-1 (ESA/Copernicus C-Band SAR VV/VH) — RTC, orbit 134, {bdate} vs {adate}",
+            (f"Sentinel-1 (ESA/Copernicus C-Band SAR VV/VH) — RTC, orbit 134; baseline median of "
+             f"{len(base_dates)} passes ({base_dates[0]} to {base_dates[-1]}), just-before {jbdate}, after {adate}"),
             "NASADEM (30m Slope, Flow Accumulation & TWI)",
             f"NASA POWER (Daily PRECTOTCORR Rainfall — {rain['r_total_mm']:.0f} mm antecedent + event)",
+            "ESA WorldCover 2021 (10m Land Cover — cropland / built-up / permanent-water mask)",
             "GPM IMERG — pending (feature/terrain-rain)",
             "SMAP Soil-Moisture Anomaly — pending (feature/terrain-rain)",
             "Landsat 8-9 / MODIS NDVI — pending (feature/rotation-engine; bare-field days are placeholders)",
@@ -260,9 +305,15 @@ def run(refresh: bool = False) -> dict:
         # ---- additive pipeline metadata
         "data_mode": "synthetic_fallback" if synthetic else "real",
         "risk_formula": "round(100 × (0.45·S_SAR + 0.35·S_TWI + 0.20·S_Rain)); high ≥ 70, watch ≥ 40",
-        "sar_scenes": {"before": sp["before_scene"].get("item_id"), "after": sp["after_scene"].get("item_id")},
+        "sar_scenes": {"baseline": [m.get("item_id") for m in sp["baseline_scenes"]],
+                       "just_before": sp["just_before_scene"].get("item_id"),
+                       "after": sp["after_scene"].get("item_id"),
+                       "storm_day_rejected": sp["other_scenes_considered"][1]},
         "sar_flood_threshold_db": sp["flood_threshold_db"],
+        "pre_event_change_db": sp["bbox_mean_pre_event_change_db"],
         "observed_flood_area_ha": round(flood_ha, 2),
+        "flooded_farmland_ha": round(flooded_farmland_ha, 2) if flooded_farmland_ha is not None else None,
+        "pilot_area_landcover_ha": landcover_bbox,
         "sar_hit_rate_plots": fmt(plot_rate),
         "sar_hit_rate_terrain_only": fmt(rate_terrain),
         "sar_hit_rate_note": ("sar_hit_rate = share of SAR-flooded 30 m cells in the pilot bbox that the full risk map "
@@ -271,7 +322,20 @@ def run(refresh: bool = False) -> dict:
                               "independent test. sar_hit_rate_plots uses whole-plot classes (CLAUDE.md §3D.3). "
                               "All are n/a when the SAR flood mask is empty."),
         "risk_class_thresholds": {"high": ">= 70", "watch": "40-69", "low": "< 40",
-                                  "missing": "no valid SAR pixel (flagged, not scored)"},
+                                  "missing": "no valid SAR pixel (flagged, not scored)",
+                                  "excluded": "built-up or permanent water per WorldCover (not farmland, not scored)"},
+        "grid_layers": {
+            "crs": C.UTM_CRS, "cell_m": C.CELL,
+            "layers": ["wetness_change_vv_db", "observed_flood", "twi", "slope_deg", "risk_score", "risk_class",
+                       "landcover"],
+            "missing_value_flag": "NaN for float layers; risk_class -1 = missing SAR, -2 = excluded land cover",
+            "missing_cells_in_pilot_area": {
+                "sar": int((~g_sar["sar_valid"] & bbox_mask).sum()),
+                "terrain": int((~np.isfinite(g_ter["twi"]) & bbox_mask).sum()),
+                "landcover": int(((landcover == 0) & bbox_mask).sum()) if landcover is not None else None,
+            },
+            "geotiffs": "data/layers/*.tif",
+        },
         "pilot_area_class_shares": bbox_shares,
         "barangay_ranking": barangay_ranking,
         "rainfall": {k: v for k, v in rain.items() if k != "daily_mm"},
@@ -298,7 +362,8 @@ def main() -> None:
     out = run(refresh=ap.parse_args().refresh)
     pv = out["provenance"]
     print(f"data_mode={pv['data_mode']}  hit_rate={pv['sar_hit_rate']} (terrain-only {pv['sar_hit_rate_terrain_only']}, "
-          f"plots {pv['sar_hit_rate_plots']})  flood={pv['observed_flood_area_ha']} ha  "
+          f"plots {pv['sar_hit_rate_plots']})  flood={pv['observed_flood_area_ha']} ha "
+          f"(farmland {pv['flooded_farmland_ha']} ha)  pre-event Δ={pv['pre_event_change_db']} dB  "
           f"high={pv['high_risk_plots']} plots / {pv['total_high_risk_ha']} ha / {pv['households_affected']} households  "
           f"t={pv['processing_time']}")
     for ft in out["plots"]["features"]:

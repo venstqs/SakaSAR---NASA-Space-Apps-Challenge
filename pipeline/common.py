@@ -337,6 +337,45 @@ def load_dem(refresh: bool = False) -> tuple[np.ndarray, dict]:
         return synthetic_dem(), meta
 
 
+# ----------------------------------------------------------------------------- land cover (ESA WorldCover)
+
+WORLDCOVER_ITEM = "ESA_WorldCover_10m_2021_v200_N12E123"
+WC_TREE, WC_CROP, WC_BUILT, WC_WATER, WC_WETLAND = 10, 40, 50, 80, 90
+WC_NAMES = {10: "tree cover", 20: "shrubland", 30: "grassland", 40: "cropland", 50: "built-up",
+            60: "bare / sparse vegetation", 80: "permanent water", 90: "herbaceous wetland",
+            95: "mangroves", 0: "no data"}
+
+
+def load_worldcover(refresh: bool = False) -> tuple[np.ndarray | None, dict]:
+    """Majority land-cover class per 30 m cell, or (None, meta) if unavailable (no masking applied)."""
+    cached = None if refresh else load_cache("worldcover")
+    if cached:
+        meta, arrs = cached
+        return arrs["landcover"], meta
+    try:
+        item = stac_item("esa-worldcover", WORLDCOVER_ITEM)
+        lc = read_to_grid(signed_href("esa-worldcover", item["assets"]["map"]["href"]), Resampling.mode)
+        lc = np.where(np.isfinite(lc), lc, 0).astype("uint8")
+        meta = {"data_mode": "live", "source": "ESA WorldCover 10 m 2021 v200 (Microsoft Planetary Computer)",
+                "item_id": WORLDCOVER_ITEM, "grid": grid_signature()}
+        save_cache("worldcover", meta, landcover=lc)
+        return lc, meta
+    except Exception as exc:
+        return None, {"data_mode": "unavailable", "reason": f"{type(exc).__name__}: {exc}",
+                      "grid": grid_signature()}
+
+
+def write_geotiff(path: Path, arr: np.ndarray, nodata=None, grid: Grid = GRID) -> None:
+    """Export a grid layer as a compressed GeoTIFF (EPSG:32651) for QGIS / judges."""
+    import rasterio
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with rasterio.open(path, "w", driver="GTiff", height=grid.height, width=grid.width, count=1,
+                       dtype=arr.dtype, crs=grid.crs, transform=grid.transform, nodata=nodata,
+                       compress="deflate") as dst:
+        dst.write(arr, 1)
+
+
 def write_json(path: Path, obj) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:

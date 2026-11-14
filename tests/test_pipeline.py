@@ -81,3 +81,11 @@ def test_terrain_only_model_ignores_sar():
     g2 = R.risk_grids(np.full((2, 2), +2.0), twi, 1.0)
     assert np.allclose(g1["terrain_score"], g2["terrain_score"])
     assert (g1["score"] > g2["score"]).all()
+
+
+def test_non_farmland_excluded_from_scoring():
+    cls = np.array([[2, 1], [0, 2]], dtype=np.int8)
+    lc = np.array([[C.WC_CROP, C.WC_BUILT], [C.WC_WATER, C.WC_CROP]], dtype=np.uint8)
+    out = R.exclude_non_farmland(cls, lc)
+    assert out.tolist() == [[2, -2], [-2, 2]]
+    assert R.exclude_non_farmland(cls, None) is cls
