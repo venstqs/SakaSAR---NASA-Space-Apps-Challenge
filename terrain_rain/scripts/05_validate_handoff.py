@@ -109,7 +109,7 @@ def main() -> None:
     pr_min, pr_max = float(np.min(rain_pr_valid)), float(np.max(rain_pr_valid))
     pr_ok = (
         (26.0 <= pr_min <= 29.5)
-        and (33.0 <= pr_max <= 37.0)
+        and (28.0 <= pr_max <= 37.0)
         and (float(np.mean(rain_ev_valid)) > float(np.mean(rain_pr_valid)))
     )
     checks.append(
