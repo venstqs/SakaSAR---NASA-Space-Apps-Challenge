@@ -110,3 +110,23 @@ def test_integrated_outputs_present():
     assert pv["bare_field_check"]["status"] == "not_used"
     for f in out["plots"]["features"]:
         assert set(f["properties"]["rotation_fit"]) == {"legume", "biotillage", "shortcycle"}
+
+
+def test_recommendations_timeline_per_plot():
+    import json
+    m = json.loads((C.ROOT / "mock-data.json").read_text(encoding="utf-8"))
+    for f in m["plots"]["features"]:
+        recs = f["properties"]["recommendations"]
+        assert [r["when"] for r in recs] == ["Next 48 hours", "This week", "Before the next storm", "Next season"]
+        assert all(r["action"] and r["why"] and r["sources"] for r in recs)
+    high = next(f["properties"] for f in m["plots"]["features"] if f["properties"]["risk_class"] == "high")
+    assert "trench" in high["recommendations"][0]["action"]
+    assert "LSTM" in high["recommendations"][1]["sources"][0]
+
+
+def test_best_rotation_skips_caution():
+    from pipeline import recommend as REC
+    rots = [{"id": "legume", "priorities": {"nitrogen": 1}}, {"id": "biotillage", "priorities": {"nitrogen": 2}},
+            {"id": "shortcycle", "priorities": {"nitrogen": 3}}]
+    fit = {"legume": {"fit": "caution"}, "biotillage": {"fit": "good"}, "shortcycle": {"fit": "caution"}}
+    assert REC._best_rotation(rots, fit, "nitrogen")["id"] == "biotillage"

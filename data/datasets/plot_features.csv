@@ -1,0 +1,6 @@
+plot_id,barangay,current_crop,hectares_placeholder,households_placeholder,dvv_db_2nov,dvv_db_9oct,dvh_db_2nov,flooded_fraction,twi,slope_deg,elevation_m,cropland_fraction,sand_pct,silt_pct,clay_pct,soc_g_per_kg,texture,s_sar,s_twi,s_rain,risk_score,risk_class,fit_legume,fit_biotillage,fit_shortcycle
+PL-01,Brgy. Bagongbong,Irrigated Lowland Rice,3.4,10,-6.2,2.22,-5.68,0.657,8.7,2.12,0.6,1.0,31.8,32.1,36.1,53.0,clay loam,1.0,0.375,1.0,78,high,caution,good,caution
+PL-02,Brgy. Taban,Irrigated Lowland Rice,2.8,8,-6.38,0.52,-5.24,0.6,10.5,0.66,2.6,0.933,32.9,30.3,36.8,45.2,clay loam,1.0,0.548,1.0,84,high,caution,good,caution
+PL-03,Brgy. Taban,White Corn,2.1,5,-2.01,-0.1,0.87,0.0,9.9,0.71,3.4,1.0,33.4,30.4,36.2,46.5,clay loam,0.503,0.485,1.0,60,watch,good,good,neutral
+PL-04,Brgy. Catanusan,Yellow Corn,1.9,4,0.13,-1.21,2.94,0.0,10.7,0.94,3.6,1.0,33.0,30.1,36.9,44.0,clay loam,0.0,0.572,1.0,40,watch,good,good,neutral
+PL-05,Brgy. Catanusan,Upland Rice,3.5,6,0.4,-1.49,1.64,0.0,8.7,0.94,5.1,1.0,32.0,31.6,36.4,44.7,clay loam,0.0,0.367,1.0,33,low,good,good,good

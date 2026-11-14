@@ -8,7 +8,7 @@
     "event_reference": "STS Kristine (Trami) — Oct 21-26, 2024 (Sentinel-1 Pass 2024-11-02)",
     "grid_resolution": "30m Shared Grid",
     "licensing_cost": "₱0 (Open NASA & Copernicus Data)",
-    "processing_time": "1.2 sec",
+    "processing_time": "0.7 sec",
     "sar_hit_rate": "31%",
     "total_high_risk_ha": 6.2,
     "high_risk_plots": 2,
@@ -207,6 +207,7 @@
       "why": "At 250 m each pixel mixes many paddies planted on different dates, so the median cropland pixel never looks bare. Field-level bare windows need 30 m Landsat/Sentinel-2 NDVI or the MAO cropping calendar; bare_field_days_per_year stays a placeholder until then."
     },
     "rotation_rules": "Per-plot fit: legume = caution on high drowning risk (waterlogging-intolerant); biotillage = good where clay ≥ 30% or risk high/watch; shortcycle = caution on high risk, good on low risk. Ranking within a priority stays as in rotation_strategies.priorities. Rules of thumb to verify with the Municipal Agriculture Office.",
+    "recommendation_method": "Per-plot timeline: next 48 h from the measured risk class; this week from the LSTM root-zone forecast after the 2 Nov 2024 pass; before the next storm from the LSTM Kristine-like scenario run on the latest NASA POWER day; next season from the rotation fit. The LSTM is regional (~50 km); plot specifics come from the radar, terrain and soil.",
     "pending_inputs": [
       "bare_field_days_per_year",
       "households",
@@ -280,7 +281,44 @@
               "fit": "caution",
               "why": "millet/sesame need drained soil; fix drainage first"
             }
-          }
+          },
+          "recommendations": [
+            {
+              "when": "Next 48 hours",
+              "action": "Open field outlets and cut a 30 cm drainage trench along the lowest bund. If the rice is near maturity, harvest early rather than risk root rot.",
+              "why": "Risk 78/100 (high): radar change -6.2 dB, terrain wetness index 8.7, 497 mm storm rain.",
+              "sources": [
+                "Sentinel-1",
+                "NASADEM",
+                "GPM IMERG"
+              ]
+            },
+            {
+              "when": "This week",
+              "action": "Keep outlets open all week and do not replant or apply fertiliser yet: the root zone is forecast to stay waterlogged.",
+              "why": "LSTM forecast issued 2024-11-03 (day after the 2 Nov radar pass): root zone 0.98 of saturation, waterlogged on 7 of the next 7 days.",
+              "sources": [
+                "LSTM (NASA POWER)"
+              ]
+            },
+            {
+              "when": "Before the next storm",
+              "action": "Before the next typhoon warning: desilt the tertiary canal and pre-cut the drainage trench; this plot floods first.",
+              "why": "LSTM scenario from 2026-11-09: root zone now 0.76 (moist); a Kristine-like week (436 mm) would leave it 'wet'.",
+              "sources": [
+                "LSTM (NASA POWER)"
+              ]
+            },
+            {
+              "when": "Next season",
+              "action": "Consider Deep-Rooting & Erosion Control Cover Crop (Bio-Tillage) (Forage Radish / Sorghum-Sudangrass) after the rice harvest.",
+              "why": "36% clay drains slowly and high drowning risk — deep roots open drainage pores. Soil: clay loam, 36.1% clay. Check seed supply and soil pH with the MAO.",
+              "sources": [
+                "SoilGrids",
+                "Risk engine"
+              ]
+            }
+          ]
         },
         "geometry": {
           "type": "Polygon",
@@ -373,7 +411,44 @@
               "fit": "caution",
               "why": "millet/sesame need drained soil; fix drainage first"
             }
-          }
+          },
+          "recommendations": [
+            {
+              "when": "Next 48 hours",
+              "action": "Open field outlets and cut a 30 cm drainage trench along the lowest bund. If the rice is near maturity, harvest early rather than risk root rot.",
+              "why": "Risk 84/100 (high): radar change -6.4 dB, terrain wetness index 10.5, 497 mm storm rain.",
+              "sources": [
+                "Sentinel-1",
+                "NASADEM",
+                "GPM IMERG"
+              ]
+            },
+            {
+              "when": "This week",
+              "action": "Keep outlets open all week and do not replant or apply fertiliser yet: the root zone is forecast to stay waterlogged.",
+              "why": "LSTM forecast issued 2024-11-03 (day after the 2 Nov radar pass): root zone 0.98 of saturation, waterlogged on 7 of the next 7 days.",
+              "sources": [
+                "LSTM (NASA POWER)"
+              ]
+            },
+            {
+              "when": "Before the next storm",
+              "action": "Before the next typhoon warning: desilt the tertiary canal and pre-cut the drainage trench; this plot floods first.",
+              "why": "LSTM scenario from 2026-11-09: root zone now 0.76 (moist); a Kristine-like week (436 mm) would leave it 'wet'.",
+              "sources": [
+                "LSTM (NASA POWER)"
+              ]
+            },
+            {
+              "when": "Next season",
+              "action": "Consider Deep-Rooting & Erosion Control Cover Crop (Bio-Tillage) (Forage Radish / Sorghum-Sudangrass) after the rice harvest.",
+              "why": "37% clay drains slowly and high drowning risk — deep roots open drainage pores. Soil: clay loam, 36.8% clay. Check seed supply and soil pH with the MAO.",
+              "sources": [
+                "SoilGrids",
+                "Risk engine"
+              ]
+            }
+          ]
         },
         "geometry": {
           "type": "Polygon",
@@ -466,7 +541,44 @@
               "fit": "neutral",
               "why": "workable once furrows are kept clear"
             }
-          }
+          },
+          "recommendations": [
+            {
+              "when": "Next 48 hours",
+              "action": "Clear perimeter furrows and outlets, and walk the low corners after each rain band.",
+              "why": "Risk 60/100 (watch): radar change -2.0 dB, terrain wetness index 9.9, 497 mm storm rain.",
+              "sources": [
+                "Sentinel-1",
+                "NASADEM",
+                "GPM IMERG"
+              ]
+            },
+            {
+              "when": "This week",
+              "action": "Keep outlets open all week and do not replant or apply fertiliser yet: the root zone is forecast to stay waterlogged.",
+              "why": "LSTM forecast issued 2024-11-03 (day after the 2 Nov radar pass): root zone 0.98 of saturation, waterlogged on 7 of the next 7 days.",
+              "sources": [
+                "LSTM (NASA POWER)"
+              ]
+            },
+            {
+              "when": "Before the next storm",
+              "action": "Before the next typhoon warning: clear furrows and check that outlets drain to the canal.",
+              "why": "LSTM scenario from 2026-11-09: root zone now 0.76 (moist); a Kristine-like week (436 mm) would leave it 'wet'.",
+              "sources": [
+                "LSTM (NASA POWER)"
+              ]
+            },
+            {
+              "when": "Next season",
+              "action": "Consider Nitrogen-Fixing & Soil Restorative Rotation (Mungbean / Cowpea (Legume-Dominant)) after the corn harvest.",
+              "why": "Drainage risk is manageable for a post-harvest legume. Soil: clay loam, 36.2% clay. Check seed supply and soil pH with the MAO.",
+              "sources": [
+                "SoilGrids",
+                "Risk engine"
+              ]
+            }
+          ]
         },
         "geometry": {
           "type": "Polygon",
@@ -559,7 +671,44 @@
               "fit": "neutral",
               "why": "workable once furrows are kept clear"
             }
-          }
+          },
+          "recommendations": [
+            {
+              "when": "Next 48 hours",
+              "action": "Clear perimeter furrows and outlets, and walk the low corners after each rain band.",
+              "why": "Risk 40/100 (watch): radar change +0.1 dB, terrain wetness index 10.7, 497 mm storm rain.",
+              "sources": [
+                "Sentinel-1",
+                "NASADEM",
+                "GPM IMERG"
+              ]
+            },
+            {
+              "when": "This week",
+              "action": "Keep outlets open all week and do not replant or apply fertiliser yet: the root zone is forecast to stay waterlogged.",
+              "why": "LSTM forecast issued 2024-11-03 (day after the 2 Nov radar pass): root zone 0.98 of saturation, waterlogged on 7 of the next 7 days.",
+              "sources": [
+                "LSTM (NASA POWER)"
+              ]
+            },
+            {
+              "when": "Before the next storm",
+              "action": "Before the next typhoon warning: clear furrows and check that outlets drain to the canal.",
+              "why": "LSTM scenario from 2026-11-09: root zone now 0.76 (moist); a Kristine-like week (436 mm) would leave it 'wet'.",
+              "sources": [
+                "LSTM (NASA POWER)"
+              ]
+            },
+            {
+              "when": "Next season",
+              "action": "Consider Nitrogen-Fixing & Soil Restorative Rotation (Mungbean / Cowpea (Legume-Dominant)) after the corn harvest.",
+              "why": "Drainage risk is manageable for a post-harvest legume. Soil: clay loam, 36.9% clay. Check seed supply and soil pH with the MAO.",
+              "sources": [
+                "SoilGrids",
+                "Risk engine"
+              ]
+            }
+          ]
         },
         "geometry": {
           "type": "Polygon",
@@ -652,7 +801,44 @@
               "fit": "good",
               "why": "well-drained plot suits low-water short-cycle crops"
             }
-          }
+          },
+          "recommendations": [
+            {
+              "when": "Next 48 hours",
+              "action": "No emergency action. Keep outlets clear.",
+              "why": "Risk 33/100 (low): radar change +0.4 dB, terrain wetness index 8.7, 497 mm storm rain.",
+              "sources": [
+                "Sentinel-1",
+                "NASADEM",
+                "GPM IMERG"
+              ]
+            },
+            {
+              "when": "This week",
+              "action": "Soil stays very wet this week; avoid heavy machinery on the field so it does not compact.",
+              "why": "LSTM forecast issued 2024-11-03 (day after the 2 Nov radar pass): root zone 0.98 of saturation, waterlogged on 7 of the next 7 days.",
+              "sources": [
+                "LSTM (NASA POWER)"
+              ]
+            },
+            {
+              "when": "Before the next storm",
+              "action": "Before the next typhoon warning: routine outlet check is enough for this plot.",
+              "why": "LSTM scenario from 2026-11-09: root zone now 0.76 (moist); a Kristine-like week (436 mm) would leave it 'wet'.",
+              "sources": [
+                "LSTM (NASA POWER)"
+              ]
+            },
+            {
+              "when": "Next season",
+              "action": "Consider Nitrogen-Fixing & Soil Restorative Rotation (Mungbean / Cowpea (Legume-Dominant)) after the rice harvest.",
+              "why": "Drainage risk is manageable for a post-harvest legume. Soil: clay loam, 36.4% clay. Check seed supply and soil pH with the MAO.",
+              "sources": [
+                "SoilGrids",
+                "Risk engine"
+              ]
+            }
+          ]
         },
         "geometry": {
           "type": "Polygon",

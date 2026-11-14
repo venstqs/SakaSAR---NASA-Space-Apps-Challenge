@@ -72,3 +72,13 @@ def test_logo_served_and_assets_locked_down():
     assert client.get("/assets/sakasar-logo.png").status_code == 200
     for bad in ("/assets/..%2Fapi.py", "/assets/../CLAUDE.md", "/assets/missing.png"):
         assert client.get(bad).status_code == 404
+
+
+def test_recommendations_and_datasets_endpoints():
+    r = client.get("/api/recommendations", params={"plot_id": "PL-01"})
+    assert r.status_code == 200 and len(r.json()["PL-01"]) == 4
+    assert client.get("/api/recommendations", params={"plot_id": "PL-99"}).status_code == 404
+    csv_resp = client.get("/data/datasets/pixels_30m_pilot.csv")
+    assert csv_resp.status_code == 200 and csv_resp.text.startswith("lon,lat")
+    for bad in ("/data/datasets/..%2F..%2Fapi.py", "/data/datasets/missing.csv"):
+        assert client.get(bad).status_code == 404

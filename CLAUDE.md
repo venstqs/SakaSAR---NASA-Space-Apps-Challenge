@@ -51,7 +51,7 @@ pip install -r requirements.txt            # API + pipeline (no torch)
 python -m pipeline.risk_engine             # rebuilds mock-data.json from cache (~1 s); --refresh re-downloads
 python -m pipeline.soil_lstm               # retrain the LSTM (needs requirements-ml.txt / torch)
 uvicorn api:app --port 8000                # dashboard + API at http://localhost:8000
-python -m pytest -q                        # 23 tests (ours + terrain_rain)
+python -m pytest -q                        # 26 tests (ours + terrain_rain)
 python terrain_rain/scripts/run_all.py     # Guian's package; works without WhiteboxTools (offline fallback)
 ```
 
@@ -80,6 +80,9 @@ Flood mask: VV_after < τ (Otsu, bounded −20…−12 dB) ∧ ΔVV < −2 dB �
 - **Rotation fit** (`pipeline/rotation_engine.py`): legume = caution on high drowning risk; biotillage =
   good on clay ≥ 30% or high/watch risk; shortcycle = caution on high, good on low. These are rules of
   thumb to verify with the Municipal Agriculture Office.
+- **Recommendations** (`pipeline/recommend.py`): per-plot timeline: next 48 h (measured risk), this week (LSTM
+  after the 2 Nov pass), before the next storm (LSTM Kristine scenario from the latest NASA POWER day), next season
+  (rotation fit). Each step lists its sources. Datasets: `python -m pipeline.build_datasets` → `data/datasets/`.
 - Current results: PL-01/02 high · PL-03/04 watch · PL-05 low · 35.1 ha flooded farmland ·
   barangay order Taban → Bagongbong → Catanusan.
 

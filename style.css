@@ -1554,3 +1554,68 @@ button svg,
 .rot-fit.fit-good { background: rgba(5, 150, 105, 0.1); color: #065f46; }
 .rot-fit.fit-neutral { background: var(--surface-muted); color: var(--text-secondary); }
 .rot-fit.fit-caution { background: rgba(217, 119, 6, 0.12); color: #92400e; }
+
+/* ===== Refinement pass: short screens, tabs on top, recommendations ===== */
+/* Tabs at the top of the left panel: one section visible at a time, nothing buried below the fold */
+.panel-top-tabs {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  border-top: none;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 2px 0 var(--space-2);
+  margin-bottom: var(--space-3);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--card-bg);
+}
+.panel-top-tabs .tab-pill { padding-left: 4px; padding-right: 4px; font-size: 0.75rem; justify-content: center; }
+#drawer-overview { display: flex; flex-direction: column; }
+#drawer-overview.hidden { display: none; }
+
+/* Buttons and meta text never truncate */
+.action-grid .btn-secondary span, .action-grid .btn-primary span { white-space: nowrap; }
+.action-grid .btn-secondary, .action-grid .btn-primary { font-size: 0.8125rem; padding-left: 8px; padding-right: 8px; }
+.inspect-meta-row { flex-wrap: wrap; row-gap: 2px; }
+.inspect-meta-row span { white-space: normal; overflow: visible; text-overflow: clip; }
+
+/* Plot card scrolls inside itself on short screens */
+.inspect-card { max-height: calc(100vh - 196px); overflow-y: auto; scrollbar-width: thin; }
+@media (max-width: 1024px) { .inspect-card { max-height: 46vh; } }
+
+/* Recommendation timeline */
+.reco-box { margin-top: var(--space-3); border: 1px solid var(--card-border); border-radius: var(--radius-md); padding: 12px; background: #fff; }
+.reco-box.hidden { display: none; }
+.reco-list { list-style: none; margin: 8px 0 0; padding: 0; position: relative; }
+.reco-step { position: relative; padding: 0 0 12px 18px; border-left: 2px solid var(--border-strong); margin-left: 5px; }
+.reco-step:last-child { padding-bottom: 0; border-left-color: transparent; }
+.reco-step::before { content: ""; position: absolute; left: -7px; top: 2px; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--brand-blue); box-shadow: 0 0 0 3px var(--brand-blue-light); }
+.reco-step:first-child::before { background: var(--risk-high); box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15); }
+.reco-when { display: block; font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-sub); }
+.reco-action { margin: 2px 0 2px; font-size: 0.8125rem; font-weight: 600; color: var(--text-main); line-height: 1.4; }
+.reco-why { margin: 0 0 4px; font-size: 0.75rem; color: var(--text-sub); line-height: 1.4; }
+.reco-sources { display: flex; flex-wrap: wrap; gap: 4px; }
+.reco-sources span { font-size: 0.625rem; font-weight: 600; color: var(--brand-blue); background: var(--brand-blue-light);
+  border-radius: var(--radius-pill); padding: 1px 7px; }
+
+/* Data tab: dataset downloads */
+.dataset-links { display: flex; flex-direction: column; gap: 4px; margin: 10px 0; font-size: 0.8125rem; }
+.dataset-links a { color: var(--brand-blue); text-decoration: none; }
+.dataset-links a:hover { text-decoration: underline; }
+.meta-kv { display: flex; flex-direction: column; gap: 2px; }
+
+/* Short screens (e.g. laptops at 125% scaling): tighten the overview */
+@media (max-height: 820px) {
+  .kpi-item { padding: 6px 10px; }
+  .kpi-val { font-size: 1rem; }
+  .status-summary { margin-bottom: var(--space-2); }
+  .kpi-grid { margin-bottom: var(--space-2); }
+  .corridor-section { padding-top: 8px; padding-bottom: 8px; }
+}
+
+/* Phones: panel and plot sheet share the screen without overlapping */
+@media (max-width: 640px) {
+  .left-panel { max-height: 40vh; }
+  .inspect-card, #lgu-card { max-height: 38vh; }
+}

@@ -84,6 +84,28 @@ def get_soil_outlook() -> dict:
         raise HTTPException(503, "soil_outlook.json not found — run `python -m pipeline.soil_lstm`")
 
 
+@app.get("/api/recommendations", tags=["data"], summary="Farmer recommendation timeline per plot")
+def get_recommendations(plot_id: str | None = None) -> dict:
+    recs = {f["properties"]["plot_id"]: f["properties"].get("recommendations", [])
+            for f in load_data()["plots"]["features"]}
+    if plot_id is None:
+        return recs
+    if plot_id not in recs:
+        raise HTTPException(404, f"unknown plot_id {plot_id}")
+    return {plot_id: recs[plot_id]}
+
+
+DATASETS_DIR = ROOT / "data" / "datasets"
+
+
+@app.get("/data/datasets/{name}", tags=["data"], summary="Download one of SakaSAR's CSV datasets")
+def get_dataset(name: str) -> FileResponse:
+    target = (DATASETS_DIR / name).resolve()
+    if target.parent != DATASETS_DIR.resolve() or not target.is_file() or target.suffix.lower() not in {".csv", ".md"}:
+        raise HTTPException(404)
+    return FileResponse(target, filename=name)
+
+
 @app.get("/", include_in_schema=False)
 def dashboard():
     index_file = ROOT / "index.html"

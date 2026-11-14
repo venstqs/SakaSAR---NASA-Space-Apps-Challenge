@@ -9,7 +9,9 @@ let appData = null;
 let map = null;
 let is3D = true;
 let playInterval = null;
-let timelineStage = 2; // Starts on Post-Storm SAR
+// Demo storyboard: baseline → pre-storm → Kristine hits → radar sees water → farmer acts → next season
+const STAGE = { BASELINE: 0, PRE: 1, STORM: 2, POST: 3, ACTION: 4, NEXT: 5 };
+let timelineStage = STAGE.POST; // starts on the 2 Nov post-storm radar view
 let sarMode = "post";
 let selectedPlotId = "PL-01";
 let mapAnimFrame = null;
@@ -1009,6 +1011,25 @@ async function initApp() {
       paint: { "fill-color": "#06b6d4", "fill-opacity": 0.28, "fill-outline-color": "#67e8f9" }
     });
 
+    // 30 m risk zones (pipeline risk grid): shows which part of each field drowns first
+    if (appData.risk_zones) {
+      map.addSource("risk-zones-source", { type: "geojson", data: appData.risk_zones });
+      map.addLayer({
+        id: "risk-zones-fill", type: "fill", source: "risk-zones-source",
+        paint: {
+          "fill-color": ["match", ["get", "risk_class"], "high", "#dc2626", "watch", "#f59e0b", "#64748b"],
+          "fill-opacity": 0.32
+        }
+      });
+      map.addLayer({
+        id: "risk-zones-line", type: "line", source: "risk-zones-source",
+        paint: {
+          "line-color": ["match", ["get", "risk_class"], "high", "#fca5a5", "watch", "#fcd34d", "#cbd5e1"],
+          "line-width": 0.8, "line-opacity": 0.7
+        }
+      });
+    }
+
     map.addSource("plots-source", {
       type: "geojson",
       data: appData.plots
@@ -1205,6 +1226,25 @@ function renderBarangayRanking() {
   }
 }
 
+// Farmer recommendation timeline (pipeline/recommend.py): measured risk + LSTM + rotation fit
+function renderRecommendations(p) {
+  const box = document.getElementById("inspect-reco");
+  if (!box) return;
+  const recs = p.recommendations || [];
+  box.classList.toggle("hidden", !recs.length);
+  box.querySelector(".reco-list").innerHTML = recs
+    .map(
+      (r) => `
+      <li class="reco-step">
+        <span class="reco-when">${escapeHtml(r.when)}</span>
+        <p class="reco-action">${escapeHtml(r.action)}</p>
+        <p class="reco-why">${escapeHtml(r.why)}</p>
+        <span class="reco-sources">${r.sources.map((s) => `<span>${escapeHtml(s)}</span>`).join("")}</span>
+      </li>`
+    )
+    .join("");
+}
+
 function populateLeftPanel() {
   const prov = appData.provenance;
   const nHigh = prov.high_risk_plots;
@@ -1259,6 +1299,10 @@ function populateLeftPanel() {
   document.getElementById("provenance-list").innerHTML = prov.datasets_used
     .map((d) => `<li>${d}</li>`)
     .join("");
+  const runEl = document.getElementById("data-runtime");
+  if (runEl) runEl.textContent = prov.processing_time || "n/a";
+  const hitEl = document.getElementById("data-hitrate");
+  if (hitEl) hitEl.textContent = `${prov.sar_hit_rate} (independent) · ${prov.sar_hit_rate_full_model || "n/a"} full model`;
   document.getElementById("future-work-text").textContent =
     `Future work (cut from 12h build): ${prov.future_work_datasets.join(", ")}.`;
 }
@@ -1286,8 +1330,11 @@ function formatDeltaSarLabel(p) {
   if (normalizedMode === "post") {
     return `ΔSAR ${signedDb(p.sar_wetness_change_db)} dB (${post} pass)`;
   }
-  if (timelineStage === 0) {
+  if (timelineStage === STAGE.BASELINE) {
     return "ΔSAR 0.0 dB (baseline reference)";
+  }
+  if (timelineStage === STAGE.STORM) {
+    return "No usable radar pass during the storm";
   }
   return `ΔSAR ${signedDb(p.sar_wetness_change_db)} dB (last pass, ${post})`;
 }
@@ -1334,6 +1381,7 @@ function selectPlot(feat, fly = true) {
   document.getElementById("inspect-twi").textContent = `TWI: ${p.twi_value}`;
   if (appData.rotation_strategies) renderRotations(); // rotation fit follows the selected plot
   document.getElementById("inspect-action").textContent = p.plain_language_action;
+  renderRecommendations(p);
 
   const sms = p.sms_alert.slice(0, 160);
   document.getElementById("inspect-sms-text").textContent = sms;
@@ -1412,7 +1460,7 @@ function bindUIEvents() {
       tab.setAttribute("aria-selected", "true");
 
       const target = tab.dataset.drawer;
-      ["layers", "rotations", "data"].forEach((id) => {
+      ["overview", "layers", "rotations", "data"].forEach((id) => {
         document.getElementById(`drawer-${id}`).classList.toggle("hidden", id !== target);
       });
     });
@@ -1494,6 +1542,9 @@ function bindUIEvents() {
     if (threeState.parcelGroup) {
       threeState.parcelGroup.visible = e.target.checked;
     }
+    ["risk-zones-fill", "risk-zones-line"].forEach((id) => {
+      if (map && map.getLayer(id)) map.setLayoutProperty(id, "visibility", e.target.checked ? "visible" : "none");
+    });
   });
 
   document.getElementById("chk-flood").addEventListener("change", (e) => {
@@ -1542,11 +1593,12 @@ function bindUIEvents() {
       sar: "off"
     },
     { clock: `${sceneDate(sc.just_before) || "Pre-storm"} · pre-storm`, sub: "Last calm pass before Kristine", sar: "pre" },
+    { clock: "21–26 Oct 2024 · Kristine", sub: "Clouds block optical satellites; storm-day radar unusable (wind)", sar: "off" },
     { clock: `${sceneDate(sc.after) || "Post-storm"} · post-storm`, sub: "Sentinel-1 sees standing water", sar: "post" },
-    { clock: "Field action", sub: "Trench & early harvest (advice)", sar: "off" },
-    { clock: "Next season", sub: "Legume / bio-tillage rotation", sar: "off" }
+    { clock: "Field action", sub: "Farmer gets the alert: trench & early harvest", sar: "off" },
+    { clock: "Next season", sub: "Rotation options vs current crop", sar: "off" }
   ];
-  const initialStage = stages[Number(slider.value)] || stages[2];
+  const initialStage = stages[Number(slider.value)] || stages[STAGE.POST];
   document.getElementById("stage-clock").textContent = initialStage.clock;
   document.getElementById("stage-sub").textContent = initialStage.sub;
 
@@ -1560,7 +1612,10 @@ function bindUIEvents() {
     document.getElementById("stage-sub").textContent = stages[idx].sub;
     setSarMode(stages[idx].sar);
 
-    if (idx === 4) document.querySelector('[data-drawer="rotations"]').click();
+    if (idx === STAGE.ACTION) {
+      setRole("farmer"); // show the plot card with the action and SMS
+    }
+    if (idx === STAGE.NEXT) document.querySelector('[data-drawer="rotations"]').click();
   });
 
   document.getElementById("btn-play-timeline").addEventListener("click", (e) => {
@@ -1574,7 +1629,7 @@ function bindUIEvents() {
       btn.setAttribute("aria-pressed", "true");
       btn.innerHTML = '<i data-lucide="pause" width="16" height="16" stroke-width="2.2"></i>';
       playInterval = setInterval(() => {
-        slider.value = (Number(slider.value) + 1) % 5;
+        slider.value = (Number(slider.value) + 1) % stages.length;
         slider.dispatchEvent(new Event("input"));
       }, 2200);
     }
@@ -1744,39 +1799,33 @@ function startMapAnimations() {
   const tick = () => {
     if (lastAppliedStage !== timelineStage) {
       lastAppliedStage = timelineStage;
-      if (timelineStage === 0 || timelineStage === 4) {
-        threeState.targetWaterLevel = 0.0;
-        threeState.cropUniforms.uWind.value = 0.22;
+      const light = (intensity, hex, hemi) => {
         if (threeState.sunLight) {
-          threeState.sunLight.intensity = 2.1;
-          threeState.sunLight.color.setHex(0xfff4e0);
+          threeState.sunLight.intensity = intensity;
+          threeState.sunLight.color.setHex(hex);
         }
-        if (threeState.hemiLight) threeState.hemiLight.intensity = 1.0;
-      } else if (timelineStage === 1) {
+        if (threeState.hemiLight) threeState.hemiLight.intensity = hemi;
+      };
+      if (timelineStage === STAGE.STORM) {
+        // Kristine: wind and rain, dim light; water starts to rise
         threeState.targetWaterLevel = 0.25;
-        threeState.cropUniforms.uWind.value = 0.65;
-        if (threeState.sunLight) {
-          threeState.sunLight.intensity = 1.05;
-          threeState.sunLight.color.setHex(0xcbd5e1);
-        }
-        if (threeState.hemiLight) threeState.hemiLight.intensity = 1.15;
-      } else if (timelineStage === 2) {
-        threeState.targetWaterLevel = 1.0;
         threeState.cropUniforms.uWind.value = 1.0;
-        if (threeState.sunLight) {
-          threeState.sunLight.intensity = 1.45;
-          threeState.sunLight.color.setHex(0xe2e8f0);
-        }
-        if (threeState.hemiLight) threeState.hemiLight.intensity = 0.95;
+        light(1.0, 0xcbd5e1, 1.15);
+      } else if (timelineStage === STAGE.POST) {
+        // 2 Nov radar pass: calm, standing water, radar sweep
+        threeState.targetWaterLevel = 1.0;
+        threeState.cropUniforms.uWind.value = 0.3;
+        light(1.5, 0xe2e8f0, 0.95);
         if (sarSweepProgress === 0) sarSweepProgress = 0.01;
-      } else if (timelineStage === 3) {
+      } else if (timelineStage === STAGE.ACTION) {
         threeState.targetWaterLevel = 0.45;
         threeState.cropUniforms.uWind.value = 0.35;
-        if (threeState.sunLight) {
-          threeState.sunLight.intensity = 1.75;
-          threeState.sunLight.color.setHex(0xfef3c7);
-        }
-        if (threeState.hemiLight) threeState.hemiLight.intensity = 1.0;
+        light(1.75, 0xfef3c7, 1.0);
+      } else {
+        // baseline, pre-storm and next season: dry, sunny
+        threeState.targetWaterLevel = 0.0;
+        threeState.cropUniforms.uWind.value = 0.22;
+        light(2.1, 0xfff4e0, 1.0);
       }
     }
 
@@ -1784,8 +1833,8 @@ function startMapAnimations() {
     if (ctx && cssWidth > 0 && cssHeight > 0) {
       ctx.clearRect(0, 0, cssWidth, cssHeight);
 
-      // Rain streaks only on Post-Storm SAR (timelineStage === 2); skipped for reduced-motion users
-      if (timelineStage === 2 && !prefersReducedMotion) {
+      // Rain streaks only while Kristine is over the area (not on the calm 2 Nov pass); skipped for reduced motion
+      if (timelineStage === STAGE.STORM && !prefersReducedMotion) {
         ctx.strokeStyle = "rgba(224, 242, 254, 0.22)";
         ctx.lineWidth = 1;
         ctx.beginPath();

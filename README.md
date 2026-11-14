@@ -72,7 +72,7 @@ Everything runs on **free, open data (₱0 licensing)** and is **reproducible fr
 
 <sub>\* Plot outlines, hectares and households are illustrative sample values placed evenly on real farmland. The satellite measurements on them are real. See [Limits](#%EF%B8%8F-limits-and-what-we-do-not-claim).</sub>
 
-| Farmer view: plot risk, action, SMS | LGU / MDRRMO view: barangay priority list |
+| Farmer view: plot risk, 30 m risk zones, recommendations | LGU / MDRRMO view: barangay priority list |
 | :---: | :---: |
 | ![Farmer view](assets/screenshots/01-farmer-view.jpg) | ![Barangay priority list](assets/screenshots/02-lgu-barangay-priority.jpg) |
 | **Rotation fit versus the current crop** | **LSTM root-zone saturation outlook** |
@@ -144,6 +144,9 @@ flowchart LR
 6. **Rotation fit.** SoilGrids texture and drowning risk rate the legume, deep-rooting cover-crop and short-cycle
    options for each plot (for example, legumes are marked *caution* on waterlogged plots).
 7. **LSTM outlook.** Forecasts root-zone saturation 1–7 days ahead from 30 days of NASA POWER weather plus the coming week's rain.
+8. **Farmer recommendations.** Each plot gets a four-step timeline. **Next 48 h** comes from the measured risk, **this week**
+   from the LSTM forecast after the 2 Nov pass, **before the next storm** from the LSTM's Kristine-scenario run on today's soil,
+   and **next season** from the rotation fit. Every step names the data it comes from (`pipeline/recommend.py`).
 
 **Why the 2 Nov pass and not the storm day?** The 21 Oct pass was taken at Kristine's peak. Typhoon wind roughened every
 water surface: permanent water brightened by a median of +5.3 dB across a 35 × 33 km scan, so floodwater was invisible.
@@ -164,7 +167,23 @@ Full details: [`docs/METHODS.md`](docs/METHODS.md).
 | LSTM vs persistence (root zone) | −60% RMSE | Test years 2022–2026, never seen in training. In heavy-rain weeks (≥100 mm): −77%. |
 | LSTM vs ridge regression (same inputs) | −25% RMSE | In heavy-rain weeks: −53%. Ridge is slightly better for day +1 only. |
 | Kristine hindcasts | 7/7 · 7/7 | Waterlogged days predicted correctly in the storm week and after the 2 Nov pass. |
-| Automated tests | 23 passing | Risk maths, D8 flow, Lee filter, contract, API, rotation rules, Guian's terrain package. |
+| Automated tests | 26 passing | Risk maths, D8 flow, Lee filter, contract, API, rotation rules, Guian's terrain package. |
+
+---
+
+## 🗂️ Our datasets
+
+The pipeline also builds the team's own reusable, documented datasets (`python -m pipeline.build_datasets`):
+
+| File | Rows | What it is |
+| :--- | ---: | :--- |
+| [`daily_weather_soil_2001_2026.csv`](data/datasets/daily_weather_soil_2001_2026.csv) | 9,444 | NASA POWER daily weather + root-zone/surface soil wetness at the pilot: the LSTM training set |
+| [`pixels_30m_pilot.csv`](data/datasets/pixels_30m_pilot.csv) | 1,541 | Every 30 m cell: radar change, TWI, slope, land cover, **observed-flood label**, risk (full and terrain-only) |
+| [`plot_features.csv`](data/datasets/plot_features.csv) | 5 | Per plot: radar, terrain, rain, SoilGrids soil, risk, rotation fit |
+| [`plot_recommendations.csv`](data/datasets/plot_recommendations.csv) | 20 | The farmer recommendation timeline |
+
+Column definitions, limits and source licences: [`data/datasets/README.md`](data/datasets/README.md). The datasets can also be
+downloaded from the dashboard's **Data** tab.
 
 ---
 
@@ -174,7 +193,7 @@ Full details: [`docs/METHODS.md`](docs/METHODS.md).
 | :--- | :--- | :--- |
 | Use NASA Earth data to help farms adapt | NASADEM, GPM IMERG, SMAP and NASA POWER fused on one 30 m grid | `pipeline/` |
 | Address extreme-weather impacts | Field drowning risk for a real typhoon, checked against observed flooding | Farmer view |
-| Actionable guidance for farmers | Plot-level 48 h action plus an SMS of 160 characters or fewer | Plot card |
+| Actionable guidance for farmers | Plot-level 48 h action, an SMS of 160 characters or fewer, and a 4-step recommendation timeline (radar + LSTM) | Plot card |
 | Support adaptation decisions | Three ranked rotations versus the current crop, using soil and risk | Rotations tab |
 | Serve local decision-makers | Barangay priority list for the MAO and MDRRMO | LGU view |
 | Look ahead | LSTM root-zone saturation outlook with rain scenarios | Soil Outlook panel |
@@ -214,7 +233,7 @@ pip install -r requirements.txt
 
 python -m pipeline.risk_engine        # full analysis from the cached real data (~1 s); --refresh re-downloads
 uvicorn api:app --port 8000           # dashboard at http://localhost:8000  (add #outlook for the LSTM panel)
-python -m pytest -q                   # 23 tests
+python -m pytest -q                   # 26 tests
 ```
 
 <details>
@@ -225,6 +244,7 @@ python -m pipeline.sar_moisture        # Sentinel-1 stage only
 python -m pipeline.terrain_rain        # terrain + rainfall stage only
 pip install -r requirements-ml.txt     # PyTorch, to retrain the LSTM
 python -m pipeline.soil_lstm           # retrain + evaluate the LSTM (~30 s on CPU)
+python -m pipeline.build_datasets      # rebuild the CSV datasets in data/datasets/
 python terrain_rain/scripts/run_all.py # Guian's terrain/rainfall package (works without WhiteboxTools)
 ```
 </details>
@@ -239,6 +259,8 @@ python terrain_rain/scripts/run_all.py # Guian's terrain/rainfall package (works
 | `GET /api/rotations?priority=water\|nitrogen\|cash` | Rotations ranked by farmer priority |
 | `GET /api/provenance` | Data sources, scene IDs, metrics, barangay ranking |
 | `GET /api/soil-outlook` | LSTM hindcasts, scenarios and accuracy |
+| `GET /api/recommendations?plot_id=PL-01` | Farmer recommendation timeline (all plots if no `plot_id`) |
+| `GET /data/datasets/<file>.csv` | Download a dataset |
 | `GET /docs` | Interactive OpenAPI documentation |
 
 ---
@@ -252,11 +274,14 @@ python terrain_rain/scripts/run_all.py # Guian's terrain/rainfall package (works
 │   ├── risk_engine.py      #   risk fusion, hit rates, barangay ranking → mock-data.json
 │   ├── rotation_engine.py  #   SoilGrids profiles and per-plot rotation fit
 │   ├── soil_lstm.py        #   PyTorch LSTM soil-saturation model
+│   ├── recommend.py        #   per-plot farmer recommendation timeline
+│   ├── build_datasets.py   #   builds the CSV datasets in data/datasets/
 │   └── common.py           #   shared 30 m grid, data access, caching
 ├── terrain_rain/           # Guian: terrain & rainfall package (scripts, config, tests)
 ├── index.html · app.js · style.css · outlook.*   # Marqus: 3D dashboard (+ LSTM panel)
 ├── api.py                  # FastAPI server (API + dashboard)
 ├── data/                   # cached real inputs, raw exports, outputs, GeoTIFF layers
+│   └── datasets/           #   our reusable CSV datasets + data card
 ├── models/soil_lstm.pt     # trained LSTM weights (82 KB)
 ├── docs/METHODS.md         # full method, validation and limits
 ├── docs/SUBMISSION.md      # submission form text

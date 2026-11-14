@@ -22,6 +22,7 @@ from shapely.geometry import shape
 from shapely.ops import unary_union
 
 from . import common as C
+from . import recommend as REC
 from . import rotation_engine as RO
 from . import sar_moisture as S
 from . import terrain_rain as T
@@ -373,8 +374,15 @@ def run(refresh: bool = False) -> dict:
         "soil_source": soil_meta,
         "bare_field_check": RO.modis_bare_field_check(),
         "rotation_rules": RO.RULES_TEXT,
+        "recommendation_method": REC.METHOD,
         "pending_inputs": ["bare_field_days_per_year", "households", "hectares", "current_crop"],
     }
+
+    rotations = json.loads(ROTATIONS_PATH.read_text(encoding="utf-8"))
+    outlook = REC.load_outlook()
+    for ft in features:
+        ft["properties"]["recommendations"] = REC.plot_recommendations(
+            ft["properties"], outlook, rotations, rain["r_total_mm"])
 
     payload = {
         "provenance": provenance,
@@ -382,7 +390,7 @@ def run(refresh: bool = False) -> dict:
         "observed_flood_extent": sar["observed_flood_extent"],
         "sar_backscatter_comparison": sar["sar_backscatter_comparison"],
         "drainage_corridor": terr["drainage_corridor"],
-        "rotation_strategies": json.loads(ROTATIONS_PATH.read_text(encoding="utf-8")),
+        "rotation_strategies": rotations,
         "risk_zones": risk_zones,
     }
     C.write_json(MOCK_PATH, payload)
