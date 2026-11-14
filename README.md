@@ -292,9 +292,9 @@ python terrain_rain/scripts/run_all.py # Guian's terrain/rainfall package (works
 | Member | GitHub | Role |
 | :--- | :--- | :--- |
 | **Adrian Xavier Moral** | [venstqs](https://github.com/venstqs) | Main developer & integration lead: SAR pipeline, risk engine, LSTM, API |
-| **Guian** | [Pudges-cmd](https://github.com/Pudges-cmd) | Terrain & rainfall pipeline: NASADEM, GPM IMERG, SMAP, NASA POWER |
-| **Marqus Szymoon Pelagio** | [mzep98](https://github.com/mzep98) | 3D MapLibre / Three.js dashboard, demo & submission |
-| **Engr. John Roy V. Galvez** | — | Mentor and hour-gate reviewer |
+| **Guian Emmanuel Beriso** | [Pudges-cmd](https://github.com/Pudges-cmd) | Terrain & rainfall pipeline: NASADEM, GPM IMERG, SMAP, NASA POWER |
+| **Marqus Szymon Pelagio** | [mzep98](https://github.com/mzep98) | 3D MapLibre / Three.js dashboard, demo & submission |
+| **Engr. John Roy V. Galvez** | — | Mentor |
 
 ## 🤖 Use of AI
 
