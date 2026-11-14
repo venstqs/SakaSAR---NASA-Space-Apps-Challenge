@@ -5,9 +5,10 @@ type: software
 authors:
   - family-names: Moral
     given-names: Adrian Xavier
-  - name: Guian
+  - family-names: Beriso
+    given-names: Guian Emmanuel
   - family-names: Pelagio
-    given-names: Marqus Szymoon
+    given-names: Marqus Szymon
 repository-code: "https://github.com/venstqs/SakaSAR---NASA-Space-Apps-Challenge"
 license: MIT
 date-released: "2026-11-14"

@@ -5,9 +5,9 @@
 This file describes what is **actually built on `main`**. If it disagrees with older notes,
 plans or chat history, this file and the code win. Keep it updated when the build changes.
 
-Team: Adrian (main developer, integration lead: SAR, risk engine, API, LSTM) · Guian
-(`terrain_rain/` package, rotation inputs) · Marqus (dashboard, demo & submission) ·
-Engr. John Roy V. Galvez (hour-gate reviewer). Submission closes **Sun 15 Nov 2026, 11:59 PM**.
+Team: Adrian Xavier Moral (main developer, integration lead: SAR, risk engine, API, LSTM) · Guian Emmanuel Beriso
+(`terrain_rain/` package, rotation inputs) · Marqus Szymon Pelagio (dashboard, demo & submission) ·
+Engr. John Roy V. Galvez (mentor). Submission closes **Sun 15 Nov 2026, 11:59 PM**.
 
 ---
 
