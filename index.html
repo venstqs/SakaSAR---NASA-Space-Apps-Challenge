@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SakaSAR — Typhoon flood screening for Bicol farms</title>
-  <meta name="description" content="Sentinel-1 radar flood screening for Bicol farms after Typhoon Kristine (2024): flooded farmland by town, field drowning risk, what farmers should do, and next-season crop options." />
+  <title>SakaSAR — Typhoon flood simulation for Bicol farms</title>
+  <meta name="description" content="3D replay of Typhoon Kristine over the Bicol Region: NASA rain and soil data, the storm track, Sentinel-1 flood mapping by town, and an LSTM forecast of waterlogged soil." />
   <link rel="icon" type="image/x-icon" href="favicon.ico" />
   <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png" />
@@ -20,145 +20,86 @@
   <meta name="twitter:image" content="https://sakasar.vercel.app/assets/logo.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="app">
+  <!-- The 3D map is the whole interface -->
+  <div id="map" aria-label="3D map of the Bicol Region"></div>
 
-    <!-- Sidebar: the story, from the whole region down to one field -->
-    <aside class="sidebar" id="sidebar" aria-label="SakaSAR">
-      <header class="sb-head">
-        <img src="assets/sakasar-logo.png" alt="" class="sb-logo" width="40" height="40" />
-        <div>
-          <h1 class="sb-title">SakaSAR</h1>
-          <p class="sb-sub">Radar flood screening for Bicol farms after Typhoon Kristine, October 2024</p>
-        </div>
-      </header>
+  <header class="brand-bar">
+    <img src="assets/sakasar-logo.png" alt="" width="38" height="38" />
+    <div>
+      <h1>SakaSAR</h1>
+      <p>Typhoon Kristine over Bicol, October 2024</p>
+    </div>
+  </header>
 
-      <div class="scope-switch" role="tablist" aria-label="View">
-        <button type="button" role="tab" class="scope-btn" id="tab-region" aria-selected="true" aria-controls="scope-region">Bicol Region</button>
-        <button type="button" role="tab" class="scope-btn" id="tab-pilot" aria-selected="false" aria-controls="scope-pilot">Minalabac fields</button>
-      </div>
+  <!-- Dock: reopen windows -->
+  <nav class="dock" id="dock" aria-label="Windows"></nav>
 
-      <div class="sb-scroll" id="sb-scroll">
-        <!-- REGION -->
-        <section class="scope" id="scope-region" role="tabpanel" aria-labelledby="tab-region">
-          <p class="lede" id="region-lede">Loading the region…</p>
-          <div class="province-bars" id="province-bars"></div>
-
-          <div class="block-head">
-            <h2>Towns to reach first</h2>
-            <p class="hint">Ranked by flooded farmland the radar saw</p>
-          </div>
-          <label class="search">
-            <span class="sr-only">Find a town</span>
-            <input type="search" id="muni-search" placeholder="Find a town or province" autocomplete="off" />
-          </label>
-          <ol class="rank-list" id="muni-list"></ol>
-          <p class="empty hidden" id="muni-empty">No town matches that name.</p>
-        </section>
-
-        <!-- PILOT -->
-        <section class="scope" id="scope-pilot" role="tabpanel" aria-labelledby="tab-pilot" hidden>
-          <p class="lede" id="pilot-lede"></p>
-          <ol class="plot-list" id="plot-list" aria-label="Sample plots"></ol>
-
-          <article class="plot-detail" id="plot-detail" aria-live="polite">
-            <header class="pd-head">
-              <h2 id="pd-title"></h2>
-              <p class="pd-meta" id="pd-meta"></p>
-            </header>
-            <div class="risk-meter" id="pd-risk"></div>
-            <dl class="facts" id="pd-facts"></dl>
-
-            <section class="nextweek" aria-labelledby="nw-title">
-              <h3 class="pd-h" id="nw-title">What to do next week</h3>
-              <p class="hint">Pick the rain you expect. Our LSTM model, trained on 25 years of NASA weather for this area, shows how wet the roots get.</p>
-              <div class="scn-btns" id="scn-btns" role="radiogroup" aria-label="Rain next week"></div>
-              <div class="scn-out" id="scn-out" aria-live="polite"></div>
-            </section>
-
-            <h3 class="pd-h">What to do now</h3>
-            <ol class="steps" id="pd-steps"></ol>
-
-            <h3 class="pd-h" id="drain-heading">Did our forecast work after Kristine?</h3>
-            <div class="drain" id="pd-drain"></div>
-
-            <h3 class="pd-h">Next season</h3>
-            <label class="priority">
-              <span>The farmer cares most about</span>
-              <select id="priority-select">
-                <option value="nitrogen">soil fertility</option>
-                <option value="water">saving water</option>
-                <option value="cash">cash income</option>
-              </select>
-            </label>
-            <ol class="rotations" id="pd-rotations"></ol>
-
-            <h3 class="pd-h">Text message to the farmer</h3>
-            <blockquote class="sms" id="pd-sms"></blockquote>
-            <div class="sms-row">
-              <span class="sms-count" id="pd-sms-count"></span>
-              <button type="button" class="btn" id="btn-copy-sms">Copy message</button>
-            </div>
-          </article>
-
-          <details class="brgy" id="brgy-block">
-            <summary>Barangays to visit first</summary>
-            <ol class="rank-list compact" id="brgy-list"></ol>
-          </details>
-        </section>
-      </div>
-
-      <footer class="sb-foot">
-        <button type="button" class="link-btn" id="btn-about">About the data and limits</button>
-      </footer>
-    </aside>
-
-    <!-- Map -->
-    <main class="map-wrap" id="map-wrap">
-      <div id="map" aria-label="Map"></div>
-      <canvas id="fx-overlay" aria-hidden="true"></canvas>
-
-      <div class="map-tools" role="group" aria-label="Map controls">
-        <button type="button" class="tool" id="btn-layers" aria-expanded="false" aria-controls="layers-panel">Layers</button>
-        <button type="button" class="tool" id="btn-3d" aria-pressed="false">3D</button>
-        <button type="button" class="tool icon" id="btn-zoom-in" aria-label="Zoom in">+</button>
-        <button type="button" class="tool icon" id="btn-zoom-out" aria-label="Zoom out">−</button>
-        <div class="layers-panel" id="layers-panel" hidden>
-          <label><input type="checkbox" id="lyr-flood" checked /> Flooded farmland (radar)</label>
-          <label><input type="checkbox" id="lyr-towns" checked /> Town boundaries</label>
-          <label><input type="checkbox" id="lyr-risk" checked /> Field drowning risk (30 m)</label>
-          <label><input type="checkbox" id="lyr-canal" checked /> Drainage channel</label>
+  <!-- ===== Windows (draggable, minimizable) ===== -->
+  <section class="win" id="win-sim" data-title="Simulation" data-icon="play-circle" style="--x:50%;--y:calc(100% - 16px);--w:min(760px, calc(100vw - 32px))" data-anchor="bottom-center">
+    <header class="win-head"><span class="win-title"><i data-lucide="play-circle"></i>Simulation</span><span class="win-ctl"></span></header>
+    <div class="win-body sim">
+      <div class="sim-row">
+        <button type="button" class="play" id="btn-play" aria-label="Play"><i data-lucide="play"></i></button>
+        <div class="sim-date"><b id="sim-date">2 Nov 2024</b><span id="sim-phase">After the storm</span></div>
+        <div class="speed" role="group" aria-label="Speed">
+          <button type="button" data-speed="1" aria-pressed="true">1×</button><button type="button" data-speed="2">2×</button><button type="button" data-speed="4">4×</button>
         </div>
       </div>
+      <input type="range" id="sim-slider" min="0" max="29" step="0.05" value="23" aria-label="Day" />
+      <div class="sim-chart"><canvas id="ch-sim"></canvas></div>
+      <div class="sim-stats" id="sim-stats"></div>
+    </div>
+  </section>
 
-      <div class="legend" id="legend" aria-label="Legend"></div>
-      <p class="map-hint" id="map-hint">Drag to move. Right-drag or Ctrl+drag to turn and tilt.</p>
+  <section class="win" id="win-situation" data-title="Situation" data-icon="gauge" style="--x:16px;--y:84px;--w:340px">
+    <header class="win-head"><span class="win-title"><i data-lucide="gauge"></i>Situation</span><span class="win-ctl"></span></header>
+    <div class="win-body">
+      <div class="kpis" id="kpis"></div>
+      <h3 class="sub">Towns to reach first</h3>
+      <p class="hint" id="towns-hint"></p>
+      <label class="search"><i data-lucide="search"></i><input type="search" id="town-search" placeholder="Find a town" autocomplete="off" /></label>
+      <ol class="towns" id="towns"></ol>
+    </div>
+  </section>
 
-      <!-- The storm ribbon: daily rain and the radar passes that matter -->
-      <section class="ribbon" id="ribbon" aria-label="Storm timeline">
-        <button type="button" class="ribbon-play" id="btn-play" aria-label="Play the storm story">▶</button>
-        <div class="ribbon-body">
-          <svg id="ribbon-svg" role="img" aria-label="Daily rainfall and Sentinel-1 radar passes"></svg>
-          <p class="ribbon-caption" id="ribbon-caption"></p>
-        </div>
-      </section>
-    </main>
-  </div>
+  <section class="win" id="win-layers" data-title="Layers" data-icon="layers" style="--x:calc(100% - 16px);--y:84px;--w:300px" data-anchor="right">
+    <header class="win-head"><span class="win-title"><i data-lucide="layers"></i>Layers</span><span class="win-ctl"></span></header>
+    <div class="win-body layers" id="layers"></div>
+  </section>
 
-  <dialog class="about" id="about-dialog" aria-labelledby="about-title">
-    <form method="dialog" class="about-close"><button class="link-btn">Close</button></form>
-    <h2 id="about-title">About the data</h2>
-    <div id="about-body"></div>
-  </dialog>
+  <section class="win" id="win-log" data-title="Event log" data-icon="list" style="--x:calc(100% - 16px);--y:470px;--w:300px" data-anchor="right">
+    <header class="win-head"><span class="win-title"><i data-lucide="list"></i>Event log</span><span class="win-ctl"></span></header>
+    <div class="win-body"><ol class="log" id="log"></ol></div>
+  </section>
 
-  <div class="toast hidden" id="toast" role="status"></div>
+  <section class="win" id="win-ai" data-title="LSTM forecast" data-icon="brain-circuit" style="--x:16px;--y:calc(100% - 16px);--w:340px" data-anchor="bottom-left" data-start="min">
+    <header class="win-head"><span class="win-title"><i data-lucide="brain-circuit"></i>LSTM forecast</span><span class="win-ctl"></span></header>
+    <div class="win-body">
+      <div class="seg" role="group" aria-label="Forecast" id="ai-seg">
+        <button type="button" data-ai="hind" aria-pressed="true">After 2 Nov 2024</button>
+        <button type="button" data-ai="again">Kristine again, today</button>
+      </div>
+      <p class="lead" id="ai-lead"></p>
+      <div class="ai-chart"><canvas id="ch-ai"></canvas></div>
+      <p class="hint" id="ai-hint"></p>
+    </div>
+  </section>
+
+  <section class="win" id="win-town" data-title="Town" data-icon="map-pin" style="--x:372px;--y:84px;--w:320px" hidden>
+    <header class="win-head"><span class="win-title"><i data-lucide="map-pin"></i><span id="town-title">Town</span></span><span class="win-ctl"></span></header>
+    <div class="win-body" id="town-body"></div>
+  </section>
+
+  <div class="toast" id="toast" role="status" hidden></div>
 
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

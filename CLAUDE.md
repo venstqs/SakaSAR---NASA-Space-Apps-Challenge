@@ -99,19 +99,23 @@ API: `/api/data`, `/api/plots`, `/api/risk-map`, `/api/rotations?priority=water|
 `/api/provenance`, `/api/soil-outlook`, plus whitelisted dashboard files and `/assets/<image>`.
 Never mount the repo root as static files.
 
-## 6. Dashboard (rebuilt 15 Nov 2026)
+## 6. Dashboard (map-first rebuild, 15 Nov 2026)
 
-- Layout: one docked sidebar (Bicol Region → Minalabac fields) plus the map. No floating cards. The bottom
-  **storm ribbon** shows daily NASA POWER rain (`provenance.rain_timeline`) and the three radar passes (9 Oct, 21 Oct rejected for wind,
-  2 Nov). Clicking a pass sets the map mode (`pre` / `storm` / `post`).
-- **Region view** reads `data/region/bicol_summary.json`, `bicol_municipalities.geojson` and the `bicol_flood.png` overlay
-  (built by `python -m pipeline.bicol_region`, 100 m, both Sentinel-1 orbits). Towns are ranked by flooded farmland.
-- **Field view**: plot chips, then risk, facts, "What to do" (from `recommendations`), "Will this field drain this week?"
-  (LSTM hindcast in plain words, not a separate panel), next-season rotation fit, the SMS with a copy button, and the barangay list.
-- Design tokens: river-silt panels `#0F2B2A`/`#17393A`, text `#E7EFEA`/`#9FB8AE`, floodwater blue `#4EC4DE` (the only accent;
-  same blue as radar water), risk `#F25F3A` / `#EBB043` / `#7CC69A`. Fonts: Atkinson Hyperlegible (body), Archivo (headings, numbers).
-- Show **only measured values**. The 3D water is built from `observed_flood_extent`; SAR shows where water is, not its depth.
-- The map centre comes from `provenance.map_center`. No hard-coded coordinates in the UI.
+- **The full-screen 3D map is the interface** (MapLibre 4.7.1, Terrarium terrain ×2.2, hillshade, sky). Everything else
+  floats in **windows** (`section.win`) that drag by their header, minimise (− or double-click), close (×) and reopen
+  from the top **dock**. Windows: Simulation, Situation, Layers, Event log, LSTM forecast, Town (opens on click).
+  Phone (≤760 px): windows become one bottom sheet at a time; the dock moves to the bottom.
+- **Bicol Region only.** Minalabac plots are no longer shown in the UI (the pipeline and `mock-data.json` still exist for the API).
+- **Simulation clock** (10 Oct – 8 Nov 2024; play, 1/2/4×, slider, ←/→, space) drives every layer from
+  `data/region/bicol_timeline.json` (`python -m pipeline.bicol_timeline`):
+  EONET storm marker interpolated between 6-hourly fixes, travelled track; NASA POWER daily rain as 3D columns per
+  ~0.5° cell (hidden above zoom 9.6); root-zone wetness grid; LSTM waterlogged-days grid; NASA GIBS imagery for the
+  simulated date (MODIS, VIIRS, IMERG, SMAP). The Sentinel-1 flood overlay and town shading appear from 2 Nov.
+- **Event log** is generated from the data (storm start / closest approach / peak wind, ≥120 mm days with the nearest town,
+  soil saturation, radar passes, flood map, LSTM skill). Nothing hand-written.
+- **LSTM window**: hindcast issued 3 Nov 2024 (forecast vs actual, per cell or region mean) and "Kristine again" on today's soil.
+- Tokens: logo green `#1f8a4c`, water `#2f9fd3`, high `#e2533c`, watch `#ee9f27`, white glass windows. Font: Outfit.
+- Show **only measured values**; SAR shows where water is, not its depth.
 
 ## 7. Honesty rules for code, docs and pitch
 
