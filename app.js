@@ -59,8 +59,10 @@ const N = () => S.tl.days.length;
 const dayISO = (i) => S.tl.days[Math.max(0, Math.min(N() - 1, Math.floor(i)))];
 const label = (iso) => { const d = new Date(iso + "T00:00:00"); return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`; };
 const short = (iso) => { const d = new Date(iso + "T00:00:00"); return `${d.getDate()} ${MONTHS[d.getMonth()]}`; };
-const t0 = () => Date.parse(S.tl.days[0] + "T00:00:00Z");
-const tAt = (iso) => (Date.parse(iso.length > 10 ? iso : iso + "T00:00:00Z") - t0()) / 86400000;
+// The day axis is Philippine time (UTC+8): NASA POWER days and farmers' calendars are local; EONET fixes are UTC.
+const t0 = () => Date.parse(S.tl.days[0] + "T00:00:00+08:00");
+const tAt = (iso) => (Date.parse(iso.length > 10 ? iso : iso + "T00:00:00+08:00") - t0()) / 86400000;
+const phDay = (utc) => new Date(Date.parse(utc) + 8 * 3600000).toISOString().slice(0, 10);
 const km = (a, b) => { const r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLon = (b.lon - a.lon) * r;
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLon / 2) ** 2; return 12742 * Math.asin(Math.sqrt(h)); };
 const mercY = (lat) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360));
@@ -84,6 +86,18 @@ function townAt(lon, lat) {
   }
   return null;
 }
+function closestPass(st, P) {
+  const k = Math.cos((P.lat * Math.PI) / 180) * 111.32, kl = 110.57;
+  let best = { km: Infinity };
+  for (let i = 1; i < st.length; i++) {
+    const a = st[i - 1], b = st[i];
+    const ax = (a.lon - P.lon) * k, ay = (a.lat - P.lat) * kl, bx = (b.lon - P.lon) * k, by = (b.lat - P.lat) * kl;
+    const dx = bx - ax, dy = by - ay, f = Math.max(0, Math.min(1, -(ax * dx + ay * dy) / (dx * dx + dy * dy || 1)));
+    const lon = a.lon + (b.lon - a.lon) * f, lat = a.lat + (b.lat - a.lat) * f, d = km({ lon, lat }, P);
+    if (d < best.km) best = { km: d, lon, lat, wind: Math.round(a.wind_kts + (b.wind_kts - a.wind_kts) * f), t: new Date(Date.parse(a.t) + (Date.parse(b.t) - Date.parse(a.t)) * f).toISOString() };
+  }
+  return best;
+}
 function nearestTown(lon, lat) {
   let best = null, bd = Infinity;
   for (const c of S.townCenters) { const d = (c.lon - lon) ** 2 + (c.lat - lat) ** 2; if (d < bd) { bd = d; best = c; } }
@@ -98,6 +112,7 @@ function nearestCell(lon, lat) {
 // ---------------- boot ----------------
 async function init() {
   if ($("splash")) $("brand-logo").style.opacity = 0;
+  document.querySelectorAll(".intro-svg .d").forEach((el) => el.setAttribute("pathLength", "1"));
   const [tl, munis, summary, overlay, pilot] = await Promise.all([
     fetchJSON("data/region/bicol_timeline.json"), fetchJSON("data/region/bicol_municipalities.geojson"),
     fetchJSON("data/region/bicol_summary.json"), fetchJSON("data/region/bicol_flood.json"), fetchJSON("mock-data.json"),
@@ -114,6 +129,7 @@ async function init() {
     return { name: f.properties.name, province: f.properties.province, lon: x / n, lat: y / n };
   });
   prepareGrid();
+  S.closest = closestPass(tl.storm, NAGA);
   if (window.Chart) { Chart.defaults.font.family = "Geist, system-ui, sans-serif"; Chart.defaults.color = "#5f7468"; }
   buildEvents();
   bindChrome();
@@ -378,19 +394,18 @@ function addLayers() {
   map.addLayer({ id: "track", type: "line", source: "track", paint: { "line-color": ["get", "c"], "line-width": 3, "line-opacity": 0.45 }, layout: { "line-cap": "round" } });
   map.addLayer({ id: "track-done", type: "line", source: "track-done", paint: { "line-color": ["get", "c"], "line-width": 4 }, layout: { "line-cap": "round" } });
   map.addLayer({ id: "track-pts", type: "circle", source: "track-pts", paint: { "circle-radius": 3.5, "circle-color": ["get", "c"], "circle-stroke-color": "#fff", "circle-stroke-width": 1.2 } });
-  const ci = st.reduce((m, p, i) => (km(p, NAGA) < km(st[m], NAGA) ? i : m), 0);
-  S.closest = { i: ci, km: km(st[ci], NAGA) };
-  map.addSource("closest", { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: [[NAGA.lon, NAGA.lat], [st[ci].lon, st[ci].lat]] } } });
+  const cp = S.closest;
+  map.addSource("closest", { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: [[NAGA.lon, NAGA.lat], [cp.lon, cp.lat]] } } });
   map.addLayer({ id: "closest", type: "line", source: "closest", paint: { "line-color": "#fff", "line-width": 1.5, "line-dasharray": [3, 2] } });
 
   S.trackLabels = st.filter((p) => p.t.endsWith("T00:00:00Z")).map((p) => {
     const el = document.createElement("div"); el.className = "track-label";
-    el.innerHTML = `<b>${short(p.t.slice(0, 10))}</b> ${p.wind_kts} kt`;
+    el.innerHTML = `<b>${short(phDay(p.t))}</b> ${p.wind_kts} kt`;
     return new maplibregl.Marker({ element: el, anchor: "left" }).setLngLat([p.lon, p.lat]).addTo(map);
   });
-  const mid = { lon: (NAGA.lon + st[ci].lon) / 2, lat: (NAGA.lat + st[ci].lat) / 2 };
+  const mid = { lon: (NAGA.lon + cp.lon) / 2, lat: (NAGA.lat + cp.lat) / 2 };
   const ref = document.createElement("div"); ref.className = "ref-label";
-  ref.textContent = `Closest pass ${fmt(S.closest.km)} km from Naga, ${short(st[ci].t.slice(0, 10))}`;
+  ref.textContent = `Closest pass ${fmt(cp.km)} km from Naga, ${short(phDay(cp.t))}`;
   S.refLabel = new maplibregl.Marker({ element: ref }).setLngLat([mid.lon, mid.lat]).addTo(map);
   const naga = document.createElement("div"); naga.className = "ref-label"; naga.textContent = "Naga City";
   S.nagaLabel = new maplibregl.Marker({ element: naga, anchor: "top", offset: [0, 6] }).setLngLat([NAGA.lon, NAGA.lat]).addTo(map);
@@ -573,30 +588,51 @@ function updateGibs(iso) {
     refresh(); map.once("idle", refresh);
   }
 }
+// sample points on Bicol land (the town-polygon mask), ~0.5 km apart
+function landPoints() {
+  if (R.lp) return R.lp;
+  const pts = [], st = 6;
+  for (let y = 0; y < R.H; y += st) for (let x = 0; x < R.W; x += st) if (R.mask[y * R.W + x] > 128) pts.push([R.lonAt[x], R.latAt[y]]);
+  return (R.lp = pts);
+}
+// Bicol land average and land maximum of the interpolated NASA POWER rain, per day
 function regionDaily() {
   if (S._rd) return S._rd;
+  const pts = landPoints();
   return (S._rd = S.tl.days.map((_, d) => {
-    const v = S.tl.rain_mm.map((r) => r[d] ?? 0);
-    const mx = Math.max(...v);
-    return { mean: v.reduce((a, b) => a + b, 0) / v.length, max: mx, imax: v.indexOf(mx) };
+    const vals = cellValues("rain", d);
+    let sum = 0, n = 0, mx = -1, at = null;
+    for (const [lo, la] of pts) { const v = sample(vals, lo, la); if (isFinite(v)) { sum += v; n++; if (v > mx) { mx = v; at = { lon: lo, lat: la }; } } }
+    return { mean: n ? sum / n : 0, max: mx, at, imax: at ? nearestCell(at.lon, at.lat) : 0 };
   }));
+}
+// share of Bicol land with root zone at 0.97+ (waterlogged)
+function landWet(d) {
+  S._wet = S._wet || {};
+  if (S._wet[d] != null) return S._wet[d];
+  const pts = landPoints(), vals = cellValues("soil", d);
+  let wet = 0, n = 0;
+  for (const [lo, la] of pts) { const v = sample(vals, lo, la); if (isFinite(v)) { n++; if (v >= 0.97) wet++; } }
+  return (S._wet[d] = n ? wet / n : 0);
 }
 function renderStats(di) {
   const rd = regionDaily(), cum = rd.slice(0, di + 1).reduce((a, b) => a + b.mean, 0);
-  const sat = S.tl.rootzone.filter((r) => (r[di] ?? 0) >= 0.97).length;
     if (!$("st-0")) $("sim-stats").innerHTML = [0, 1, 2, 3].map((i) => `<div><b id="st-${i}">0</b><span id="sl-${i}"></span></div>`).join("");
-  countTo($("st-0"), rd[di].mean, 0, " mm"); $("sl-0").textContent = `Bicol rain that day (max ${fmt(rd[di].max)})`;
+  countTo($("st-0"), rd[di].mean, 0, " mm"); $("sl-0").textContent = `rain over Bicol land, peak ${fmt(rd[di].max)}`;
   countTo($("st-1"), cum, 0, " mm"); $("sl-1").textContent = "Bicol rain since 10 Oct";
-  countTo($("st-2"), sat, 0, ` of ${S.tl.cells.length}`); $("sl-2").textContent = "grid cells waterlogged";
+  countTo($("st-2"), Math.round(landWet(di) * 100), 0, "%"); $("sl-2").textContent = "of Bicol land waterlogged";
   if (S.storm?.active) countTo($("st-3"), S.storm.wind, 0, " kt"); else { cancelAnimationFrame($("st-3")._raf); $("st-3").textContent = "None"; delete $("st-3").dataset.v; }
-  $("sl-3").textContent = "storm wind (NASA EONET)";
+  $("sl-3").textContent = "Kristine wind (EONET)";
 }
 function buildTimeline() {
   const rd = regionDaily(), max = Math.max(...rd.map((d) => d.mean)), passes = new Set(S.tl.passes.filter((p) => p.used).map((p) => p.date));
-  $("bars").innerHTML = S.tl.days.map((d, i) => `<i class="${d >= "2024-10-20" && d <= "2024-10-26" ? "storm" : ""}${passes.has(d) ? " pass" : ""}" style="height:${Math.max(4, (rd[i].mean / max) * 100)}%;--i:${i}" title="${short(d)}: ${fmt(rd[i].mean)} mm Bicol average"></i>`).join("");
+  $("bars").innerHTML = S.tl.days.map((d, i) => `<i class="${d >= "2024-10-20" && d <= "2024-10-26" ? "storm" : ""}${passes.has(d) ? " pass" : ""}" style="height:${Math.max(4, (rd[i].mean / max) * 100)}%;--i:${i}" title="${short(d)}: ${fmt(rd[i].mean)} mm over Bicol land (peak ${fmt(rd[i].max)})"></i>`).join("");
   $("bars").classList.add("intro"); setTimeout(() => $("bars").classList.remove("intro"), 1400);
-  $("days").innerHTML = S.tl.days.map((d, i) => (i % 4 === 0 || d === "2024-11-02" ? `<span style="left:${((i + 0.5) / N()) * 100}%">${short(d)}</span>` : "")).join("");
+  $("days").innerHTML = S.tl.days.map((d, i) => (i % 7 === 0 ? `<span style="left:${((i + 0.5) / N()) * 100}%">${short(d)}</span>` : "")).join("");
   $("ticks").innerHTML = S.events.map((e) => `<i style="left:${(e.t / N()) * 100}%;--c:${e.c}" title="${esc(short(dayISO(e.t)) + ": " + e.text)}"></i>`).join("");
+  const sp = document.createElement("button"); sp.type = "button"; sp.className = "tl-speed"; sp.textContent = "1×"; sp.setAttribute("aria-label", "Playback speed");
+  sp.addEventListener("click", () => { S.speed = S.speed === 1 ? 2 : S.speed === 2 ? 4 : 1; sp.textContent = `${S.speed}×`; });
+  document.querySelector(".timeline").appendChild(sp);
   const scrub = $("scrub");
   let drag = false;
   const at = (e) => { const r = scrub.getBoundingClientRect(); return ((e.clientX - r.left) / r.width) * N(); };
@@ -642,8 +678,8 @@ function buildEvents() {
   const ev = [], st = S.tl.storm, rd = regionDaily();
   if (st.length) {
     ev.push({ t: tAt(st[0].t), c: STORM, at: st[0], text: `NASA EONET starts tracking Kristine (Trami) east of Samar, ${st[0].wind_kts} kt.` });
-    const ci = st.reduce((m, p, i) => (km(p, NAGA) < km(st[m], NAGA) ? i : m), 0);
-    ev.push({ t: tAt(st[ci].t), c: STORM, at: st[ci], text: `Closest pass: the storm centre is ${fmt(km(st[ci], NAGA))} km north of Naga City, ${st[ci].wind_kts} kt. Bicol's rain comes from the storm's southern bands.` });
+    const cp = S.closest;
+    ev.push({ t: tAt(cp.t), c: STORM, at: cp, text: `Closest pass: the storm centre is ${fmt(cp.km)} km north-east of Naga City, about ${cp.wind} kt. Bicol's rain comes from the storm's southern bands.` });
     const land = st.findIndex((p) => p.lon < 122.3 && p.lat > 16.5);
     if (land > 0) ev.push({ t: tAt(st[land].t), c: STORM, at: st[land], text: `Kristine crosses northern Luzon (Isabela), ${st[land].wind_kts} kt.` });
     const mi = st.reduce((m, p, i) => (p.wind_kts > st[m].wind_kts ? i : m), 0);
@@ -651,16 +687,15 @@ function buildEvents() {
   }
   rd.forEach((d, i) => {
     if (d.max >= 120) {
-      const c = S.tl.cells[d.imax], town = nearestTown(c.lon, c.lat);
-      ev.push({ t: i + 0.5, c: WATER, at: town || c, text: `${fmt(d.max)} mm of rain in one day near ${town ? `${town.name}, ${town.province}` : "Bicol"}. Bicol average ${fmt(d.mean)} mm.` });
+      const town = nearestTown(d.at.lon, d.at.lat);
+      ev.push({ t: i + 0.5, c: WATER, at: town || d.at, text: `Up to ${fmt(d.max)} mm of rain in one day around ${town ? `${town.name}, ${town.province}` : "Bicol"} (NASA POWER, ~50 km grid). Bicol land average ${fmt(d.mean)} mm.` });
     }
   });
-  const half = S.tl.cells.length / 2;
   let wasSat = false;
   S.tl.days.forEach((_, d) => {
-    const sat = S.tl.rootzone.filter((r) => (r[d] ?? 0) >= 0.97).length >= half;
-    if (sat && !wasSat) ev.push({ t: d + 0.6, c: WATER_DARK, text: "Root-zone soil is waterlogged in more than half of the grid cells." });
-    if (!sat && wasSat) ev.push({ t: d + 0.6, c: GREEN, text: "Soil starts to drain: fewer than half of the grid cells are waterlogged." });
+    const sat = landWet(d) >= 0.5;
+    if (sat && !wasSat) ev.push({ t: d + 0.6, c: WATER_DARK, text: `Root-zone soil is waterlogged on ${Math.round(landWet(d) * 100)}% of Bicol's land.` });
+    if (!sat && wasSat) ev.push({ t: d + 0.6, c: GREEN, text: `Soil starts to drain: ${Math.round(landWet(d) * 100)}% of Bicol's land still waterlogged.` });
     wasSat = sat;
   });
   S.tl.passes.forEach((p) => ev.push({ t: tAt(p.date) + 0.75, c: p.used ? GREEN : "#9aa59f", text: p.label + "." }));
@@ -776,7 +811,7 @@ function renderLayers() {
   const tile = (tiles) => tiles[0].replace("{z}", "6").replace("{x}", "54").replace("{y}", "29");
   const toggle = (k, title, sub) => `<label class="toggle"><span><b>${title}</b><small>${sub}</small></span><input type="checkbox" data-layer="${k}" ${S.layers[k] ? "checked" : ""} /><span class="switch" aria-hidden="true"></span></label>`;
   const slider = (id, label, min, max, step, val, out) => `<div class="slider-row"><label for="${id}">${label}</label><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${val}" /><output id="${id}-v">${out}</output></div>`;
-  const closest = Math.min(...S.tl.storm.map((p) => km(p, NAGA)));
+  const closest = S.closest?.km ?? 0;
   const gibsNote = () => (S.gibs === "none" ? "From NASA GIBS, for the date on the timeline." : GIBS[S.gibs].sub);
   $("tab-layers").innerHTML = `
     <p class="h">Heatmap</p>
@@ -800,7 +835,7 @@ function renderLayers() {
     </div>
     <p class="h">Storm</p>
     ${toggle("storm", "Kristine's track", "NASA EONET every 6 hours, PAGASA colours")}
-    <p class="callout"><i data-lucide="info"></i><span>Kristine's centre crossed northern Luzon, ${fmt(closest)} km north of Naga at its closest. Bicol flooded from the storm's southern rain bands: pick <b>Rain that day</b> and press play.</span></p>
+    <p class="callout"><i data-lucide="info"></i><span>Kristine's centre crossed northern Luzon and came no closer than ${fmt(closest)} km to Naga. Bicol flooded from the storm's southern rain bands: pick <b>Rain that day</b> and press play.</span></p>
     <p class="h">NASA satellite image of the day</p>
     <div class="chips" role="group" aria-label="NASA GIBS image">
       <button type="button" class="chip" data-gibs="none" aria-pressed="${S.gibs === "none"}">Off</button>
@@ -858,7 +893,7 @@ function renderLegend() {
     parts.unshift(`<div><b>${st.name}, 30 m</b><small>risk engine grid, ${S.pgrid.width}×${S.pgrid.height} cells</small><div class="ramp" style="background:linear-gradient(90deg,${st.stops.map((q) => `rgba(${q[1][0]},${q[1][1]},${q[1][2]},${Math.max(0.2, q[1][3] / 255)}) ${((q[0] - a) / (b - a)) * 100}%`).join(",")})"></div><div class="ticks-row"><span>${st.fmt(a)}</span><span>${st.fmt(b)}</span></div></div>`);
   }
   if (S.pilot && S.layers.pilot && S.ready && map.getZoom() >= 10.5) parts.unshift(`<div><b>Field Drowning Risk, 30 m</b><div class="sw">${["high", "watch", "low"].map((k) => `<span><i style="background:${RISK_C[k]}"></i>${RISK_W[k]}</span>`).join("")}<span><i style="background:none;box-shadow:inset 0 0 0 2px #4ec4de"></i>Radar flood edge</span><span><i style="background:#7fe0ff"></i>Drainage channel</span></div></div>`);
-  if (S.layers.storm && z < 10) parts.push(`<div><b>Kristine, PAGASA category</b><div class="sw">${CATS.map((c) => `<span><i style="background:${c.c}"></i>${c.short}</span>`).join("")}</div></div>`);
+  if (S.layers.storm && z < 10) parts.push(`<div><b>Kristine (EONET winds, PAGASA classes)</b><div class="sw">${CATS.map((c) => `<span><i style="background:${c.c}"></i>${c.short}</span>`).join("")}</div></div>`);
   $("legend").innerHTML = parts.join("");
 }
 
@@ -1113,7 +1148,7 @@ function renderData() {
 
 // ================= Story mode: the 30-second demo path =================
 const STORY = [
-  { title: "Kristine soaks Bicol", text: () => `21–26 Oct 2024. The storm's centre passes ${fmt(S.closest?.km || 263)} km north of Naga, but its rain bands drop up to 246 mm a day on Bicol. The heatmap is NASA POWER daily rain.`,
+  { title: "Kristine soaks Bicol", text: () => { const rd = regionDaily(), pk = rd.reduce((m, d, i) => (d.max > rd[m].max ? i : m), 0); return `21–26 Oct 2024. The storm's centre stays ${fmt(S.closest?.km)} km from Naga at its closest, yet its rain bands drop up to ${fmt(rd[pk].max)} mm in a day on Bicol land (${short(S.tl.days[pk])}). The heatmap is NASA POWER daily rain.`; },
     go: () => { setField("rain"); setGibs("none"); setTime(tAt("2024-10-22") + 0.5, true); map.fitBounds([[R.w, R.s], [R.e, R.n]], { padding: chromePadding(), pitch: 30, bearing: 0, duration: 1400 }); } },
   { title: "Clouds blind optical satellites", text: () => "NASA MODIS on 23 Oct sees only cloud over Bicol. Optical images cannot show where the water is during a typhoon.",
     go: () => { setField("none"); setGibs("modis"); setTime(tAt("2024-10-23") + 0.5, true); } },
@@ -1152,7 +1187,7 @@ function bindStory() {
 // Home is the 3D map. Each panel is a window: drag by the header, resize from the corner, minimise to the rail,
 // close, or maximise to "teleport" it into the full-screen workspace.
 const APPS = [
-  { id: "ai", title: "SakaSAR AI", icon: "sparkles", ai: true },
+  { id: "ai", title: "SakaSAR AI", icon: "message-square-text", ai: true },
   { id: "layers", title: "Layers", icon: "layers" },
   { id: "towns", title: "Towns", icon: "map-pin" },
   { id: "fields", title: "Field risk", icon: "sprout" },
@@ -1323,21 +1358,20 @@ function backToMap() {
 
 // ================= Intro: the logo's radar pulses, then flies into the brand chip =================
 const intro = { t0: performance.now(), done: false, hadView: location.hash.includes("view=") };
-function finishIntro() {
+function finishIntro(now) {
   if (intro.done) return; intro.done = true;
-  const wait = Math.max(0, 2300 - (performance.now() - intro.t0));
+  const wait = now ? 0 : Math.max(0, 2350 - (performance.now() - intro.t0));
   setTimeout(() => {
-    const sp = $("splash"), from = $("splash-logo").getBoundingClientRect(), brand = $("brand-logo"), to = brand.getBoundingClientRect();
-    const fly = document.createElement("img"); fly.src = $("splash-logo").src; fly.className = "fly-logo";
-    Object.assign(fly.style, { left: `${from.left}px`, top: `${from.top}px`, width: `${from.width}px`, height: `${from.height}px` });
-    document.body.appendChild(fly);
-    sp.classList.add("out");
-    const s = to.width / from.width;
-    fly.animate([{ transform: "none" }, { transform: `translate(${to.left - from.left}px, ${to.top - from.top}px) scale(${s})` }], { duration: reduceMotion ? 1 : 850, easing: ease, fill: "forwards" })
-      .onfinish = () => { brand.style.opacity = 1; fly.remove(); setTimeout(() => sp.remove(), 300); };
+    const sp = $("splash"), scan = $("intro-scan"), brand = $("brand-logo");
+    if (!sp) return;
+    const dur = reduceMotion ? 1 : 950, W = window.innerWidth;
+    brand.style.opacity = 1;
+    sp.animate([{ clipPath: "inset(0 0 0 0)" }, { clipPath: "inset(0 0 0 100%)" }], { duration: dur, easing: "cubic-bezier(0.65, 0, 0.35, 1)", fill: "forwards" }).onfinish = () => { sp.remove(); scan.remove(); };
+    scan.animate([{ transform: "translateX(0)", opacity: 1 }, { transform: `translateX(${W}px)`, opacity: 1 }], { duration: dur, easing: "cubic-bezier(0.65, 0, 0.35, 1)", fill: "forwards" });
     if (!intro.hadView && map) map.fitBounds([[R.w, R.s], [R.e, R.n]], { padding: chromePadding(), pitch: 42, bearing: -8, duration: reduceMotion ? 0 : 2600, essential: true });
   }, wait);
 }
+document.addEventListener("click", (e) => { if (e.target.closest("#splash")) finishIntro(true); });
 
 // ================= 30 m detail layers from the pilot GeoTIFFs =================
 const PG_STYLE = {
@@ -1435,7 +1469,7 @@ function renderAIPane() {
 function msgHTML(m) {
   if (m.who === "user") return `<div class="msg user">${esc(m.text)}</div>`;
   if (m.typing) return `<div class="msg bot typing"><i></i><i></i><i></i></div>`;
-  return `<div class="msg bot"><div class="who"><img src="assets/sakasar-logo.png" alt="" />SakaSAR AI</div>${m.html}${m.src ? `<div class="srcs">${m.src.map((x) => `<span class="src">${esc(x)}</span>`).join("")}</div>` : ""}</div>`;
+  return `<div class="msg bot"><div class="who"><img src="assets/sakasar-mark.svg" alt="" />SakaSAR AI</div>${m.html}${m.src ? `<div class="srcs">${m.src.map((x) => `<span class="src">${esc(x)}</span>`).join("")}</div>` : ""}</div>`;
 }
 function aiSuggestions(c) {
   const t = c.town ? c.town.name : null;
@@ -1451,7 +1485,7 @@ function aiSuggestions(c) {
 function aiWelcome() {
   if (!AI.greeted) {
     AI.greeted = true;
-    AI.msgs.push({ who: "bot", html: `<p>Hi, I'm SakaSAR AI. Click any place on the map or move the timeline, then ask me about it: flooding, rain, soil, the storm, field risk or what to plant next.</p>` });
+    AI.msgs.push({ who: "bot", html: `<p>Click a place on the map or move the timeline, then ask about it: flooding, rain, soil, the storm, a field's risk or what to plant next.</p>` });
   }
   renderAIPane();
 }
@@ -1460,9 +1494,8 @@ function aiAsk(q) {
   const tn = S.munis.features.map((f) => f.properties).find((t) => q.toLowerCase().includes(t.name.toLowerCase()));
   if (tn) AI.town = tn;
   const pm = q.match(/PL-0?(\d)/i); if (pm && S.pilot) S.plot = `PL-0${pm[1]}`;
-  AI.msgs.push({ who: "bot", typing: true });
   renderAIPane();
-  setTimeout(() => { AI.msgs.pop(); AI.msgs.push(aiAnswer(q, aiContext())); renderAIPane(); if (tn && !WM.ws) openTown(tn.name, tn.province); }, reduceMotion ? 0 : 520);
+  AI.msgs.push(aiAnswer(q, aiContext())); renderAIPane(); if (tn && !WM.ws) openTown(tn.name, tn.province);
 }
 function aiAnswer(q, c) {
   const s = q.toLowerCase(), tl = S.tl, sm = S.summary;
@@ -1476,8 +1509,8 @@ function aiAnswer(q, c) {
       <li>Limits: C-band radar sees surface water, not root-zone moisture; NASA POWER cells are about 50 km.</li></ul>` };
   }
   if (has("storm", "kristine", "typhoon", "wind", "track")) {
-    const st = tl.storm, ci = S.closest?.i ?? 0;
-    return { who: "bot", src: ["NASA EONET"], html: `<p>${S.storm?.active ? `On ${short(c.iso)} Kristine is at ${S.storm.lat.toFixed(1)}°N ${S.storm.lon.toFixed(1)}°E with ${S.storm.wind} kt winds (${S.storm.cat.name}).` : `On ${short(c.iso)} Kristine is not over the region.`} Its closest pass was ${fmt(S.closest?.km)} km north of Naga on ${short(st[ci].t.slice(0, 10))}. The centre crossed northern Luzon, so Bicol's flooding came from the storm's southern rain bands, not a direct hit.</p>` };
+    const cp = S.closest;
+    return { who: "bot", src: ["NASA EONET"], html: `<p>${S.storm?.active ? `On ${short(c.iso)} Kristine is at ${S.storm.lat.toFixed(1)}°N ${S.storm.lon.toFixed(1)}°E with ${S.storm.wind} kt winds (${S.storm.cat.name}).` : `On ${short(c.iso)} Kristine is not over the region.`} Its closest pass was ${fmt(cp.km)} km from Naga on ${short(phDay(cp.t))} (Philippine time). The centre crossed northern Luzon, so Bicol's flooding came from the storm's southern rain bands, not a direct hit.</p>` };
   }
   if (has("plant", "rotation", "crop", "next season", "legume", "season")) {
     const p = c.plot; if (!p) return { who: "bot", html: "<p>Rotation advice needs a field's soil data; it is available for the sample fields in the Field risk window.</p>" };
@@ -1500,7 +1533,7 @@ function aiAnswer(q, c) {
   if (has("rain", "rainfall", "mm")) {
     const today = rainAt("rain"), tot = rainAt("rainsum");
     const rd = regionDaily(), peak = rd.reduce((m, d, i) => (d.max > rd[m].max ? i : m), 0);
-    return { who: "bot", src: ["NASA POWER"], html: `<p>${c.lon != null ? `${c.town ? esc(c.town.name) : "Here"} on ${short(c.iso)}: <b>${fmt(today)} mm</b> that day, ${fmt(tot)} mm since 10 Oct.` : `Bicol averaged ${fmt(rd[c.day].mean)} mm on ${short(c.iso)}.`} The wettest day was ${short(tl.days[peak])}, with ${fmt(rd[peak].max)} mm in one grid cell.</p>` };
+    return { who: "bot", src: ["NASA POWER"], html: `<p>${c.lon != null ? `${c.town ? esc(c.town.name) : "Here"} on ${short(c.iso)}: <b>${fmt(today)} mm</b> that day, ${fmt(tot)} mm since 10 Oct.` : `Bicol averaged ${fmt(rd[c.day].mean)} mm on ${short(c.iso)}.`} The wettest day was ${short(tl.days[peak])}, peaking at ${fmt(rd[peak].max)} mm over Bicol land (NASA POWER, ~50 km grid).</p>` };
   }
   if (has("flood", "water", "bad", "damage", "how much")) {
     const t = c.town;

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SakaSAR</title>
   <meta name="description" content="GIS replay of Typhoon Kristine over the Bicol Region: NASA rain and soil heatmaps, the storm track, Sentinel-1 flood hotspots by town, and an LSTM forecast of waterlogged soil." />
+  <link rel="icon" type="image/svg+xml" href="assets/sakasar-mark.svg" />
   <link rel="icon" type="image/x-icon" href="favicon.ico" />
   <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png" />
@@ -20,7 +21,7 @@
   <meta name="twitter:image" content="https://sakasar.vercel.app/assets/logo.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&display=swap" rel="stylesheet" />
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -29,7 +30,7 @@
     <!-- ===== Top bar ===== -->
     <header class="topbar">
       <a class="brandchip" href="./" aria-label="SakaSAR home">
-        <img src="assets/sakasar-logo.png" alt="" width="40" height="40" class="logo" id="brand-logo" />
+        <img src="assets/sakasar-mark.svg" alt="" width="36" height="36" class="logo" id="brand-logo" />
         <span class="wordmark">SakaSAR</span>
       </a>
       <div class="toolbar" role="toolbar" aria-label="Map tools">
@@ -133,18 +134,44 @@
   <!-- Workspace: full-screen frame a window teleports into -->
   <div class="workspace" id="workspace" hidden>
     <header class="ws-head">
-      <span class="ws-brand"><img src="assets/sakasar-logo.png" alt="" width="34" height="34" /><span class="wordmark">SakaSAR</span></span>
+      <span class="ws-brand"><img src="assets/sakasar-mark.svg" alt="" width="32" height="32" /><span class="wordmark">SakaSAR</span></span>
       <nav class="seg ws-nav" id="ws-nav" aria-label="Workspace sections"></nav>
       <button type="button" class="btn" id="ws-back"><i data-lucide="globe-2"></i><span>Back to 3D map</span></button>
     </header>
     <main class="ws-body" id="ws-body"></main>
   </div>
 
-  <!-- Intro -->
-  <div class="splash" id="splash" aria-hidden="true">
-    <div class="splash-mark"><span class="ring"></span><span class="ring"></span><span class="ring"></span><img src="assets/sakasar-logo.png" alt="" width="148" height="148" id="splash-logo" /></div>
-    <p class="splash-word">SakaSAR</p>
+  <!-- Intro: the mark is traced like a radar outline, then a Sentinel-1 style swath wipes it away to the map -->
+  <div class="intro" id="splash" aria-hidden="true">
+    <div class="intro-inner">
+      <svg class="intro-svg" viewBox="0 0 120 120" aria-hidden="true">
+  
+  <circle cx="60" cy="60" r="58" fill="#17643a"/>
+  <g fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round">
+    
+    <rect class="d" pathLength="1" x="53" y="14" width="14" height="13" rx="3" stroke-width="3.2"/>
+    <path class="d" pathLength="1" d="M53 20.5H45M67 20.5H75" stroke-width="2.6"/>
+    <rect class="d" pathLength="1" x="27" y="16" width="18" height="9" rx="1.5" stroke-width="2.6"/>
+    <rect class="d" pathLength="1" x="75" y="16" width="18" height="9" rx="1.5" stroke-width="2.6"/>
+    <path class="d" pathLength="1" d="M33 16v9M39 16v9M81 16v9M87 16v9" stroke-width="1.6"/>
+    
+    <path class="d" pathLength="1" d="M52 37q8 4 16 0" stroke-width="3.2"/>
+    <path class="d" pathLength="1" d="M47 46q13 6 26 0" stroke-width="3.2"/>
+    <path class="d" pathLength="1" d="M42 55q18 7 36 0" stroke-width="3.2"/>
+    
+    <path class="d" pathLength="1" d="M8 72q52 -10 104 0" stroke-width="2.4"/>
+    
+    <ellipse class="d" pathLength="1" cx="60" cy="92" rx="36" ry="12" stroke-width="2.8"/>
+    <ellipse class="d" pathLength="1" cx="60" cy="92" rx="23" ry="7.5" stroke-width="2.8"/>
+    <ellipse class="d" pathLength="1" cx="60" cy="92" rx="11" ry="3.6" stroke-width="2.8"/>
+    <circle cx="60" cy="92" r="2.6" fill="#ffffff" stroke="none"/>
+  </g>
+</svg>
+      <p class="intro-word">SakaSAR</p>
+      <p class="intro-line">Flood intelligence for Bicol farms, from radar and NASA data</p>
+    </div>
   </div>
+  <div class="intro-scan" id="intro-scan" aria-hidden="true"></div>
 
   <div class="toast" id="toast" role="status" hidden></div>
 

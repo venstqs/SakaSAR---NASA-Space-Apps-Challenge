@@ -101,9 +101,12 @@ Never mount the repo root as static files.
 
 ## 6. Dashboard (windowed 3D app, 15 Nov 2026) — agent brief: docs/ANTIGRAVITY.md
 
-- **Home = the 3D map** with a brand chip (logo + "SakaSAR" only), toolbar (2D/3D, Story, Bicol, Storm track, save, link),
-  a launcher **rail** on the left, the timeline and the legend. A splash intro pulses the logo's radar rings, then the
-  logo flies into the brand chip and the camera flies onto Bicol.
+- **Home = the 3D map** with a brand chip (`assets/sakasar-mark.svg`: green disc, white strokes; wordmark in Inter 800), toolbar (2D/3D, Story, Bicol, Storm track, save, link),
+  a launcher **rail** on the left, the timeline and the legend. The intro traces the mark in white strokes, reveals the
+  wordmark, then a Sentinel-1 style swath wipes to the map while the camera flies onto Bicol (click skips).
+- Accuracy: Bicol figures are Bicol-land averages/peaks of the interpolated POWER grid (sea cells excluded); the day axis
+  is Philippine time (UTC+8); the closest pass is measured to the EONET track line (≈259 km, 23 Oct 04:49 PHT).
+- Timeline is a short centred bar: play, date, rain bars + event ticks, rain over land, storm wind, speed button.
 - **Windows** (rail buttons): SakaSAR AI, Layers, Towns, Field risk, LSTM forecast, Events, Data & method. Drag by the
   header, resize from the corner, minimise to the rail, close, or maximise/double-click to **teleport** into the
   full-screen **workspace** (section switcher, "Back to 3D map", Esc). Phones open panels straight in the workspace.
