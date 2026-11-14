@@ -1,11 +1,914 @@
 const DATA_SOURCE_URL = "mock-data.json";
+const ORIGIN_LNG_LAT = [123.2005, 13.6182];
 
 let appData = null;
 let map = null;
 let is3D = true;
 let playInterval = null;
+<<<<<<< HEAD
 const DEFAULT_CENTER = [123.2057, 13.5416]; // Minalabac pilot strip; overridden by provenance.map_center
 let mapCenter = DEFAULT_CENTER;
+=======
+let timelineStage = 2; // Starts on Post-Storm SAR
+let sarMode = "off";
+let selectedPlotId = "PL-01";
+let mapAnimFrame = null;
+let sarSweepProgress = 0;
+
+let threeOrigin = null;
+let threeScale = 1;
+const threeState = {
+  ready: false,
+  scene: null,
+  camera: null,
+  renderer: null,
+  sunLight: null,
+  hemiLight: null,
+  parcelGroup: null,
+  canalGroup: null,
+  sarGroup: null,
+  waterMesh: null,
+  canalWaterMesh: null,
+  waterUniforms: null,
+  canalWaterUniforms: null,
+  sarUniforms: null,
+  cropUniforms: { uTime: { value: 0 }, uWind: { value: 1.0 } },
+  selectionMeshes: {},
+  showParcels: true,
+  showFlood: true,
+  showCorridor: true,
+  currentWaterLevel: 1.0,
+  targetWaterLevel: 1.0
+};
+
+function seededRand(seed) {
+  const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+function lngLatToLocalMeters(lngLat) {
+  const mc = maplibregl.MercatorCoordinate.fromLngLat(lngLat, 0);
+  return {
+    x: (mc.x - threeOrigin.x) / threeScale,
+    z: (mc.y - threeOrigin.y) / threeScale
+  };
+}
+
+function pointInPolygon(point, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1];
+    const xj = ring[j][0], yj = ring[j][1];
+    const intersect =
+      yi > point[1] !== yj > point[1] &&
+      point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi + 1e-12) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function createSoilTextures() {
+  const size = 256;
+  const diffCanvas = document.createElement("canvas");
+  diffCanvas.width = size;
+  diffCanvas.height = size;
+  const dCtx = diffCanvas.getContext("2d");
+
+  const bumpCanvas = document.createElement("canvas");
+  bumpCanvas.width = size;
+  bumpCanvas.height = size;
+  const bCtx = bumpCanvas.getContext("2d");
+
+  dCtx.fillStyle = "#8b7355";
+  dCtx.fillRect(0, 0, size, size);
+  bCtx.fillStyle = "#808080";
+  bCtx.fillRect(0, 0, size, size);
+
+  for (let i = 0; i < 3200; i++) {
+    const x = seededRand(i * 3 + 1) * size;
+    const y = seededRand(i * 3 + 2) * size;
+    const r = 1 + seededRand(i * 3 + 3) * 3.5;
+    const isGrass = seededRand(i * 7 + 5) > 0.52;
+    dCtx.fillStyle = isGrass
+      ? `rgba(${78 + Math.floor(seededRand(i) * 32)}, ${118 + Math.floor(seededRand(i + 1) * 36)}, 56, 0.52)`
+      : `rgba(${122 + Math.floor(seededRand(i) * 30)}, ${96 + Math.floor(seededRand(i + 2) * 24)}, 68, 0.55)`;
+    dCtx.beginPath();
+    dCtx.arc(x, y, r, 0, Math.PI * 2);
+    dCtx.fill();
+
+    const lum = Math.floor(95 + seededRand(i * 11) * 110);
+    bCtx.fillStyle = `rgb(${lum},${lum},${lum})`;
+    bCtx.beginPath();
+    bCtx.arc(x, y, r * 0.9, 0, Math.PI * 2);
+    bCtx.fill();
+  }
+
+  const mapTex = new THREE.CanvasTexture(diffCanvas);
+  mapTex.wrapS = mapTex.wrapT = THREE.RepeatWrapping;
+  mapTex.repeat.set(6, 2);
+
+  const bumpTex = new THREE.CanvasTexture(bumpCanvas);
+  bumpTex.wrapS = bumpTex.wrapT = THREE.RepeatWrapping;
+  bumpTex.repeat.set(6, 2);
+
+  return { mapTex, bumpTex };
+}
+
+function createFurrowTexture() {
+  const size = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  const img = ctx.createImageData(size, size);
+  for (let y = 0; y < size; y++) {
+    const ridge = Math.sin((y / size) * Math.PI * 24) * 0.5 + 0.5;
+    for (let x = 0; x < size; x++) {
+      const grain = (seededRand(x * 13 + y * 37) - 0.5) * 0.22;
+      const v = Math.max(0, Math.min(255, Math.floor((ridge * 0.78 + 0.12 + grain) * 255)));
+      const idx = (y * size + x) * 4;
+      img.data[idx] = v;
+      img.data[idx + 1] = v;
+      img.data[idx + 2] = v;
+      img.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(3, 5);
+  return tex;
+}
+
+function buildFurrowedParcelGeometry(cornersLocal, cropType) {
+  const segs = 24;
+  const positions = [];
+  const uvs = [];
+  const indices = [];
+
+  const [c0, c1, c2, c3] = cornersLocal;
+  const furrowFreq = cropType.includes("Corn") ? 14.0 : 20.0;
+  const furrowAmp = cropType.includes("Corn") ? 0.85 : 0.55;
+
+  for (let j = 0; j <= segs; j++) {
+    const v = j / segs;
+    for (let i = 0; i <= segs; i++) {
+      const u = i / segs;
+      const x =
+        (1 - u) * (1 - v) * c0.x +
+        u * (1 - v) * c1.x +
+        u * v * c2.x +
+        (1 - u) * v * c3.x;
+      const z =
+        (1 - u) * (1 - v) * c0.z +
+        u * (1 - v) * c1.z +
+        u * v * c2.z +
+        (1 - u) * v * c3.z;
+      const edgeFade = Math.sin(u * Math.PI) * Math.sin(v * Math.PI);
+      const y = 0.45 + (Math.sin(v * Math.PI * furrowFreq) * 0.5 + 0.5) * furrowAmp * Math.min(1, edgeFade * 2.2);
+      positions.push(x, y, z);
+      uvs.push(u, v);
+    }
+  }
+
+  for (let j = 0; j < segs; j++) {
+    for (let i = 0; i < segs; i++) {
+      const a = j * (segs + 1) + i;
+      const b = a + 1;
+      const c = (j + 1) * (segs + 1) + i;
+      const d = c + 1;
+      indices.push(a, b, d, a, d, c);
+    }
+  }
+
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geom.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geom.setIndex(indices);
+  geom.computeVertexNormals();
+  return geom;
+}
+
+function buildEarthenBundGeometry(cornersLocal, bundHeight) {
+  const positions = [];
+  const uvs = [];
+  const indices = [];
+
+  const cx = (cornersLocal[0].x + cornersLocal[1].x + cornersLocal[2].x + cornersLocal[3].x) * 0.25;
+  const cz = (cornersLocal[0].z + cornersLocal[1].z + cornersLocal[2].z + cornersLocal[3].z) * 0.25;
+
+  const outerHalf = 3.2;
+  const crownHalf = 1.4;
+  let vertOffset = 0;
+
+  for (let e = 0; e < 4; e++) {
+    const pA = cornersLocal[e];
+    const pB = cornersLocal[(e + 1) % 4];
+    const dx = pB.x - pA.x;
+    const dz = pB.z - pA.z;
+    const len = Math.hypot(dx, dz) || 1;
+    let nx = -dz / len;
+    let nz = dx / len;
+    // Ensure normal points outward from parcel center
+    const midX = (pA.x + pB.x) * 0.5;
+    const midZ = (pA.z + pB.z) * 0.5;
+    if (nx * (midX - cx) + nz * (midZ - cz) < 0) {
+      nx = -nx;
+      nz = -nz;
+    }
+
+    const profileOffsets = [
+      { n: -outerHalf, y: 0.0 },
+      { n: -crownHalf, y: bundHeight },
+      { n: crownHalf, y: bundHeight },
+      { n: outerHalf, y: 0.0 }
+    ];
+
+    for (let k = 0; k < 4; k++) {
+      const prof = profileOffsets[k];
+      positions.push(pA.x + nx * prof.n, prof.y, pA.z + nz * prof.n);
+      uvs.push(0, k / 3);
+      positions.push(pB.x + nx * prof.n, prof.y, pB.z + nz * prof.n);
+      uvs.push(len / 24, k / 3);
+    }
+
+    for (let k = 0; k < 3; k++) {
+      const i0 = vertOffset + k * 2;
+      const i1 = i0 + 1;
+      const i2 = i0 + 2;
+      const i3 = i0 + 3;
+      indices.push(i0, i1, i3, i0, i3, i2);
+    }
+    vertOffset += 8;
+  }
+
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geom.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geom.setIndex(indices);
+  geom.computeVertexNormals();
+  return geom;
+}
+
+function buildInnerBevelRibbonGeometry(cornersLocal, insetMeters, yPos, widthMeters) {
+  const positions = [];
+  const indices = [];
+  const cx = (cornersLocal[0].x + cornersLocal[1].x + cornersLocal[2].x + cornersLocal[3].x) * 0.25;
+  const cz = (cornersLocal[0].z + cornersLocal[1].z + cornersLocal[2].z + cornersLocal[3].z) * 0.25;
+  let offset = 0;
+
+  for (let e = 0; e < 4; e++) {
+    const pA = cornersLocal[e];
+    const pB = cornersLocal[(e + 1) % 4];
+    const dx = pB.x - pA.x;
+    const dz = pB.z - pA.z;
+    const len = Math.hypot(dx, dz) || 1;
+    let inX = -dz / len;
+    let inZ = dx / len;
+    const midX = (pA.x + pB.x) * 0.5;
+    const midZ = (pA.z + pB.z) * 0.5;
+    if (inX * (cx - midX) + inZ * (cz - midZ) < 0) {
+      inX = -inX;
+      inZ = -inZ;
+    }
+
+    const innerDist = insetMeters + widthMeters;
+    positions.push(
+      pA.x + inX * insetMeters, yPos, pA.z + inZ * insetMeters,
+      pB.x + inX * insetMeters, yPos, pB.z + inZ * insetMeters,
+      pA.x + inX * innerDist, yPos - 0.15, pA.z + inZ * innerDist,
+      pB.x + inX * innerDist, yPos - 0.15, pB.z + inZ * innerDist
+    );
+    indices.push(offset, offset + 1, offset + 3, offset, offset + 3, offset + 2);
+    offset += 4;
+  }
+
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geom.setIndex(indices);
+  geom.computeVertexNormals();
+  return geom;
+}
+
+function buildDrainageCanalMeshes(corridorCoords, soilMat, waterMat) {
+  const group = new THREE.Group();
+  const pts = corridorCoords.map((c) => lngLatToLocalMeters(c));
+  const subPts = [];
+  const subPerSeg = 12;
+  for (let i = 0; i < pts.length - 1; i++) {
+    for (let s = 0; s < (i === pts.length - 2 ? subPerSeg + 1 : subPerSeg); s++) {
+      const t = s / subPerSeg;
+      subPts.push({
+        x: pts[i].x + (pts[i + 1].x - pts[i].x) * t,
+        z: pts[i].z + (pts[i + 1].z - pts[i].z) * t
+      });
+    }
+  }
+
+  // Carved earthen canal banks (left & right slopes + bed)
+  const bankPos = [];
+  const bankUv = [];
+  const bankIdx = [];
+  const waterPos = [];
+  const waterUv = [];
+  const waterIdx = [];
+
+  for (let i = 0; i < subPts.length; i++) {
+    const prev = subPts[Math.max(0, i - 1)];
+    const next = subPts[Math.min(subPts.length - 1, i + 1)];
+    const dx = next.x - prev.x;
+    const dz = next.z - prev.z;
+    const len = Math.hypot(dx, dz) || 1;
+    const nx = -dz / len;
+    const nz = dx / len;
+    const u = i / (subPts.length - 1);
+    const widthScale = 0.72 + u * 0.95; // Graduated flow-accumulation width (upland -> lowland)
+
+    // 6-point cross-section: outer left, crown left, bed left, bed right, crown right, outer right
+    const profile = [
+      { n: -10.5 * widthScale, y: 0.0 },
+      { n: -6.5 * widthScale, y: 2.2 },
+      { n: -3.5 * widthScale, y: 0.2 },
+      { n: 3.5 * widthScale, y: 0.2 },
+      { n: 6.5 * widthScale, y: 2.2 },
+      { n: 10.5 * widthScale, y: 0.0 }
+    ];
+    for (let k = 0; k < 6; k++) {
+      bankPos.push(subPts[i].x + nx * profile[k].n, profile[k].y, subPts[i].z + nz * profile[k].n);
+      bankUv.push(u * 16, k / 5);
+    }
+
+    // Water surface ribbon inside canal
+    const waterHalf = 4.6 * widthScale;
+    waterPos.push(subPts[i].x - nx * waterHalf, 1.45, subPts[i].z - nz * waterHalf);
+    waterPos.push(subPts[i].x + nx * waterHalf, 1.45, subPts[i].z + nz * waterHalf);
+    waterUv.push(u * 10, 0, u * 10, 1);
+  }
+
+  for (let i = 0; i < subPts.length - 1; i++) {
+    for (let k = 0; k < 5; k++) {
+      const a = i * 6 + k;
+      const b = a + 1;
+      const c = (i + 1) * 6 + k;
+      const d = c + 1;
+      bankIdx.push(a, b, d, a, d, c);
+    }
+    const wa = i * 2;
+    const wb = wa + 1;
+    const wc = (i + 1) * 2;
+    const wd = wc + 1;
+    waterIdx.push(wa, wb, wd, wa, wd, wc);
+  }
+
+  const bankGeom = new THREE.BufferGeometry();
+  bankGeom.setAttribute("position", new THREE.Float32BufferAttribute(bankPos, 3));
+  bankGeom.setAttribute("uv", new THREE.Float32BufferAttribute(bankUv, 2));
+  bankGeom.setIndex(bankIdx);
+  bankGeom.computeVertexNormals();
+  const bankMesh = new THREE.Mesh(bankGeom, soilMat);
+  group.add(bankMesh);
+
+  const waterGeom = new THREE.BufferGeometry();
+  waterGeom.setAttribute("position", new THREE.Float32BufferAttribute(waterPos, 3));
+  waterGeom.setAttribute("uv", new THREE.Float32BufferAttribute(waterUv, 2));
+  waterGeom.setIndex(waterIdx);
+  waterGeom.computeVertexNormals();
+  const canalWater = new THREE.Mesh(waterGeom, waterMat);
+  group.add(canalWater);
+
+  // Dendritic Tributary Feeder Channels branching into the main runoff corridor
+  const tribSpecs = [
+    { idx: 8, side: -1, len: 135, angle: 0.55 },
+    { idx: 15, side: 1, len: 145, angle: -0.5 },
+    { idx: 22, side: -1, len: 160, angle: 0.6 },
+    { idx: 29, side: 1, len: 155, angle: -0.58 },
+    { idx: 36, side: -1, len: 175, angle: 0.52 },
+    { idx: 42, side: 1, len: 165, angle: -0.48 }
+  ];
+  tribSpecs.forEach((spec) => {
+    const base = subPts[Math.min(subPts.length - 1, spec.idx)];
+    const prev = subPts[Math.max(0, spec.idx - 1)];
+    const dirX = base.x - prev.x;
+    const dirZ = base.z - prev.z;
+    const dLen = Math.hypot(dirX, dirZ) || 1;
+    const ux = dirX / dLen;
+    const uz = dirZ / dLen;
+    const nx = -uz * spec.side;
+    const nz = ux * spec.side;
+    const startX = base.x + nx * spec.len - ux * 55;
+    const startZ = base.z + nz * spec.len - uz * 55;
+    const midX = (startX + base.x) * 0.5 + nx * 18;
+    const midZ = (startZ + base.z) * 0.5 + nz * 18;
+
+    const tPts = [
+      { x: startX, z: startZ },
+      { x: midX, z: midZ },
+      { x: base.x, z: base.z }
+    ];
+    const tPos = [];
+    const tUv = [];
+    const tIdx = [];
+    for (let j = 0; j < tPts.length; j++) {
+      const p0 = tPts[Math.max(0, j - 1)];
+      const p1 = tPts[Math.min(tPts.length - 1, j + 1)];
+      const tx = p1.x - p0.x;
+      const tz = p1.z - p0.z;
+      const tl = Math.hypot(tx, tz) || 1;
+      const tnx = -tz / tl;
+      const tnz = tx / tl;
+      const halfW = 1.6 + (j / 2) * 1.4;
+      const uVal = (spec.idx / subPts.length) * 10 * 0.7;
+      tPos.push(tPts[j].x - tnx * halfW, 1.35, tPts[j].z - tnz * halfW);
+      tPos.push(tPts[j].x + tnx * halfW, 1.35, tPts[j].z + tnz * halfW);
+      tUv.push(uVal + j * 1.1, 0, uVal + j * 1.1, 1);
+    }
+    for (let j = 0; j < tPts.length - 1; j++) {
+      const a = j * 2, b = a + 1, c = a + 2, d = a + 3;
+      tIdx.push(a, b, d, a, d, c);
+    }
+    const tGeom = new THREE.BufferGeometry();
+    tGeom.setAttribute("position", new THREE.Float32BufferAttribute(tPos, 3));
+    tGeom.setAttribute("uv", new THREE.Float32BufferAttribute(tUv, 2));
+    tGeom.setIndex(tIdx);
+    tGeom.computeVertexNormals();
+    group.add(new THREE.Mesh(tGeom, waterMat));
+  });
+
+  return { group, canalWater };
+}
+
+function createRiskGridTexture(riskClass) {
+  const size = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+
+  const palette =
+    riskClass === "high"
+      ? ["#dc2626", "#ef4444", "#b91c1c"]
+      : riskClass === "watch"
+        ? ["#d97706", "#f59e0b", "#b45309"]
+        : ["#059669", "#10b981", "#047857"];
+
+  const cells = 6;
+  const cellSize = size / cells;
+  for (let gy = 0; gy < cells; gy++) {
+    for (let gx = 0; gx < cells; gx++) {
+      const idx = Math.floor(seededRand(gx * 19 + gy * 37 + riskClass.length * 7) * 3);
+      ctx.fillStyle = palette[idx];
+      ctx.fillRect(gx * cellSize, gy * cellSize, cellSize, cellSize);
+    }
+  }
+
+  // Crisp 30m grid matrix lines
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
+  ctx.lineWidth = 2;
+  for (let i = 0; i <= cells; i++) {
+    const p = i * cellSize;
+    ctx.beginPath();
+    ctx.moveTo(p, 0);
+    ctx.lineTo(p, size);
+    ctx.moveTo(0, p);
+    ctx.lineTo(size, p);
+    ctx.stroke();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(2, 2);
+  return tex;
+}
+
+function createPhysicalWaterMaterial(isCanal = false) {
+  const uniforms = {
+    uTime: { value: 0 },
+    uWaterLevel: { value: 1.0 },
+    uSunDir: { value: new THREE.Vector3(0.52, 0.76, 0.39).normalize() },
+    uCamPos: { value: new THREE.Vector3(0, 450, 450) },
+    uIsCanal: { value: isCanal ? 1.0 : 0.0 }
+  };
+
+  const vertexShader = `
+    uniform float uTime;
+    uniform float uWaterLevel;
+    uniform float uIsCanal;
+    varying vec3 vWorldPos;
+    varying vec2 vUv;
+    varying float vDepth;
+
+    void main() {
+      vUv = uv;
+      vec3 pos = position;
+
+      if (uIsCanal < 0.5) {
+        // Organic basin depth field concentrated in PL-01, PL-02, and lower PL-03
+        vec2 basinUv = uv * 2.0 - 1.0;
+        float westBias = smoothstep(1.0, -0.85, basinUv.x);
+        float radial = 1.0 - length(vec2((basinUv.x + 0.18) * 0.92, basinUv.y * 1.15));
+        float organic = 0.09 * sin(pos.x * 0.025 + 1.2) * cos(pos.z * 0.032) + 0.05 * sin(pos.x * 0.07 - pos.z * 0.05);
+        vDepth = clamp((radial * 0.85 + westBias * 0.32 + organic) * uWaterLevel, 0.0, 1.0);
+        float swell = (sin(pos.x * 0.08 + uTime * 2.1) + cos(pos.z * 0.09 - uTime * 1.7)) * 0.1 * uWaterLevel;
+        pos.y = mix(0.2, 1.75, uWaterLevel) + swell * smoothstep(0.05, 0.4, vDepth);
+      } else {
+        vDepth = clamp(0.65 * (0.35 + 0.65 * uWaterLevel), 0.25, 0.95);
+        pos.y += sin(uv.x * 12.0 - uTime * 4.5) * 0.05;
+      }
+
+      vec4 worldPosition = modelMatrix * vec4(pos, 1.0);
+      vWorldPos = worldPosition.xyz;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+    }
+  `;
+
+  const fragmentShader = `
+    precision highp float;
+    uniform float uTime;
+    uniform float uWaterLevel;
+    uniform vec3 uSunDir;
+    uniform vec3 uCamPos;
+    uniform float uIsCanal;
+    varying vec3 vWorldPos;
+    varying vec2 vUv;
+    varying float vDepth;
+
+    float hash21(vec2 p) {
+      p = fract(p * vec2(123.34, 456.21));
+      p += dot(p, p + 45.32);
+      return fract(p.x * p.y);
+    }
+
+    float waveOctave(vec2 p, vec2 dir, float freq, float speed) {
+      return sin(dot(p, dir) * freq + uTime * speed);
+    }
+
+    vec3 computeRippleNormal(vec2 p) {
+      float flowShift = uIsCanal > 0.5 ? uTime * 1.8 : 0.0;
+      vec2 sp = p + vec2(-flowShift, 0.0);
+      float eps = 0.35;
+
+      float h0 =
+        waveOctave(sp, normalize(vec2(1.0, 0.35)), 0.42, 2.2) * 0.35 +
+        waveOctave(sp, normalize(vec2(-0.6, 0.8)), 0.78, 2.9) * 0.25 +
+        waveOctave(sp, normalize(vec2(0.3, -0.95)), 1.35, 3.6) * 0.16 +
+        waveOctave(sp, normalize(vec2(-0.85, -0.5)), 2.15, 4.4) * 0.10;
+
+      float hx =
+        waveOctave(sp + vec2(eps, 0.0), normalize(vec2(1.0, 0.35)), 0.42, 2.2) * 0.35 +
+        waveOctave(sp + vec2(eps, 0.0), normalize(vec2(-0.6, 0.8)), 0.78, 2.9) * 0.25 +
+        waveOctave(sp + vec2(eps, 0.0), normalize(vec2(0.3, -0.95)), 1.35, 3.6) * 0.16 +
+        waveOctave(sp + vec2(eps, 0.0), normalize(vec2(-0.85, -0.5)), 2.15, 4.4) * 0.10;
+
+      float hz =
+        waveOctave(sp + vec2(0.0, eps), normalize(vec2(1.0, 0.35)), 0.42, 2.2) * 0.35 +
+        waveOctave(sp + vec2(0.0, eps), normalize(vec2(-0.6, 0.8)), 0.78, 2.9) * 0.25 +
+        waveOctave(sp + vec2(0.0, eps), normalize(vec2(0.3, -0.95)), 1.35, 3.6) * 0.16 +
+        waveOctave(sp + vec2(0.0, eps), normalize(vec2(-0.85, -0.5)), 2.15, 4.4) * 0.10;
+
+      float chop = 0.16 + 0.18 * uWaterLevel;
+      return normalize(vec3((h0 - hx) * chop / eps, 1.0, (h0 - hz) * chop / eps));
+    }
+
+    vec3 floodDepthRamp(float d) {
+      // Scientific WD (0m -> 2m) ramp: royal blue -> cyan -> emerald -> amber -> crimson core
+      vec3 c0 = vec3(0.114, 0.306, 0.847); // #1d4ed8
+      vec3 c1 = vec3(0.024, 0.714, 0.831); // #06b6d4
+      vec3 c2 = vec3(0.133, 0.773, 0.369); // #22c55e
+      vec3 c3 = vec3(0.980, 0.800, 0.082); // #facc15
+      vec3 c4 = vec3(0.863, 0.149, 0.149); // #dc2626
+      if (d < 0.28) return mix(c0, c1, d / 0.28);
+      if (d < 0.55) return mix(c1, c2, (d - 0.28) / 0.27);
+      if (d < 0.78) return mix(c2, c3, (d - 0.55) / 0.23);
+      return mix(c3, c4, clamp((d - 0.78) / 0.22, 0.0, 1.0));
+    }
+
+    void main() {
+      if (vDepth <= 0.025) discard;
+
+      // SAR pixel-speckle fringe at shallow inundation boundary
+      if (uIsCanal < 0.5 && vDepth < 0.22) {
+        vec2 cell = floor(vWorldPos.xz / 9.0);
+        float n = hash21(cell);
+        if (n > vDepth * 4.8) discard;
+      }
+
+      vec3 N = computeRippleNormal(vWorldPos.xz);
+      vec3 V = normalize(uCamPos - vWorldPos);
+      vec3 H = normalize(uSunDir + V);
+
+      // Schlick Fresnel & sun specular glint
+      float fresnel = 0.02 + 0.98 * pow(1.0 - max(dot(N, V), 0.0), 4.0);
+      float spec = pow(max(dot(N, H), 0.0), 160.0) * (1.2 + 0.4 * uWaterLevel);
+
+      vec3 waterCol;
+      if (uIsCanal < 0.5) {
+        waterCol = floodDepthRamp(vDepth);
+        vec3 skyColor = vec3(0.73, 0.90, 0.99);
+        waterCol = mix(waterCol, skyColor, clamp(fresnel * 0.42, 0.0, 0.45));
+      } else {
+        // Graduated hydrological runoff tiers along corridor (upland cyan -> downstream royal blue)
+        float flowT = clamp(vUv.x / 10.0, 0.0, 1.0);
+        vec3 upland = vec3(0.49, 0.83, 0.99);    // #7dd3fc (<25 L/s/km2)
+        vec3 midstream = vec3(0.055, 0.647, 0.914); // #0ea5e9 (25-100)
+        vec3 downstream = vec3(0.114, 0.306, 0.847); // #1d4ed8 (>100)
+        waterCol = flowT < 0.5
+          ? mix(upland, midstream, flowT * 2.0)
+          : mix(midstream, downstream, (flowT - 0.5) * 2.0);
+        // Animated downstream flow pulse bands
+        float pulse = sin(vUv.x * 3.5 - uTime * 5.2) * 0.5 + 0.5;
+        waterCol += vec3(0.45, 0.75, 0.95) * smoothstep(0.65, 1.0, pulse) * 0.42;
+      }
+
+      waterCol += vec3(1.0, 0.98, 0.92) * spec;
+
+      float shoreMask = smoothstep(0.18, 0.03, vDepth);
+      float foamWave = sin(vWorldPos.x * 0.35 + vWorldPos.z * 0.28 - uTime * 3.0) * 0.5 + 0.5;
+      float foam = shoreMask * smoothstep(0.45, 0.95, foamWave) * 0.5;
+      waterCol = mix(waterCol, vec3(0.92, 0.98, 1.0), foam);
+
+      float alpha = uIsCanal > 0.5 ? 0.88 : mix(0.55, 0.86, vDepth);
+      gl_FragColor = vec4(waterCol, clamp(alpha + foam * 0.2, 0.0, 0.94));
+    }
+  `;
+
+  const mat = new THREE.ShaderMaterial({
+    uniforms,
+    vertexShader,
+    fragmentShader,
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide
+  });
+
+  return { mat, uniforms };
+}
+
+function buildThreeScene(mapInstance, gl) {
+  threeOrigin = maplibregl.MercatorCoordinate.fromLngLat(ORIGIN_LNG_LAT, 0);
+  threeScale = threeOrigin.meterInMercatorCoordinateUnits();
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.Camera();
+  camera.matrixAutoUpdate = false;
+
+  const renderer = new THREE.WebGLRenderer({
+    canvas: mapInstance.getCanvas(),
+    context: gl,
+    antialias: true
+  });
+  renderer.autoClear = false;
+  if ("SRGBColorSpace" in THREE) {
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+  } else if ("sRGBEncoding" in THREE) {
+    renderer.outputEncoding = THREE.sRGBEncoding;
+  }
+
+  // Outdoor Studio Lighting Rig
+  const hemiLight = new THREE.HemisphereLight(0xbae6fd, 0x3f3f46, 0.95);
+  scene.add(hemiLight);
+
+  const sunLight = new THREE.DirectionalLight(0xfff4e0, 1.85);
+  sunLight.position.set(180, 260, 140);
+  scene.add(sunLight);
+
+  const rimLight = new THREE.DirectionalLight(0x93c5fd, 0.45);
+  rimLight.position.set(-150, 120, -140);
+  scene.add(rimLight);
+
+  const { mapTex: soilTex, bumpTex: soilBump } = createSoilTextures();
+  const furrowBump = createFurrowTexture();
+
+  const soilMat = new THREE.MeshStandardMaterial({
+    map: soilTex,
+    bumpMap: soilBump,
+    bumpScale: 0.45,
+    roughness: 0.85,
+    metalness: 0.04,
+    side: THREE.DoubleSide
+  });
+
+  // 1. Sculpted 3D Farm Parcels + Crop Rows + Instanced Crop Tufts
+  const parcelGroup = new THREE.Group();
+  const cropTuftPositions = [];
+
+  appData.plots.features.forEach((feat, idx) => {
+    const p = feat.properties;
+    const ring = feat.geometry.coordinates[0];
+    const corners = [ring[0], ring[1], ring[2], ring[3]].map((c) => lngLatToLocalMeters(c));
+
+    // 3D 30m Risk Grid Cover + Plowed Furrow Relief
+    const cropGeom = buildFurrowedParcelGeometry(corners, p.current_crop);
+    const riskGridTex = createRiskGridTexture(p.risk_class);
+    const cropMat = new THREE.MeshStandardMaterial({
+      map: riskGridTex,
+      bumpMap: furrowBump,
+      bumpScale: 0.35,
+      roughness: 0.72,
+      metalness: 0.04,
+      transparent: true,
+      opacity: 0.76,
+      side: THREE.DoubleSide
+    });
+    const cropMesh = new THREE.Mesh(cropGeom, cropMat);
+    parcelGroup.add(cropMesh);
+
+    // Sculpted 3D Earthen Bunds
+    const bundH = p.risk_class === "high" ? 2.6 : p.risk_class === "watch" ? 2.2 : 1.9;
+    const bundGeom = buildEarthenBundGeometry(corners, bundH);
+    const bundMesh = new THREE.Mesh(bundGeom, soilMat);
+    parcelGroup.add(bundMesh);
+
+    // Subtle Risk-Status Inner Bevel Illumination (elevated 1.2m to avoid z-fighting)
+    const statusHex =
+      p.risk_class === "high" ? 0xef4444 : p.risk_class === "watch" ? 0xf59e0b : 0x10b981;
+    const bevelGeom = buildInnerBevelRibbonGeometry(corners, 1.2, 1.2, 2.2);
+    const bevelMat = new THREE.MeshStandardMaterial({
+      color: statusHex,
+      emissive: statusHex,
+      emissiveIntensity: 0.55,
+      roughness: 0.45,
+      transparent: true,
+      opacity: 0.85,
+      side: THREE.DoubleSide
+    });
+    parcelGroup.add(new THREE.Mesh(bevelGeom, bevelMat));
+
+    // Selection Halo Ring
+    const selGeom = buildInnerBevelRibbonGeometry(corners, -1.8, bundH + 0.15, 2.4);
+    const selMat = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: p.plot_id === selectedPlotId ? 0.92 : 0.0,
+      side: THREE.DoubleSide
+    });
+    const selMesh = new THREE.Mesh(selGeom, selMat);
+    parcelGroup.add(selMesh);
+    threeState.selectionMeshes[p.plot_id] = selMesh;
+
+    // Collect InstancedMesh crop tuft positions along furrow ridges
+    const rows = 12;
+    const cols = 12;
+    for (let r = 1; r < rows; r++) {
+      const v = r / rows;
+      for (let c = 1; c < cols; c++) {
+        const u = c / cols;
+        const jU = u + (seededRand(idx * 500 + r * 20 + c) - 0.5) * 0.04;
+        const jV = v + (seededRand(idx * 500 + r * 20 + c + 9) - 0.5) * 0.03;
+        const x =
+          (1 - jU) * (1 - jV) * corners[0].x +
+          jU * (1 - jV) * corners[1].x +
+          jU * jV * corners[2].x +
+          (1 - jU) * jV * corners[3].x;
+        const z =
+          (1 - jU) * (1 - jV) * corners[0].z +
+          jU * (1 - jV) * corners[1].z +
+          jU * jV * corners[2].z +
+          (1 - jU) * jV * corners[3].z;
+        cropTuftPositions.push({
+          x,
+          y: 0.35,
+          z,
+          scale: 0.8 + seededRand(idx * 300 + r * 17 + c) * 0.65,
+          rotY: seededRand(r * 31 + c) * Math.PI * 2,
+          color: p.current_crop.includes("Corn") ? 0x65a30d : 0x4d7c0f
+        });
+      }
+    }
+  });
+
+  // InstancedMesh for 3D Crop Clusters swaying in storm wind
+  const tuftGeom = new THREE.ConeGeometry(1.5, 4.2, 5);
+  tuftGeom.translate(0, 2.1, 0);
+  const tuftMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.78,
+    metalness: 0.02
+  });
+  tuftMat.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = threeState.cropUniforms.uTime;
+    shader.uniforms.uWind = threeState.cropUniforms.uWind;
+    shader.vertexShader =
+      `uniform float uTime;\nuniform float uWind;\n` + shader.vertexShader;
+    shader.vertexShader = shader.vertexShader.replace(
+      "#include <begin_vertex>",
+      `
+      #include <begin_vertex>
+      float swayFactor = clamp(position.y / 4.2, 0.0, 1.0);
+      float phase = instanceMatrix[3][0] * 0.08 + instanceMatrix[3][2] * 0.08;
+      transformed.x += sin(uTime * 2.8 + phase) * 0.55 * swayFactor * uWind;
+      transformed.z += cos(uTime * 2.2 + phase * 1.3) * 0.3 * swayFactor * uWind;
+      `
+    );
+  };
+
+  const instancedCrops = new THREE.InstancedMesh(tuftGeom, tuftMat, cropTuftPositions.length);
+  const dummy = new THREE.Object3D();
+  const cObj = new THREE.Color();
+  cropTuftPositions.forEach((pt, i) => {
+    dummy.position.set(pt.x, pt.y, pt.z);
+    dummy.rotation.set(0, pt.rotY, 0);
+    dummy.scale.set(pt.scale, pt.scale, pt.scale);
+    dummy.updateMatrix();
+    instancedCrops.setMatrixAt(i, dummy.matrix);
+    cObj.setHex(pt.color);
+    instancedCrops.setColorAt(i, cObj);
+  });
+  instancedCrops.instanceMatrix.needsUpdate = true;
+  if (instancedCrops.instanceColor) instancedCrops.instanceColor.needsUpdate = true;
+  parcelGroup.add(instancedCrops);
+  scene.add(parcelGroup);
+
+  // 2. Sculpted 3D Carved Drainage Canal + Animated Water
+  const { mat: canalWaterMat, uniforms: canalWaterUniforms } = createPhysicalWaterMaterial(true);
+  const corridorCoords = appData.drainage_corridor.features[0].geometry.coordinates;
+  const { group: canalGroup, canalWater } = buildDrainageCanalMeshes(corridorCoords, soilMat, canalWaterMat);
+  scene.add(canalGroup);
+
+  // 3. Subdivided 128x128 Physical Floodwater Surface Mesh (Clipped to PL-01, PL-02, lower PL-03 basin)
+  const basinMin = lngLatToLocalMeters([123.1920, 13.6194]);
+  const basinMax = lngLatToLocalMeters([123.2022, 13.6156]);
+  const basinW = Math.abs(basinMax.x - basinMin.x);
+  const basinH = Math.abs(basinMax.z - basinMin.z);
+  const basinCenterX = (basinMin.x + basinMax.x) * 0.5;
+  const basinCenterZ = (basinMin.z + basinMax.z) * 0.5;
+
+  const waterGeom = new THREE.PlaneGeometry(basinW, basinH, 96, 96);
+  waterGeom.rotateX(-Math.PI / 2);
+  const { mat: waterMat, uniforms: waterUniforms } = createPhysicalWaterMaterial(false);
+  const waterMesh = new THREE.Mesh(waterGeom, waterMat);
+  waterMesh.position.set(basinCenterX, 0, basinCenterZ);
+  scene.add(waterMesh);
+
+  // 4. 3D C-Band SAR Backscatter Wireframe Relief (No flat 2D boxes)
+  const sarGroup = new THREE.Group();
+  const sarUniforms = {
+    uTime: { value: 0 },
+    uMode: { value: 1.0 }
+  };
+  const sarGeom = new THREE.PlaneGeometry(basinW * 1.45, basinH * 1.25, 42, 24);
+  sarGeom.rotateX(-Math.PI / 2);
+  const sarMat = new THREE.ShaderMaterial({
+    uniforms: sarUniforms,
+    wireframe: true,
+    transparent: true,
+    depthWrite: false,
+    vertexShader: `
+      uniform float uTime;
+      uniform float uMode;
+      varying float vElev;
+      void main() {
+        vec3 p = position;
+        float wave = sin(p.x * 0.03 + uTime * 1.6) * cos(p.z * 0.04 - uTime * 1.2);
+        p.y = 4.5 + (uMode > 0.5 ? 2.4 * wave : 1.0 * wave);
+        vElev = wave * 0.5 + 0.5;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float uMode;
+      varying float vElev;
+      void main() {
+        vec3 preCol = mix(vec3(0.58, 0.64, 0.72), vec3(0.95, 0.75, 0.35), vElev);
+        vec3 postCol = mix(vec3(0.03, 0.57, 0.70), vec3(0.40, 0.91, 0.98), vElev);
+        vec3 col = mix(preCol, postCol, uMode);
+        gl_FragColor = vec4(col, uMode > 0.5 ? 0.42 : 0.28);
+      }
+    `
+  });
+  const sarMesh = new THREE.Mesh(sarGeom, sarMat);
+  sarMesh.position.set(basinCenterX + 120, 0, basinCenterZ);
+  sarGroup.add(sarMesh);
+  sarGroup.visible = false;
+  scene.add(sarGroup);
+
+  scene.traverse((obj) => {
+    obj.frustumCulled = false;
+  });
+
+  threeState.ready = true;
+  threeState.scene = scene;
+  threeState.camera = camera;
+  threeState.renderer = renderer;
+  threeState.sunLight = sunLight;
+  threeState.hemiLight = hemiLight;
+  threeState.parcelGroup = parcelGroup;
+  threeState.canalGroup = canalGroup;
+  threeState.sarGroup = sarGroup;
+  threeState.waterMesh = waterMesh;
+  threeState.canalWaterMesh = canalWater;
+  threeState.waterUniforms = waterUniforms;
+  threeState.canalWaterUniforms = canalWaterUniforms;
+  threeState.sarUniforms = sarUniforms;
+}
+
+function updateThreeSelectedPlot(plotId) {
+  Object.entries(threeState.selectionMeshes).forEach(([id, mesh]) => {
+    if (mesh && mesh.material) {
+      mesh.material.opacity = id === plotId ? 0.92 : 0.0;
+    }
+  });
+}
+>>>>>>> 2e80ca5 (Implement 3D WebGL water shader, PBR parcel models, and refined SAR animations)
 
 async function initApp() {
   const res = await fetch(DATA_SOURCE_URL);
@@ -43,13 +946,19 @@ async function initApp() {
           id: "road-overlay",
           type: "raster",
           source: "osm_labels",
-          paint: { "raster-opacity": 0.22 }
+          paint: { "raster-opacity": 0.0 }
         }
       ]
     },
+<<<<<<< HEAD
     center: mapCenter,
     zoom: 14.8,
     pitch: 52,
+=======
+    center: ORIGIN_LNG_LAT,
+    zoom: 15.0,
+    pitch: 30,
+>>>>>>> 2e80ca5 (Implement 3D WebGL water shader, PBR parcel models, and refined SAR animations)
     bearing: -12,
     attributionControl: { compact: true }
   });
@@ -60,99 +969,73 @@ async function initApp() {
   });
 
   map.on("load", () => {
-    // 1. SAR Backscatter Comparison Source
-    map.addSource("sar-source", {
-      type: "geojson",
-      data: appData.sar_backscatter_comparison.after_event
-    });
+    const threeCustomLayer = {
+      id: "fieldshift-3d-world",
+      type: "custom",
+      renderingMode: "3d",
+      onAdd: function (mapInstance, gl) {
+        console.log("FieldShift 3D WebGL Layer initialized. THREE.REVISION:", THREE.REVISION);
+        buildThreeScene(mapInstance, gl);
+      },
+      render: function (gl, matrix) {
+        if (!threeState.ready) return;
 
-    map.addLayer({
-      id: "sar-layer",
-      type: "fill",
-      source: "sar-source",
-      layout: { visibility: "none" },
-      paint: {
-        "fill-color": "#06b6d4",
-        "fill-opacity": 0.38
+        const nowSec = performance.now() * 0.001;
+        threeState.currentWaterLevel +=
+          (threeState.targetWaterLevel - threeState.currentWaterLevel) * 0.06;
+
+        threeState.waterUniforms.uTime.value = nowSec;
+        threeState.waterUniforms.uWaterLevel.value = threeState.currentWaterLevel;
+        threeState.canalWaterUniforms.uTime.value = nowSec;
+        threeState.canalWaterUniforms.uWaterLevel.value = Math.max(0.18, threeState.currentWaterLevel);
+        threeState.cropUniforms.uTime.value = nowSec;
+        threeState.sarUniforms.uTime.value = nowSec;
+
+        const camCenter = map.getCenter();
+        const camCenterLocal = lngLatToLocalMeters([camCenter.lng, camCenter.lat]);
+        const pitchRad = (map.getPitch() * Math.PI) / 180;
+        const bearingRad = (map.getBearing() * Math.PI) / 180;
+        const camDist = 600 * Math.pow(2, 15 - map.getZoom());
+        const camLocal = new THREE.Vector3(
+          camCenterLocal.x - Math.sin(bearingRad) * Math.sin(pitchRad) * camDist,
+          Math.max(40, Math.cos(pitchRad) * camDist),
+          camCenterLocal.z + Math.cos(bearingRad) * Math.sin(pitchRad) * camDist
+        );
+        threeState.waterUniforms.uCamPos.value.copy(camLocal);
+        threeState.canalWaterUniforms.uCamPos.value.copy(camLocal);
+
+        const m = new THREE.Matrix4().fromArray(matrix);
+        const l = new THREE.Matrix4()
+          .makeTranslation(threeOrigin.x, threeOrigin.y, threeOrigin.z)
+          .scale(new THREE.Vector3(threeScale, -threeScale, threeScale))
+          .multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2));
+
+        threeState.camera.projectionMatrix = m.multiply(l);
+        threeState.camera.projectionMatrixInverse
+          .copy(threeState.camera.projectionMatrix)
+          .invert();
+        threeState.renderer.resetState();
+        threeState.renderer.render(threeState.scene, threeState.camera);
+        map.triggerRepaint();
       }
-    });
+    };
 
-    // 2. NASADEM Runoff Corridor Line
-    map.addSource("corridor-source", {
-      type: "geojson",
-      data: appData.drainage_corridor
-    });
-
-    map.addLayer({
-      id: "corridor-line",
-      type: "line",
-      source: "corridor-source",
-      paint: {
-        "line-color": "#38bdf8",
-        "line-width": 4,
-        "line-opacity": 0.85
-      }
-    });
-
-    // 3. Farm Plots Risk Layer
     map.addSource("plots-source", {
       type: "geojson",
       data: appData.plots
     });
 
     map.addLayer({
-      id: "plots-fill",
+      id: "plots-hit-target",
       type: "fill",
       source: "plots-source",
       paint: {
-        "fill-color": [
-          "match",
-          ["get", "risk_class"],
-          "high", "#ef4444",
-          "watch", "#f59e0b",
-          "low", "#10b981",
-          "#64748b"
-        ],
-        "fill-opacity": 0.52
+        "fill-color": "#000000",
+        "fill-opacity": 0.01
       }
     });
 
-    map.addLayer({
-      id: "plots-outline",
-      type: "line",
-      source: "plots-source",
-      paint: {
-        "line-color": "#ffffff",
-        "line-width": 2
-      }
-    });
-
-    // 4. Observed SAR Flood Extent Mask
-    map.addSource("flood-source", {
-      type: "geojson",
-      data: appData.observed_flood_extent
-    });
-
-    map.addLayer({
-      id: "flood-fill",
-      type: "fill",
-      source: "flood-source",
-      paint: {
-        "fill-color": "#3b82f6",
-        "fill-opacity": 0.42
-      }
-    });
-
-    map.addLayer({
-      id: "flood-outline",
-      type: "line",
-      source: "flood-source",
-      paint: {
-        "line-color": "#93c5fd",
-        "line-width": 2.5,
-        "line-dasharray": [2, 2]
-      }
-    });
+    map.addLayer(threeCustomLayer);
 
     // Add Floating Pill Markers Above Each Parcel
     appData.plots.features.forEach((feat) => {
@@ -172,13 +1055,22 @@ async function initApp() {
       new maplibregl.Marker({ element: el }).setLngLat(coords).addTo(map);
     });
 
-    map.on("click", "plots-fill", (e) => {
+    map.on("click", "plots-hit-target", (e) => {
       if (e.features && e.features[0]) {
         const clickedId = e.features[0].properties.plot_id;
         const fullFeat = appData.plots.features.find((f) => f.properties.plot_id === clickedId);
         if (fullFeat) selectPlot(fullFeat);
       }
     });
+
+    map.on("mouseenter", "plots-hit-target", () => {
+      map.getCanvas().style.cursor = "pointer";
+    });
+    map.on("mouseleave", "plots-hit-target", () => {
+      map.getCanvas().style.cursor = "";
+    });
+
+    startMapAnimations();
   });
 
   populateLeftPanel();
@@ -242,25 +1134,46 @@ function populateLeftPanel() {
     `Future work (cut from 12h build): ${prov.future_work_datasets.join(", ")}.`;
 }
 
+function closeRiskPopover() {
+  const riskBtn = document.getElementById("btn-risk-popover");
+  const riskPopover = document.getElementById("risk-symbology-popover");
+  if (riskPopover && !riskPopover.classList.contains("hidden")) {
+    riskPopover.classList.add("hidden");
+  }
+  if (riskBtn) {
+    riskBtn.setAttribute("aria-expanded", "false");
+  }
+}
+
 function selectPlot(feat, fly = true) {
   const p = feat.properties;
+  selectedPlotId = p.plot_id;
+  closeRiskPopover();
+
+  updateThreeSelectedPlot(selectedPlotId);
+
   const inspect = document.getElementById("inspect-card");
   inspect.classList.remove("hidden");
 
   document.getElementById("inspect-title").textContent = `${p.plot_id} · ${p.barangay}`;
-  document.getElementById("inspect-meta").textContent =
-    `${p.hectares} ha · ${p.current_crop} · ΔSAR ${p.sar_wetness_change_db} dB`;
+  document.getElementById("inspect-meta").innerHTML = `
+    <span>${p.hectares} ha</span>
+    <span class="meta-dot" aria-hidden="true">·</span>
+    <span>${p.current_crop}</span>
+    <span class="meta-dot" aria-hidden="true">·</span>
+    <span>ΔSAR ${p.sar_wetness_change_db} dB</span>
+  `;
 
   const badge = document.getElementById("inspect-risk-badge");
   badge.className = `risk-tag ${p.risk_class}`;
-  badge.textContent = `${p.risk_class.toUpperCase()} DROWNING RISK (${p.risk_score}/100)`;
+  badge.innerHTML = `<span class="risk-dot" aria-hidden="true"></span><span>${p.risk_class.toUpperCase()} DROWNING RISK · ${p.risk_score}/100</span>`;
 
   document.getElementById("inspect-twi").textContent = `TWI: ${p.twi_value}`;
   document.getElementById("inspect-action").textContent = p.plain_language_action;
 
   const sms = p.sms_alert.slice(0, 160);
   document.getElementById("inspect-sms-text").textContent = sms;
-  document.getElementById("sms-counter").textContent = `${sms.length} / 160 chars`;
+  document.getElementById("sms-counter").textContent = `${sms.length}/160 CHARS`;
 
   document.querySelectorAll(".step-node").forEach((node) => {
     const isSelected = node.dataset.id === p.plot_id;
@@ -332,11 +1245,16 @@ function bindUIEvents() {
   });
 
   document.getElementById("btn-open-sms").addEventListener("click", () => {
+    closeRiskPopover();
     document.getElementById("inspect-card").classList.remove("hidden");
   });
 
-  document.getElementById("btn-bell").addEventListener("click", () => {
-    document.getElementById("inspect-card").classList.toggle("hidden");
+  document.getElementById("btn-bell").addEventListener("click", (e) => {
+    e.stopPropagation();
+    const inspect = document.getElementById("inspect-card");
+    const willOpen = inspect.classList.contains("hidden");
+    if (willOpen) closeRiskPopover();
+    inspect.classList.toggle("hidden", !willOpen);
   });
 
   document.getElementById("btn-close-inspect").addEventListener("click", () => {
@@ -376,15 +1294,17 @@ function bindUIEvents() {
 
   // Layer Checkboxes
   document.getElementById("chk-risk").addEventListener("change", (e) => {
-    const v = e.target.checked ? "visible" : "none";
-    map.setLayoutProperty("plots-fill", "visibility", v);
-    map.setLayoutProperty("plots-outline", "visibility", v);
+    threeState.showParcels = e.target.checked;
+    if (threeState.parcelGroup) {
+      threeState.parcelGroup.visible = e.target.checked;
+    }
   });
 
   document.getElementById("chk-flood").addEventListener("change", (e) => {
-    const v = e.target.checked ? "visible" : "none";
-    map.setLayoutProperty("flood-fill", "visibility", v);
-    map.setLayoutProperty("flood-outline", "visibility", v);
+    threeState.showFlood = e.target.checked;
+    if (threeState.waterMesh) {
+      threeState.waterMesh.visible = e.target.checked;
+    }
     const dockFlood = document.getElementById("dock-flood");
     if (dockFlood) {
       dockFlood.classList.toggle("active", e.target.checked);
@@ -393,7 +1313,10 @@ function bindUIEvents() {
   });
 
   document.getElementById("chk-flow").addEventListener("change", (e) => {
-    map.setLayoutProperty("corridor-line", "visibility", e.target.checked ? "visible" : "none");
+    threeState.showCorridor = e.target.checked;
+    if (threeState.canalGroup) {
+      threeState.canalGroup.visible = e.target.checked;
+    }
   });
 
   // SAR Before/After Mini Switcher
@@ -417,12 +1340,21 @@ function bindUIEvents() {
 
   slider.addEventListener("input", (e) => {
     const idx = Number(e.target.value);
+    timelineStage = idx;
     document.querySelectorAll(".scrubber-labels span").forEach((el, i) => {
       el.classList.toggle("active", i === idx);
     });
     document.getElementById("stage-clock").textContent = stages[idx].clock;
     document.getElementById("stage-sub").textContent = stages[idx].sub;
     setSarMode(stages[idx].sar);
+
+    if (idx === 2) {
+      const chkFlood = document.getElementById("chk-flood");
+      if (chkFlood && !chkFlood.checked) {
+        chkFlood.checked = true;
+        chkFlood.dispatchEvent(new Event("change"));
+      }
+    }
     if (idx === 4) document.querySelector('[data-drawer="rotations"]').click();
   });
 
@@ -472,18 +1404,16 @@ function bindUIEvents() {
     document.getElementById("btn-reset-bounds").click();
   });
 
-  // Field Drowning Risk Symbology Popover
+  // Field Drowning Risk Symbology Popover (mutually exclusive with #inspect-card)
   const riskBtn = document.getElementById("btn-risk-popover");
   const riskPopover = document.getElementById("risk-symbology-popover");
   if (riskBtn && riskPopover) {
-    const closeRiskPopover = () => {
-      riskPopover.classList.add("hidden");
-      riskBtn.setAttribute("aria-expanded", "false");
-    };
-
     riskBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       const willOpen = riskPopover.classList.contains("hidden");
+      if (willOpen) {
+        document.getElementById("inspect-card").classList.add("hidden");
+      }
       riskPopover.classList.toggle("hidden", !willOpen);
       riskBtn.setAttribute("aria-expanded", String(willOpen));
     });
@@ -506,6 +1436,7 @@ function bindUIEvents() {
 }
 
 function setSarMode(mode) {
+  sarMode = mode;
   document.querySelectorAll(".mini-btn").forEach((b) => {
     b.classList.toggle("active", b.dataset.sar === mode);
   });
@@ -516,18 +1447,164 @@ function setSarMode(mode) {
     dockSar.setAttribute("aria-pressed", String(isActive));
   }
 
-  if (!map || !map.getSource("sar-source")) return;
-  if (mode === "off") {
-    map.setLayoutProperty("sar-layer", "visibility", "none");
-  } else {
-    const data =
-      mode === "before"
-        ? appData.sar_backscatter_comparison.before_event
-        : appData.sar_backscatter_comparison.after_event;
-    map.getSource("sar-source").setData(data);
-    map.setPaintProperty("sar-layer", "fill-color", mode === "before" ? "#94a3b8" : "#06b6d4");
-    map.setLayoutProperty("sar-layer", "visibility", "visible");
+  if (threeState.sarGroup) {
+    if (mode === "off") {
+      threeState.sarGroup.visible = false;
+      sarSweepProgress = 0;
+    } else {
+      threeState.sarGroup.visible = true;
+      if (threeState.sarUniforms) {
+        threeState.sarUniforms.uMode.value = mode === "before" ? 0.0 : 1.0;
+      }
+      sarSweepProgress = mode === "after" ? 0.01 : 0;
+    }
   }
+}
+
+function startMapAnimations() {
+  if (mapAnimFrame) {
+    cancelAnimationFrame(mapAnimFrame);
+    mapAnimFrame = null;
+  }
+
+  const canvas = document.getElementById("fx-overlay");
+  const ctx = canvas ? canvas.getContext("2d") : null;
+  let cssWidth = 0;
+  let cssHeight = 0;
+
+  const resizeCanvas = () => {
+    if (!canvas || !ctx) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cssWidth = canvas.clientWidth || window.innerWidth;
+    cssHeight = canvas.clientHeight || window.innerHeight;
+    canvas.width = Math.round(cssWidth * dpr);
+    canvas.height = Math.round(cssHeight * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  };
+
+  if (canvas && ctx) {
+    resizeCanvas();
+    if (!canvas.dataset.resizeBound) {
+      window.addEventListener("resize", resizeCanvas);
+      canvas.dataset.resizeBound = "true";
+    }
+  }
+
+  const rainDrops = Array.from({ length: 90 }, () => ({
+    x: Math.random(),
+    y: Math.random(),
+    len: 10 + Math.random() * 14,
+    speed: 0.008 + Math.random() * 0.009
+  }));
+
+  let lastAppliedStage = -1;
+
+  const tick = () => {
+    if (lastAppliedStage !== timelineStage) {
+      lastAppliedStage = timelineStage;
+      if (timelineStage === 0 || timelineStage === 4) {
+        threeState.targetWaterLevel = 0.0;
+        threeState.cropUniforms.uWind.value = 0.22;
+        if (threeState.sunLight) {
+          threeState.sunLight.intensity = 2.1;
+          threeState.sunLight.color.setHex(0xfff4e0);
+        }
+        if (threeState.hemiLight) threeState.hemiLight.intensity = 1.0;
+      } else if (timelineStage === 1) {
+        threeState.targetWaterLevel = 0.25;
+        threeState.cropUniforms.uWind.value = 0.65;
+        if (threeState.sunLight) {
+          threeState.sunLight.intensity = 1.05;
+          threeState.sunLight.color.setHex(0xcbd5e1);
+        }
+        if (threeState.hemiLight) threeState.hemiLight.intensity = 1.15;
+      } else if (timelineStage === 2) {
+        threeState.targetWaterLevel = 1.0;
+        threeState.cropUniforms.uWind.value = 1.0;
+        if (threeState.sunLight) {
+          threeState.sunLight.intensity = 1.45;
+          threeState.sunLight.color.setHex(0xe2e8f0);
+        }
+        if (threeState.hemiLight) threeState.hemiLight.intensity = 0.95;
+        if (sarSweepProgress === 0) sarSweepProgress = 0.01;
+      } else if (timelineStage === 3) {
+        threeState.targetWaterLevel = 0.45;
+        threeState.cropUniforms.uWind.value = 0.35;
+        if (threeState.sunLight) {
+          threeState.sunLight.intensity = 1.75;
+          threeState.sunLight.color.setHex(0xfef3c7);
+        }
+        if (threeState.hemiLight) threeState.hemiLight.intensity = 1.0;
+      }
+    }
+
+    // Render Orbital SAR Scan Sweep & Storm Rain Canvas (#fx-overlay)
+    if (ctx && cssWidth > 0 && cssHeight > 0) {
+      ctx.clearRect(0, 0, cssWidth, cssHeight);
+
+      // Rain streaks only on Post-Storm SAR (timelineStage === 2)
+      if (timelineStage === 2) {
+        ctx.strokeStyle = "rgba(224, 242, 254, 0.22)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let i = 0; i < rainDrops.length; i++) {
+          const drop = rainDrops[i];
+          drop.y += drop.speed * 1.15;
+          drop.x -= drop.speed * 0.24;
+          if (drop.y > 1.05) {
+            drop.y = -0.05;
+            drop.x = Math.random() * 1.15;
+          }
+          if (drop.x < -0.05) {
+            drop.x = 1.05;
+          }
+          const px = drop.x * cssWidth;
+          const py = drop.y * cssHeight;
+          ctx.moveTo(px, py);
+          ctx.lineTo(px - drop.len * 0.24, py + drop.len);
+        }
+        ctx.stroke();
+      }
+
+      // Soft feathered SAR radar beam confined to pilot bounding box
+      if (sarSweepProgress > 0 && map) {
+        const pNW = map.project([123.1912, 13.6215]);
+        const pSE = map.project([123.2102, 13.6152]);
+        const minX = Math.max(0, Math.min(pNW.x, pSE.x) - 24);
+        const maxX = Math.min(cssWidth, Math.max(pNW.x, pSE.x) + 24);
+        const minY = Math.min(pNW.y, pSE.y) - 20;
+        const maxY = Math.max(pNW.y, pSE.y) + 20;
+        const boxW = Math.max(0, maxX - minX);
+        const boxH = Math.max(0, maxY - minY);
+
+        if (boxW > 10 && boxH > 10) {
+          const sweepY = minY + sarSweepProgress * boxH;
+          const beam = ctx.createLinearGradient(0, sweepY - 22, 0, sweepY + 22);
+          beam.addColorStop(0, "rgba(56, 189, 248, 0)");
+          beam.addColorStop(0.5, "rgba(56, 189, 248, 0.14)");
+          beam.addColorStop(1, "rgba(56, 189, 248, 0)");
+          ctx.fillStyle = beam;
+          ctx.fillRect(minX, sweepY - 22, boxW, 44);
+
+          ctx.strokeStyle = "rgba(125, 211, 252, 0.45)";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(minX, sweepY);
+          ctx.lineTo(maxX, sweepY);
+          ctx.stroke();
+        }
+
+        sarSweepProgress += 0.011;
+        if (sarSweepProgress > 1.05) {
+          sarSweepProgress = 0;
+        }
+      }
+    }
+
+    mapAnimFrame = requestAnimationFrame(tick);
+  };
+
+  mapAnimFrame = requestAnimationFrame(tick);
 }
 
 initApp();
