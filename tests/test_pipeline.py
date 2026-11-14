@@ -61,3 +61,23 @@ def test_pipeline_outputs_real_data_from_cache():
     pv = out["provenance"]
     assert pv["data_mode"] == "real"
     assert len(out["plots"]["features"]) == 5
+
+
+def test_pixel_classes_hit_rate_and_shares():
+    score = np.array([[80.0, 69.6, 50.0], [39.4, np.nan, 10.0]])
+    cls = R.classify_grid(score)
+    assert cls.tolist() == [[2, 2, 1], [0, -1, 0]]
+    flood = np.array([[True, False, True], [True, True, False]])
+    region = np.ones_like(flood)
+    assert abs(R.pixel_hit_rate(flood, cls, region) - 25.0) < 1e-9  # 1 of 4 flooded cells is high
+    assert R.pixel_hit_rate(np.zeros_like(flood), cls, region) is None
+    sh = R.class_shares(cls, region)
+    assert sh["high_ha"] == round(2 * 0.09, 2) and sh["missing_share"] == round(1 / 6, 3)
+
+
+def test_terrain_only_model_ignores_sar():
+    twi = np.full((2, 2), 12.0)
+    g1 = R.risk_grids(np.full((2, 2), -4.0), twi, 1.0)
+    g2 = R.risk_grids(np.full((2, 2), +2.0), twi, 1.0)
+    assert np.allclose(g1["terrain_score"], g2["terrain_score"])
+    assert (g1["score"] > g2["score"]).all()

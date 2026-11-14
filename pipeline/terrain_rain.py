@@ -240,6 +240,7 @@ def run(refresh: bool = False, write: bool = True) -> dict:
     }
     if write:
         C.write_json(OUTPUT, output)
+    output["_grids"] = {"twi": twi_grid, "slope_deg": beta}  # for the risk engine; not written
     return output
 
 

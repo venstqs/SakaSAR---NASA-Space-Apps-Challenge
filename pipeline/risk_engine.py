@@ -15,7 +15,9 @@ from __future__ import annotations
 import argparse
 import json
 import time
+from collections import defaultdict
 
+import numpy as np
 from shapely.geometry import shape
 from shapely.ops import unary_union
 
@@ -36,6 +38,49 @@ def risk_score(s_sar: float, s_twi: float, s_rain: float) -> int:
 
 def risk_class(score: int) -> str:
     return "high" if score >= 70 else "watch" if score >= 40 else "low"
+
+
+CLASS_CODES = {"missing": -1, "low": 0, "watch": 1, "high": 2}
+
+
+def classify_grid(score: np.ndarray) -> np.ndarray:
+    """Per-pixel class codes: 2 high, 1 watch, 0 low, -1 missing data (NaN score)."""
+    out = np.where(score >= 69.5, 2, np.where(score >= 39.5, 1, 0))  # matches round() then threshold
+    return np.where(np.isfinite(score), out, -1).astype(np.int8)
+
+
+def risk_grids(d_vv_db: np.ndarray, twi_grid: np.ndarray, s_rain_value: float) -> dict:
+    """Full model and a terrain+rain-only model (no SAR) on the shared 30 m grid.
+
+    The terrain-only model is what makes the hit rate a real test: it predicts flooding
+    without looking at the radar, so comparing it with the SAR flood mask is not circular.
+    """
+    s_sar_px = np.clip(-d_vv_db / 4.0, 0.0, 1.0)  # NaN where SAR is missing
+    s_twi_px = np.clip((twi_grid - 5.0) / 10.0, 0.0, 1.0)
+    full = 100 * (W_SAR * s_sar_px + W_TWI * s_twi_px + W_RAIN * s_rain_value)
+    terrain_only = 100 * (W_TWI * s_twi_px + W_RAIN * s_rain_value) / (W_TWI + W_RAIN)
+    return {"score": full, "class": classify_grid(full),
+            "terrain_score": terrain_only, "terrain_class": classify_grid(terrain_only)}
+
+
+def pixel_hit_rate(flood: np.ndarray, cls: np.ndarray, region: np.ndarray) -> float | None:
+    """Share (%) of SAR-flooded cells in `region` that the risk map rated high."""
+    flooded = flood & region
+    n = int(flooded.sum())
+    if n == 0:
+        return None
+    return 100.0 * int((flooded & (cls == 2)).sum()) / n
+
+
+def class_shares(cls: np.ndarray, mask: np.ndarray) -> dict:
+    cell_ha = C.CELL * C.CELL / 10_000
+    n = int(mask.sum())
+    out = {}
+    for name, code in CLASS_CODES.items():
+        k = int((cls[mask] == code).sum())
+        out[f"{name}_ha"] = round(k * cell_ha, 2)
+        out[f"{name}_share"] = round(k / n, 3) if n else 0.0
+    return out
 
 
 def hit_rate(flood_geoms_wgs: list, high_plot_geoms_wgs: list) -> tuple[float | None, float]:
@@ -107,6 +152,9 @@ def run(refresh: bool = False) -> dict:
     rain = terr["rainfall"]
     sar_by_id = {p["plot_id"]: p for p in sar["plots"]}
     terr_by_id = {p["plot_id"]: p for p in terr["plots"]}
+    g_sar, g_ter = sar.pop("_grids"), terr.pop("_grids")
+    grids = risk_grids(g_sar["d_vv_db"], g_ter["twi"], rain["s_rain"])
+    bbox_mask = C.plot_mask(C.bbox_polygon_wgs())
 
     features, high_geoms = [], []
     for f in C.load_plots():
@@ -135,6 +183,10 @@ def run(refresh: bool = False) -> dict:
             "mean_elevation_m": t["mean_elevation_m"],
             "polygon_area_ha": round(C.to_utm(geom).area / 10_000, 2),
         })
+        pmask = C.plot_mask(geom)
+        shares = class_shares(grids["class"], pmask)
+        p["risk_zone_shares"] = shares
+        p["missing_data_fraction"] = shares["missing_share"]
         ordered = {k: p[k] for k in ("plot_id", "name", "barangay", "hectares", "households", "risk_class",
                                      "risk_score", "sar_wetness_change_db", "twi_value", "current_crop",
                                      "bare_field_days_per_year", "plain_language_action", "sms_alert")}
@@ -144,7 +196,36 @@ def run(refresh: bool = False) -> dict:
             high_geoms.append(geom)
 
     flood_geoms = [shape(ft["geometry"]) for ft in sar["observed_flood_extent"]["features"]]
-    rate, flood_ha = hit_rate(flood_geoms, high_geoms)
+    plot_rate, flood_ha = hit_rate(flood_geoms, high_geoms)
+    rate = pixel_hit_rate(g_sar["flood"], grids["class"], bbox_mask)
+    rate_terrain = pixel_hit_rate(g_sar["flood"], grids["terrain_class"], bbox_mask)
+    fmt = lambda r: f"{r:.0f}%" if r is not None else "n/a"  # noqa: E731
+
+    by_brgy: dict = defaultdict(lambda: {"plots": 0, "high_risk_ha": 0.0, "watch_ha": 0.0,
+                                         "high_risk_households": 0, "scores": []})
+    for ft in features:
+        p = ft["properties"]
+        b = by_brgy[p["barangay"]]
+        b["plots"] += 1
+        b["high_risk_ha"] += p["risk_zone_shares"]["high_ha"]
+        b["watch_ha"] += p["risk_zone_shares"]["watch_ha"]
+        b["high_risk_households"] += p["households"] if p["risk_class"] == "high" else 0
+        b["scores"].append(p["risk_score"])
+    barangay_ranking = sorted(
+        ({"barangay": k, "plots": v["plots"], "high_risk_ha": round(v["high_risk_ha"], 2),
+          "watch_ha": round(v["watch_ha"], 2), "high_risk_households": v["high_risk_households"],
+          "max_risk_score": max(v["scores"])} for k, v in by_brgy.items()),
+        key=lambda r: (-r["high_risk_ha"], -r["watch_ha"], -r["max_risk_score"]))
+    for i, r in enumerate(barangay_ranking, 1):
+        r["rank"] = i
+
+    zone_geoms, zone_props = [], []
+    for name in ("high", "watch"):
+        for g in C.vectorize(grids["class"] == CLASS_CODES[name]):
+            zone_geoms.append(g)
+            zone_props.append({"risk_class": name})
+    risk_zones = C.feature_collection(zone_geoms, zone_props)
+    bbox_shares = class_shares(grids["class"], bbox_mask)
     high = [ft["properties"] for ft in features if ft["properties"]["risk_class"] == "high"]
     sp = sar["provenance"]
     data_modes = {sp["data_mode"], sp["dem"]["data_mode"], rain["data_mode"]}
@@ -157,7 +238,7 @@ def run(refresh: bool = False) -> dict:
         "grid_resolution": "30m Shared Grid",
         "licensing_cost": "₱0 (Open NASA & Copernicus Data)",
         "processing_time": f"{time.perf_counter() - t0:.1f} sec",
-        "sar_hit_rate": f"{rate:.0f}%" if rate is not None else "n/a",
+        "sar_hit_rate": fmt(rate),
         "total_high_risk_ha": round(sum(p["hectares"] for p in high), 1),
         "high_risk_plots": len(high),
         "households_affected": sum(p["households"] for p in high),
@@ -181,8 +262,17 @@ def run(refresh: bool = False) -> dict:
         "sar_scenes": {"before": sp["before_scene"].get("item_id"), "after": sp["after_scene"].get("item_id")},
         "sar_flood_threshold_db": sp["flood_threshold_db"],
         "observed_flood_area_ha": round(flood_ha, 2),
-        "sar_hit_rate_note": ("Hit rate is a consistency check, not independent validation: the flood mask and the "
-                              "risk score both use the same Sentinel-1 ΔVV. It is n/a when the SAR flood mask is empty."),
+        "sar_hit_rate_plots": fmt(plot_rate),
+        "sar_hit_rate_terrain_only": fmt(rate_terrain),
+        "sar_hit_rate_note": ("sar_hit_rate = share of SAR-flooded 30 m cells in the pilot bbox that the full risk map "
+                              "rated high. It shares ΔVV with the flood mask, so it is a consistency check. "
+                              "sar_hit_rate_terrain_only uses a model without SAR (terrain + rain) and is the "
+                              "independent test. sar_hit_rate_plots uses whole-plot classes (CLAUDE.md §3D.3). "
+                              "All are n/a when the SAR flood mask is empty."),
+        "risk_class_thresholds": {"high": ">= 70", "watch": "40-69", "low": "< 40",
+                                  "missing": "no valid SAR pixel (flagged, not scored)"},
+        "pilot_area_class_shares": bbox_shares,
+        "barangay_ranking": barangay_ranking,
         "rainfall": {k: v for k, v in rain.items() if k != "daily_mm"},
         "pending_inputs": ["bare_field_days_per_year", "households", "hectares", "current_crop"],
     }
@@ -194,6 +284,7 @@ def run(refresh: bool = False) -> dict:
         "sar_backscatter_comparison": sar["sar_backscatter_comparison"],
         "drainage_corridor": terr["drainage_corridor"],
         "rotation_strategies": json.loads(ROTATIONS_PATH.read_text(encoding="utf-8")),
+        "risk_zones": risk_zones,
     }
     C.write_json(MOCK_PATH, payload)
     C.write_json(PROCESSED_PATH, payload)
@@ -205,13 +296,18 @@ def main() -> None:
     ap.add_argument("--refresh", action="store_true", help="ignore data/cache and re-download")
     out = run(refresh=ap.parse_args().refresh)
     pv = out["provenance"]
-    print(f"data_mode={pv['data_mode']}  hit_rate={pv['sar_hit_rate']}  flood={pv['observed_flood_area_ha']} ha  "
+    print(f"data_mode={pv['data_mode']}  hit_rate={pv['sar_hit_rate']} (terrain-only {pv['sar_hit_rate_terrain_only']}, "
+          f"plots {pv['sar_hit_rate_plots']})  flood={pv['observed_flood_area_ha']} ha  "
           f"high={pv['high_risk_plots']} plots / {pv['total_high_risk_ha']} ha / {pv['households_affected']} households  "
           f"t={pv['processing_time']}")
     for ft in out["plots"]["features"]:
         p = ft["properties"]
         print(f"  {p['plot_id']}: {p['risk_score']:>3} {p['risk_class']:<5}  S_SAR={p['s_sar']:.2f} S_TWI={p['s_twi']:.2f} "
               f"S_Rain={p['s_rain']:.2f}  ΔVV={p['sar_wetness_change_db']:+.2f} dB  TWI={p['twi_value']}  sms={len(p['sms_alert'])}c")
+    print("Pilot area:", {k: v for k, v in pv["pilot_area_class_shares"].items() if k.endswith("_ha")})
+    for r in pv["barangay_ranking"]:
+        print(f"  #{r['rank']} {r['barangay']}: high {r['high_risk_ha']} ha, watch {r['watch_ha']} ha, "
+              f"{r['high_risk_households']} households")
     print(f"wrote {MOCK_PATH.name} and {PROCESSED_PATH.relative_to(C.ROOT)}")
 
 

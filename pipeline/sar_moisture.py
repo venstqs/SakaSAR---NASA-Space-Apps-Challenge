@@ -27,6 +27,16 @@ COLLECTION = "sentinel-1-rtc"
 BEFORE_ID = "S1A_IW_GRDH_1SDV_20241009T213901_20241009T213930_056031_06DA7E_rtc"
 AFTER_ID = "S1A_IW_GRDH_1SDV_20241021T213901_20241021T213930_056206_06E170_rtc"
 
+# Other passes over the pilot area in the event window, recorded for the provenance panel.
+OTHER_SCENES = [
+    {"item_id": "S1A_IW_GRDH_1SSV_20241017T095829_20241017T095859_056141_06DED7_rtc",
+     "datetime": "2024-10-17T09:58:44Z", "orbit": "ascending 69", "polarisations": "VV only",
+     "why_not_used": "different orbit geometry and no VH; not directly comparable with the orbit-134 pair"},
+    {"item_id": "S1A_IW_GRDH_1SDV_20241102T213901_20241102T213930_056381_06E85F_rtc",
+     "datetime": "2024-11-02T21:39:15Z", "orbit": "descending 134", "polarisations": "VV+VH",
+     "why_not_used": "12 days after landfall; recession-phase check only"},
+]
+
 LEE_SIZE = 5
 # RTC GRD-IW has ENL ≈ 4.4; 3x3 averaging of correlated 10 m pixels roughly quadruples it.
 LEE_LOOKS = 18.0
@@ -192,8 +202,12 @@ def run(refresh: bool = False, write: bool = True) -> dict:
     }
     for k in ("before_scene", "after_scene"):
         output["provenance"][k].pop("grid", None)
+    output["provenance"]["other_scenes_considered"] = OTHER_SCENES
     if write:
         C.write_json(OUTPUT, output)
+    # Raster layers for the risk engine (not written to JSON)
+    output["_grids"] = {"d_vv_db": res["d_vv_db"], "flood": res["flood"],
+                        "sar_valid": np.isfinite(res["d_vv_db"])}
     return output
 
 

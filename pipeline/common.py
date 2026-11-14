@@ -232,12 +232,27 @@ def signed_href(collection: str, href: str) -> str:
     return f"{href}?{_TOKENS[collection]}"
 
 
-def read_to_grid(href: str, resampling: Resampling, grid: Grid = GRID) -> np.ndarray:
-    """Windowed read of a remote COG, reprojected onto the shared 30 m grid (NaN = nodata)."""
+def read_to_grid(href: str, resampling: Resampling, grid: Grid = GRID, attempts: int = 4) -> np.ndarray:
+    """Windowed read of a remote COG, reprojected onto the shared 30 m grid (NaN = nodata).
+    Retries on truncated HTTP tile reads, which Planetary Computer occasionally returns."""
+    import time as _time
+
+    from rasterio.errors import RasterioIOError
+
+    for i in range(attempts):
+        try:
+            return _read_to_grid_once(href, resampling, grid)
+        except RasterioIOError:
+            if i == attempts - 1:
+                raise
+            _time.sleep(2 * (i + 1))
+
+
+def _read_to_grid_once(href: str, resampling: Resampling, grid: Grid) -> np.ndarray:
     import rasterio
 
     with rasterio.Env(GDAL_HTTP_TIMEOUT=str(HTTP_TIMEOUT), GDAL_HTTP_MAX_RETRY="3",
-                      GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR"):
+                      GDAL_HTTP_RETRY_DELAY="2", GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR"):
         with rasterio.open(href) as src:
             b = transform_bounds(grid.crs, src.crs, *grid.bounds, densify_pts=21)
             px = abs(src.res[0]) * 4
