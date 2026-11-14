@@ -10,3 +10,9 @@ terrain_rain/data_interim/
 data/cache_region/
 
 .vercel
+
+# Internal handoff docs and local demo (kept on disk for Claude/Gemini, never published)
+CLAUDE.md
+docs/ANTIGRAVITY.md
+docs/SUBMISSION.md
+assets/demo/
