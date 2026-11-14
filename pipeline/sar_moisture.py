@@ -5,7 +5,12 @@ Implements CLAUDE.md §3A:
 
 Scene pair (same relative orbit 134, descending, so incidence geometry is identical):
   before: 2024-10-09 21:39 UTC  — 12 days before STS Kristine (Trami)
-  after:  2024-10-21 21:39 UTC  — 05:39 PHT on 22 Oct, during the storm's peak rainfall day
+  after:  2024-11-02 21:39 UTC  — calm-weather pass; Bicol River basin floodwater still standing
+
+Why not the storm-day pass (2024-10-21 21:39 UTC = 05:39 PHT 22 Oct): typhoon wind and rain
+roughened every water surface. Across a 35 x 33 km regional scan, permanent water brightened by
++5.3 dB median and only 30% of it still read as water (< −15 dB), so dark-water flood mapping
+fails everywhere in that scene. It stays in provenance as the storm-day example.
 
 Input product: Sentinel-1 RTC (radiometrically terrain-corrected γ⁰, linear power) from
 Microsoft Planetary Computer, averaged from 10 m to the shared 30 m grid in linear units.
@@ -25,16 +30,17 @@ from . import common as C
 
 COLLECTION = "sentinel-1-rtc"
 BEFORE_ID = "S1A_IW_GRDH_1SDV_20241009T213901_20241009T213930_056031_06DA7E_rtc"
-AFTER_ID = "S1A_IW_GRDH_1SDV_20241021T213901_20241021T213930_056206_06E170_rtc"
+AFTER_ID = "S1A_IW_GRDH_1SDV_20241102T213901_20241102T213930_056381_06E85F_rtc"
 
 # Other passes over the pilot area in the event window, recorded for the provenance panel.
 OTHER_SCENES = [
     {"item_id": "S1A_IW_GRDH_1SSV_20241017T095829_20241017T095859_056141_06DED7_rtc",
      "datetime": "2024-10-17T09:58:44Z", "orbit": "ascending 69", "polarisations": "VV only",
      "why_not_used": "different orbit geometry and no VH; not directly comparable with the orbit-134 pair"},
-    {"item_id": "S1A_IW_GRDH_1SDV_20241102T213901_20241102T213930_056381_06E85F_rtc",
-     "datetime": "2024-11-02T21:39:15Z", "orbit": "descending 134", "polarisations": "VV+VH",
-     "why_not_used": "12 days after landfall; recession-phase check only"},
+    {"item_id": "S1A_IW_GRDH_1SDV_20241021T213901_20241021T213930_056206_06E170_rtc",
+     "datetime": "2024-10-21T21:39:15Z", "orbit": "descending 134", "polarisations": "VV+VH",
+     "why_not_used": ("taken at the storm peak (05:39 PHT 22 Oct): wind-roughened water brightened +5.3 dB "
+                      "regionally, so open water is not detectable in this scene")},
 ]
 
 LEE_SIZE = 5

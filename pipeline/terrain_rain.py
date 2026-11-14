@@ -35,7 +35,7 @@ EVENT_START, EVENT_END = "20241021", "20241026"   # STS Kristine (Trami) over Bi
 ANTECEDENT_DAYS = 7
 RAIN_SATURATION_MM = 300.0
 FALLBACK_RAIN_MM = 300.0
-POWER_CACHE = C.CACHE_DIR / "nasa_power_202410.json"
+POWER_CACHE = C.CACHE_DIR / f"nasa_power_202410_{C.CENTER[0]:.4f}_{C.CENTER[1]:.4f}.json"
 OUTPUT = C.DATA_DIR / "terrain_rain_output.json"
 
 # D8 neighbour offsets (row, col) and distances in cell units

@@ -233,7 +233,8 @@ def run(refresh: bool = False) -> dict:
     bdate, adate = (sp["before_scene"].get("datetime") or "")[:10], (sp["after_scene"].get("datetime") or "")[:10]
 
     provenance = {
-        "pilot_area": "Camarines Sur Pilot Farming Cluster (Bicol River Basin)",
+        "pilot_area": C.PILOT_AREA,
+        "map_center": list(C.CENTER),
         "event_reference": f"STS Kristine (Trami) — Oct 21-26, 2024 (Sentinel-1 Pass {adate or 'n/a'})",
         "grid_resolution": "30m Shared Grid",
         "licensing_cost": "₱0 (Open NASA & Copernicus Data)",

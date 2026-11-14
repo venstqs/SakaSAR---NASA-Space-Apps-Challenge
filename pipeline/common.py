@@ -31,8 +31,13 @@ DATA_DIR = ROOT / "data"
 CACHE_DIR = DATA_DIR / "cache"
 PLOTS_PATH = Path(__file__).resolve().parent / "plots.geojson"
 
-BBOX = (123.1912, 13.6152, 123.2102, 13.6215)  # min_lon, min_lat, max_lon, max_lat
-CENTER = (123.2005, 13.6182)
+# Pilot strip: rice paddies in Brgy. Catanusan, Minalabac, Camarines Sur (Bicol River basin).
+# Moved from the original Naga City box, which sits on residential subdivisions where C-band
+# cannot see standing water (see README / provenance). Chosen by a regional scan of the
+# Nov 2 2024 Sentinel-1 pass for >60% cropland, <10% built-up and a visible flood edge.
+BBOX = (123.1963, 13.5384, 123.2151, 13.5448)  # min_lon, min_lat, max_lon, max_lat
+CENTER = (123.2057, 13.5416)
+PILOT_AREA = "Minalabac Pilot Farming Cluster, Camarines Sur (Bicol River Basin)"
 UTM_CRS = "EPSG:32651"
 CELL = 30.0
 # Pad the analysis grid so D8 flow accumulation sees upslope area outside the display bbox.
