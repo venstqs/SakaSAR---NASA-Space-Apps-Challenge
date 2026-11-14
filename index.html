@@ -3,96 +3,246 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Field Shift | SAR Root-Zone Hydrology & Crop Rotation</title>
+  <title>FieldShift 3D | SAR Root-Zone Hydrology & Crop Rotation GIS</title>
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <h1>Field Shift: Agro-Hydrological Decision Support</h1>
-      <p class="subtitle">SAR Surface Wetness &amp; Micro-Topographic Drowning Risk Engine</p>
+  <!-- Full-Screen Map Canvas -->
+  <div id="map"></div>
+
+  <!-- 1. LEFT FLOATING COMMAND CARD (Bulos 3D Style) -->
+  <aside class="floating-card left-panel" id="left-panel">
+    <div class="drag-handle">⋮⋮⋮</div>
+    <div class="brand-header">
+      <button class="icon-btn" id="btn-collapse-left" title="Toggle Panel">☰</button>
+      <div class="brand-logo">🛰️</div>
+      <div class="brand-title-wrap">
+        <span class="brand-title">FieldShift SAR</span>
+        <span class="brand-sub">NASA Space Apps · 30m Grid</span>
+      </div>
+      <button class="icon-btn chevron-btn" id="btn-chevron-left" title="Minimize">⌃</button>
     </div>
-    <span class="badge-mode">MOCK DATA SHELL (HOUR 4 GATE)</span>
+
+    <div id="left-panel-body">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="plot-search" placeholder="Search farm plots, barangays, crops..." />
+      </div>
+
+      <div class="status-summary">
+        <h2 id="headline-status">2 plots at high drowning risk</h2>
+        <p class="timestamp-sub" id="headline-sub">Updated post-storm overpass · C-band surface wetness</p>
+      </div>
+
+      <!-- 2x2 KPI Grid (Impact Deliverables from PDF) -->
+      <div class="kpi-grid">
+        <div class="kpi-item">
+          <div class="kpi-val" id="kpi-ha">6.2 ha</div>
+          <div class="kpi-label">High-risk area (2 plots)</div>
+        </div>
+        <div class="kpi-item">
+          <div class="kpi-val" id="kpi-households">18</div>
+          <div class="kpi-label">Farming households</div>
+        </div>
+        <div class="kpi-item">
+          <div class="kpi-val" id="kpi-hitrate">89%</div>
+          <div class="kpi-label">SAR flood hit rate</div>
+        </div>
+        <div class="kpi-item">
+          <div class="kpi-val" id="kpi-baredays">68 days</div>
+          <div class="kpi-label">Bare-field window/yr</div>
+        </div>
+      </div>
+
+      <!-- Horizontal Plot Stepper ("Along the river" style) -->
+      <div class="corridor-section">
+        <div class="corridor-header">
+          <span>Along the runoff corridor</span>
+          <span class="status-pill-sm danger" id="corridor-badge">Drainage alert</span>
+        </div>
+        <div class="stepper-track" id="plot-stepper"></div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="action-grid">
+        <button class="btn-secondary" id="btn-open-rotation">🌱 Rotation options</button>
+        <button class="btn-primary" id="btn-open-sms">📨 Send SMS alert</button>
+      </div>
+      <button class="btn-full-light" id="btn-reset-bounds">🌐 See all of Pilot Area</button>
+
+      <!-- Bottom Quick-Switch Tabs -->
+      <div class="panel-footer-tabs">
+        <button class="tab-pill active" data-drawer="layers">📑 Layers</button>
+        <button class="tab-pill" data-drawer="rotations">🔄 Rotations</button>
+        <button class="tab-pill" data-drawer="data">📊 Data &amp; Limits</button>
+      </div>
+
+      <!-- Expandable Sub-Drawer inside Left Panel -->
+      <div class="sub-drawer" id="drawer-layers">
+        <label class="layer-check">
+          <input type="checkbox" id="chk-risk" checked />
+          <span>Field Drowning Risk (3-Class Grid)</span>
+        </label>
+        <label class="layer-check">
+          <input type="checkbox" id="chk-flood" checked />
+          <span>Observed SAR Flood Extent Mask</span>
+        </label>
+        <label class="layer-check">
+          <input type="checkbox" id="chk-flow" checked />
+          <span>NASADEM Runoff Corridor</span>
+        </label>
+        <div class="sar-mini-toggle">
+          <span>SAR Scene:</span>
+          <button class="mini-btn active" data-sar="off">Off</button>
+          <button class="mini-btn" data-sar="before">Pre-Storm</button>
+          <button class="mini-btn" data-sar="after">Post-Storm</button>
+        </div>
+      </div>
+
+      <div class="sub-drawer hidden" id="drawer-rotations">
+        <div class="priority-bar">
+          <span>Farmer Priority:</span>
+          <select id="priority-select">
+            <option value="nitrogen">Soil Nitrogen Fixation</option>
+            <option value="water">Water Conservation</option>
+            <option value="cash">Cash Crop Income</option>
+          </select>
+        </div>
+        <div id="rotation-cards-container" class="rotation-stack"></div>
+      </div>
+
+      <div class="sub-drawer hidden" id="drawer-data">
+        <div class="limit-callout">
+          <strong>Scientific Limit:</strong> Wetness layers represent <em>C-band Sentinel-1 surface wetness</em>, not direct root-zone moisture measurements.
+        </div>
+        <div class="meta-kv">
+          <span>Licensing Cost: <strong>₱0 (Open Data)</strong></span>
+          <span>Run Time: <strong>42 sec</strong></span>
+        </div>
+        <ul class="compact-list" id="provenance-list"></ul>
+        <p class="future-work-text" id="future-work-text"></p>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 2. TOP CENTER FLOATING TIMELINE & OVERALL RISK BAR (Bulos 3D Style) -->
+  <header class="floating-card top-timeline-bar">
+    <button class="play-circle" id="btn-play-timeline" title="Cycle Overpass Steps">▶</button>
+    <span class="speed-pill">1x</span>
+
+    <div class="scrubber-wrap">
+      <input type="range" id="time-slider" min="0" max="4" step="1" value="2" />
+      <div class="scrubber-labels">
+        <span data-step="0">-7d Dry</span>
+        <span data-step="1">Pre-Storm</span>
+        <span data-step="2" class="active">Post-Storm SAR</span>
+        <span data-step="3">+48h Drain</span>
+        <span data-step="4">Next Season</span>
+      </div>
+    </div>
+
+    <div class="time-readout">
+      <strong id="stage-clock">Overpass +6h</strong>
+      <span id="stage-sub">Sentinel-1 C-Band</span>
+    </div>
+
+    <div class="overall-risk-meter">
+      <div class="risk-meter-title">Field drowning risk ⌄</div>
+      <div class="risk-bar-row">
+        <span>Low</span>
+        <div class="gradient-bar"></div>
+        <span>High</span>
+      </div>
+    </div>
   </header>
 
-  <main class="layout">
-    <!-- Left / Top: MapLibre GL JS Canvas + Controls + Legend -->
-    <section class="map-section">
-      <div class="layer-controls">
-        <label class="toggle-item">
-          <input type="checkbox" id="toggle-risk" checked />
-          <span>Field Drowning Risk</span>
-        </label>
-        <label class="toggle-item">
-          <input type="checkbox" id="toggle-flood" checked />
-          <span>Observed Flood Overlay</span>
-        </label>
-        <div class="sar-switcher">
-          <span>SAR Backscatter:</span>
-          <button type="button" class="sar-btn active" data-sar="off">Off</button>
-          <button type="button" class="sar-btn" data-sar="before">Before Storm</button>
-          <button type="button" class="sar-btn" data-sar="after">After Storm</button>
+  <!-- 3. TOP RIGHT ACTION PILLS (Bell + Role / Simulate) -->
+  <div class="top-right-actions">
+    <button class="circle-action-btn" id="btn-bell" title="View Sample SMS Alert">🔔</button>
+    <button class="simulate-pill-btn" id="btn-role-switch">👨‍🌾 View: Farmer / LGU ⌄</button>
+  </div>
+
+  <!-- 4. FLOATING PLOT INSPECTION POPUP CARD ("Check this location" Style) -->
+  <section class="floating-card inspect-card" id="inspect-card">
+    <div class="drag-handle">⋮⋮⋮</div>
+    <div class="inspect-header">
+      <div>
+        <h3 id="inspect-title">PL-01 · Brgy. San Isidro</h3>
+        <span class="inspect-sub" id="inspect-meta">3.4 ha · Irrigated Lowland Rice · ΔSAR -3.6 dB</span>
+      </div>
+      <button class="icon-btn" id="btn-close-inspect" title="Close">✕</button>
+    </div>
+
+    <div class="inspect-badge-row">
+      <span class="risk-tag high" id="inspect-risk-badge">HIGH DROWNING RISK (88/100)</span>
+      <span class="twi-tag" id="inspect-twi">TWI: 14.2</span>
+    </div>
+
+    <p class="inspect-action-text" id="inspect-action">
+      Loading plot salvage instructions...
+    </p>
+
+    <div class="sms-preview-box" id="sms-box">
+      <div class="sms-box-header">
+        <span>📱 Sample Farmer SMS Alert</span>
+        <span id="sms-counter" class="sms-count">0 / 160 chars</span>
+      </div>
+      <p id="inspect-sms-text"></p>
+    </div>
+  </section>
+
+  <!-- 5. RIGHT VERTICAL MAP TOOL DOCK -->
+  <nav class="floating-card right-tool-dock">
+    <button class="dock-btn" id="dock-zoom-in" title="Zoom In">＋</button>
+    <button class="dock-btn" id="dock-zoom-out" title="Zoom Out">－</button>
+    <button class="dock-btn" id="dock-compass" title="Reset Bearing">🧭</button>
+    <button class="dock-btn active" id="dock-pitch" title="Toggle 2D / 3D Tilt">3D</button>
+    <button class="dock-btn" id="dock-sar" title="Toggle Post-Storm SAR Wetness">📡</button>
+    <button class="dock-btn" id="dock-flood" title="Toggle Observed Flood Mask">🌊</button>
+    <button class="dock-btn" id="dock-center" title="Recenter Pilot Plots">🎯</button>
+  </nav>
+
+  <!-- 6. BOTTOM-LEFT SYMBOLOGY CARD (BicolAqua 3D Style) -->
+  <section class="floating-card bottom-symbology">
+    <div class="symbology-header">
+      <span class="sym-dot"></span>
+      <strong>FIELD DROWNING RISK SYMBOLOGY</strong>
+      <span class="sym-scale">30m SAR + NASADEM TWI Rule Score</span>
+    </div>
+    <div class="sym-pills">
+      <div class="sym-pill low">
+        <span class="dot"></span>
+        <div>
+          <strong>Low: Under 35</strong>
+          <span>Normal Field Drainage</span>
         </div>
       </div>
-
-      <div id="map"></div>
-
-      <!-- Three-Class Risk Legend -->
-      <div class="legend">
-        <h4>Field Drowning Risk</h4>
-        <div class="legend-row"><span class="swatch high"></span> High Risk (Immediate Drainage / Harvest)</div>
-        <div class="legend-row"><span class="swatch watch"></span> Watch (Clear Canals &amp; Monitor)</div>
-        <div class="legend-row"><span class="swatch low"></span> Low Risk (Normal Drainage)</div>
-        <div class="legend-row"><span class="swatch flood"></span> Observed Flood Extent (Post-Event SAR)</div>
+      <div class="sym-pill watch">
+        <span class="dot"></span>
+        <div>
+          <strong>Watch: 35–69</strong>
+          <span>Clear Perimeter Canals</span>
+        </div>
       </div>
-    </section>
-
-    <!-- Right / Bottom: Plain-Language Decision Cards -->
-    <aside class="sidebar">
-      <!-- 1. Plot Card -->
-      <article class="card" id="plot-card">
-        <div class="card-header">
-          <h2>Plot Risk &amp; Salvage Action</h2>
-          <span id="plot-risk-badge" class="risk-pill high">HIGH RISK</span>
+      <div class="sym-pill high">
+        <span class="dot"></span>
+        <div>
+          <strong>High: 70 &amp; above</strong>
+          <span>Dig Trench / Early Harvest</span>
         </div>
-        <div class="plot-meta">
-          <div><strong id="plot-id">PLOT-01</strong> &bull; <span id="plot-barangay">Barangay San Isidro</span></div>
-          <div>Affected Area: <strong id="plot-hectares">2.4 ha</strong> | Current: <span id="plot-crop">Irrigated Lowland Rice</span></div>
-          <div>SAR Backscatter Shift: <strong id="plot-sar">-3.4 dB</strong> | Bare-Field Window: <strong id="plot-bare">68 days/yr</strong></div>
-        </div>
-        <p class="action-box" id="plot-action">Loading plot guidance...</p>
-      </article>
+      </div>
+    </div>
+    <div class="sym-footnote">
+      ⓘ C-band Sentinel-1 surface wetness + NASADEM TWI + GPM 7-day rain · Dashed blue = Observed SAR flood extent
+    </div>
+  </section>
 
-      <!-- 2. Sample SMS Alert (<= 160 chars) -->
-      <article class="card sms-card">
-        <div class="card-header">
-          <h2>Sample Farmer SMS Alert</h2>
-          <span class="char-count" id="sms-char-count">0 / 160 chars</span>
-        </div>
-        <pre class="sms-text" id="sms-text">Loading SMS alert...</pre>
-      </article>
-
-      <!-- 3. Rotation Card (3 Options vs Current Crop) -->
-      <article class="card">
-        <div class="card-header">
-          <h2>Next-Season Rotation Options</h2>
-          <span class="sub-tag">vs. Current Crop</span>
-        </div>
-        <div id="rotation-list" class="rotation-list"></div>
-      </article>
-
-      <!-- 4. Data Sources & Limits Panel -->
-      <article class="card limits-card">
-        <h2>Data Sources &amp; Scientific Limits</h2>
-        <p class="limit-warning">
-          <strong>Important Limit:</strong> Surface wetness layers represent <em>surface wetness from C-band Sentinel-1 SAR</em>, not direct root-zone soil moisture measurements.
-        </p>
-        <ul id="dataset-list" class="dataset-list"></ul>
-        <p class="future-note" id="future-datasets"></p>
-      </article>
-    </aside>
-  </main>
+  <!-- 7. BOTTOM-RIGHT SCALE & LIVE COORDINATES PILL -->
+  <footer class="bottom-right-HUD">
+    <div class="scale-pill">30m Grid · ~500 m</div>
+    <div class="coord-pill" id="coord-readout">13.6175, 123.1995, 30m SAR</div>
+  </footer>
 
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <script src="app.js"></script>
