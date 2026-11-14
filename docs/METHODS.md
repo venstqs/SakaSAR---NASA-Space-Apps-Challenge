@@ -71,9 +71,10 @@ from which per-plot and per-barangay hectares and shares in each class are compu
 
 Share of SAR-flooded farmland cells that the map rated **high**.
 
-- **`sar_hit_rate_terrain_only`: the independent test.** It uses the same rule without the SAR term
-  (terrain + rain only), so it predicts flooding without looking at the radar.
-- `sar_hit_rate` (full model): a consistency check only, because ΔVV is in both the score and the flood mask.
+- **`sar_hit_rate` (headline, 31%): the independent test.** It uses the same rule without the SAR term
+  (terrain + rain only), so it rates the land *before* seeing the radar, matching the checklist's
+  "flooded area the map had already rated high".
+- `sar_hit_rate_full_model` (100%): a consistency check only, because ΔVV is in both the score and the flood mask.
 - `sar_hit_rate_plots`: the plot-polygon version from the original spec.
 
 ## Limits
@@ -108,13 +109,3 @@ Answers *"how long will the root zone stay waterlogged?"*
 - **Limits:** it learns NASA's regional soil model (a ~50 km cell), not a field sensor. Rain for the coming
   week must be supplied as observations, a forecast or a scenario.
 
-## AI crop advisor (`advisor.py`)
-
-- **LLM:** Groq, through its OpenAI-compatible API (`GROQ_API_KEY` in `.env`). Every answer is built only from
-  this pipeline's numbers: plot risk, ΔVV, TWI, thresholds, the LSTM outlook and the rotation options.
-- **Short-term memory:** the last 6 exchanges of each chat session.
-- **Long-term memory:** per-plot field notes in `data/advisor_memory.json`. When a user reports something
-  observed on the ground, the model tags it `REMEMBER:` and it is saved for later sessions.
-- **Fallback:** a rule-based answer from the same data when there is no key or Groq is unreachable.
-- **Safeguards:** replies are rendered as plain text, inputs are validated, and requests are limited to
-  15 per minute per IP to protect the API quota.
