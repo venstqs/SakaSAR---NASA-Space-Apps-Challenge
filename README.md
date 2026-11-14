@@ -15,7 +15,7 @@
 [![MapLibre](https://img.shields.io/badge/MapLibre%20GL-396CB2?style=for-the-badge&logo=maplibre&logoColor=white)](https://maplibre.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
-### [▶ Open the live dashboard](https://venstqs.github.io/SakaSAR---NASA-Space-Apps-Challenge/)
+### [▶ Open Live App on Vercel](https://sakasar.vercel.app) · [GitHub Pages Mirror](https://venstqs.github.io/SakaSAR---NASA-Space-Apps-Challenge/) · [Interactive API Docs](https://sakasar.vercel.app/docs)
 
 **[Results](#-results-typhoon-kristine-october-2024)** ·
 **[How it works](#%EF%B8%8F-how-it-works)** ·
