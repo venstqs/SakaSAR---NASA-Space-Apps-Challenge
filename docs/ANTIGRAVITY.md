@@ -53,7 +53,7 @@ http://localhost:8000. Tests: `python -m pytest -q` (27 must pass before any com
 - **SakaSAR AI**: `aiAnswer(q, ctx)`: rule-based, every sentence built from a dataset value. `aiContext()` uses
   the clicked place, the timeline day and the selected field. It is NOT a chat model; keep the note that says so.
   To add a topic: add a `has("keyword")` branch that reads real fields and returns `{ html, src: [sources] }`.
-- **Story**: `STORY` steps + `storyGo`. **Intro**: `finishIntro` (mark trace, then swath wipe to the map; camera flies in).
+- **Story**: `STORY` steps + `storyGo`. **Intro**: `finishIntro` (logo + wordmark, then swath wipe to the map; camera flies in).
 - **Accuracy helpers**: `landPoints`, `regionDaily` (Bicol-land mean/peak), `landWet`, `closestPass`, `phDay` (UTC+8).
 - **Motion helpers**: `initSegs` (sliding pill), `countTo` (count-up). Respect `reduceMotion`.
 
@@ -62,7 +62,7 @@ http://localhost:8000. Tests: `python -m pytest -q` (27 must pass before any com
 - Brand from the logo (`assets/sakasar-logo.png`: satellite, gold radar arcs, green field rings).
   Tokens: `--night #0c2620`, `--gold #e9b234`, `--lime #8fd16b`, controls green `--green #1f8a4c`,
   water `#2f9fd3`/`#1b5fa8`, storm `#e2533c`. Solid white panels, small radii. Fonts: Inter (UI and the wordmark),
-  Bricolage Grotesque (big figures only). Mark: `assets/sakasar-mark.svg` (green disc, white strokes). Brand = logo + "SakaSAR" only, no subtitle.
+  Bricolage Grotesque (big figures only). Logo: always the original `assets/sakasar-logo.png` (do not redraw or recolour it); it sits on a green chip with a white wordmark. Brand = logo + "SakaSAR" only, no subtitle.
 - Home stays clean: map, brand chip, toolbar, rail, timeline, legend. Detail goes in windows or the workspace.
 - Test in a real browser at 1534×728 and 390×844 (phone: rail becomes a bottom bar, panels open in the workspace).
 

@@ -635,3 +635,14 @@ h2, h3, h4, .pilot-head h2, .plot-card h3, .story h2, .insp-head b { font-family
   .intro-word { font-size: 38px; }
   .intro-line { font-size: 13px; padding: 0 24px; text-align: center; }
 }
+
+/* ================= brand: original logo on a green chip, white wordmark ================= */
+.brandchip { background: var(--brand); box-shadow: 0 0 0 1px rgba(12, 38, 32, 0.25), 0 8px 22px -10px rgba(12, 38, 32, 0.6); }
+.brandchip .logo { width: 38px; height: 38px; }
+.brandchip .wordmark { color: #fff; }
+.ws-brand { background: var(--brand); border-radius: 12px; padding: 4px 12px 4px 4px; }
+.ws-brand img { box-shadow: none; }
+.ws-brand .wordmark { color: #fff; font-size: 19px; }
+.intro { background: radial-gradient(70% 70% at 50% 42%, #134a36 0%, var(--night) 70%); }
+.intro-logo { width: 150px; height: 150px; border-radius: 50%; opacity: 0; transform: scale(0.86); animation: logoIn 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.1s forwards; filter: drop-shadow(0 18px 40px rgba(0, 0, 0, 0.45)); }
+@keyframes logoIn { to { opacity: 1; transform: none; } }

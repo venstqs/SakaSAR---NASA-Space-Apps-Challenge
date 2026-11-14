@@ -112,7 +112,6 @@ function nearestCell(lon, lat) {
 // ---------------- boot ----------------
 async function init() {
   if ($("splash")) $("brand-logo").style.opacity = 0;
-  document.querySelectorAll(".intro-svg .d").forEach((el) => el.setAttribute("pathLength", "1"));
   const [tl, munis, summary, overlay, pilot] = await Promise.all([
     fetchJSON("data/region/bicol_timeline.json"), fetchJSON("data/region/bicol_municipalities.geojson"),
     fetchJSON("data/region/bicol_summary.json"), fetchJSON("data/region/bicol_flood.json"), fetchJSON("mock-data.json"),
@@ -1469,7 +1468,7 @@ function renderAIPane() {
 function msgHTML(m) {
   if (m.who === "user") return `<div class="msg user">${esc(m.text)}</div>`;
   if (m.typing) return `<div class="msg bot typing"><i></i><i></i><i></i></div>`;
-  return `<div class="msg bot"><div class="who"><img src="assets/sakasar-mark.svg" alt="" />SakaSAR AI</div>${m.html}${m.src ? `<div class="srcs">${m.src.map((x) => `<span class="src">${esc(x)}</span>`).join("")}</div>` : ""}</div>`;
+  return `<div class="msg bot"><div class="who"><img src="assets/sakasar-logo.png" alt="" />SakaSAR AI</div>${m.html}${m.src ? `<div class="srcs">${m.src.map((x) => `<span class="src">${esc(x)}</span>`).join("")}</div>` : ""}</div>`;
 }
 function aiSuggestions(c) {
   const t = c.town ? c.town.name : null;

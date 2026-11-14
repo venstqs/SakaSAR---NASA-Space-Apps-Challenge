@@ -101,8 +101,8 @@ Never mount the repo root as static files.
 
 ## 6. Dashboard (windowed 3D app, 15 Nov 2026) — agent brief: docs/ANTIGRAVITY.md
 
-- **Home = the 3D map** with a brand chip (`assets/sakasar-mark.svg`: green disc, white strokes; wordmark in Inter 800), toolbar (2D/3D, Story, Bicol, Storm track, save, link),
-  a launcher **rail** on the left, the timeline and the legend. The intro traces the mark in white strokes, reveals the
+- **Home = the 3D map** with a green brand chip: the original logo (`assets/sakasar-logo.png`, never redraw or recolour it) + white wordmark in Inter 800, toolbar (2D/3D, Story, Bicol, Storm track, save, link),
+  a launcher **rail** on the left, the timeline and the legend. The intro shows the original logo, reveals the
   wordmark, then a Sentinel-1 style swath wipes to the map while the camera flies onto Bicol (click skips).
 - Accuracy: Bicol figures are Bicol-land averages/peaks of the interpolated POWER grid (sea cells excluded); the day axis
   is Philippine time (UTC+8); the closest pass is measured to the EONET track line (≈259 km, 23 Oct 04:49 PHT).
