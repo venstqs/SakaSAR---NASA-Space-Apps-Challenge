@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Field Shift | SAR Root-Zone Hydrology & Crop Rotation</title>
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>Field Shift: Agro-Hydrological Decision Support</h1>
+      <p class="subtitle">SAR Surface Wetness &amp; Micro-Topographic Drowning Risk Engine</p>
+    </div>
+    <span class="badge-mode">MOCK DATA SHELL (HOUR 4 GATE)</span>
+  </header>
+
+  <main class="layout">
+    <!-- Left / Top: MapLibre GL JS Canvas + Controls + Legend -->
+    <section class="map-section">
+      <div class="layer-controls">
+        <label class="toggle-item">
+          <input type="checkbox" id="toggle-risk" checked />
+          <span>Field Drowning Risk</span>
+        </label>
+        <label class="toggle-item">
+          <input type="checkbox" id="toggle-flood" checked />
+          <span>Observed Flood Overlay</span>
+        </label>
+        <div class="sar-switcher">
+          <span>SAR Backscatter:</span>
+          <button type="button" class="sar-btn active" data-sar="off">Off</button>
+          <button type="button" class="sar-btn" data-sar="before">Before Storm</button>
+          <button type="button" class="sar-btn" data-sar="after">After Storm</button>
+        </div>
+      </div>
+
+      <div id="map"></div>
+
+      <!-- Three-Class Risk Legend -->
+      <div class="legend">
+        <h4>Field Drowning Risk</h4>
+        <div class="legend-row"><span class="swatch high"></span> High Risk (Immediate Drainage / Harvest)</div>
+        <div class="legend-row"><span class="swatch watch"></span> Watch (Clear Canals &amp; Monitor)</div>
+        <div class="legend-row"><span class="swatch low"></span> Low Risk (Normal Drainage)</div>
+        <div class="legend-row"><span class="swatch flood"></span> Observed Flood Extent (Post-Event SAR)</div>
+      </div>
+    </section>
+
+    <!-- Right / Bottom: Plain-Language Decision Cards -->
+    <aside class="sidebar">
+      <!-- 1. Plot Card -->
+      <article class="card" id="plot-card">
+        <div class="card-header">
+          <h2>Plot Risk &amp; Salvage Action</h2>
+          <span id="plot-risk-badge" class="risk-pill high">HIGH RISK</span>
+        </div>
+        <div class="plot-meta">
+          <div><strong id="plot-id">PLOT-01</strong> &bull; <span id="plot-barangay">Barangay San Isidro</span></div>
+          <div>Affected Area: <strong id="plot-hectares">2.4 ha</strong> | Current: <span id="plot-crop">Irrigated Lowland Rice</span></div>
+          <div>SAR Backscatter Shift: <strong id="plot-sar">-3.4 dB</strong> | Bare-Field Window: <strong id="plot-bare">68 days/yr</strong></div>
+        </div>
+        <p class="action-box" id="plot-action">Loading plot guidance...</p>
+      </article>
+
+      <!-- 2. Sample SMS Alert (<= 160 chars) -->
+      <article class="card sms-card">
+        <div class="card-header">
+          <h2>Sample Farmer SMS Alert</h2>
+          <span class="char-count" id="sms-char-count">0 / 160 chars</span>
+        </div>
+        <pre class="sms-text" id="sms-text">Loading SMS alert...</pre>
+      </article>
+
+      <!-- 3. Rotation Card (3 Options vs Current Crop) -->
+      <article class="card">
+        <div class="card-header">
+          <h2>Next-Season Rotation Options</h2>
+          <span class="sub-tag">vs. Current Crop</span>
+        </div>
+        <div id="rotation-list" class="rotation-list"></div>
+      </article>
+
+      <!-- 4. Data Sources & Limits Panel -->
+      <article class="card limits-card">
+        <h2>Data Sources &amp; Scientific Limits</h2>
+        <p class="limit-warning">
+          <strong>Important Limit:</strong> Surface wetness layers represent <em>surface wetness from C-band Sentinel-1 SAR</em>, not direct root-zone soil moisture measurements.
+        </p>
+        <ul id="dataset-list" class="dataset-list"></ul>
+        <p class="future-note" id="future-datasets"></p>
+      </article>
+    </aside>
+  </main>
+
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
