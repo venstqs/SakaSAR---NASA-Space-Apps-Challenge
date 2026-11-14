@@ -4,10 +4,13 @@ let appData = null;
 let map = null;
 let is3D = true;
 let playInterval = null;
+const DEFAULT_CENTER = [123.2057, 13.5416]; // Minalabac pilot strip; overridden by provenance.map_center
+let mapCenter = DEFAULT_CENTER;
 
 async function initApp() {
   const res = await fetch(DATA_SOURCE_URL);
   appData = await res.json();
+  mapCenter = (appData.provenance && appData.provenance.map_center) || DEFAULT_CENTER;
 
   // Initialize MapLibre with Satellite Imagery + Hybrid Reference Labels
   map = new maplibregl.Map({
@@ -44,7 +47,7 @@ async function initApp() {
         }
       ]
     },
-    center: [123.2005, 13.6182],
+    center: mapCenter,
     zoom: 14.8,
     pitch: 52,
     bearing: -12,
@@ -341,7 +344,7 @@ function bindUIEvents() {
   });
 
   document.getElementById("btn-reset-bounds").addEventListener("click", () => {
-    map.flyTo({ center: [123.2005, 13.6182], zoom: 14.8, pitch: is3D ? 52 : 0, bearing: -12 });
+    map.flyTo({ center: mapCenter, zoom: 14.8, pitch: is3D ? 52 : 0, bearing: -12 });
   });
 
   // Collapse Left Panel (smooth accordion shrink)
