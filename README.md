@@ -1,176 +1,323 @@
 <div align="center">
 
-<img src="assets/logo.png" alt="SakaSAR Logo" width="160" />
+<img src="assets/logo.png" alt="SakaSAR logo" width="150" />
 
-# SakaSAR: Agro-Hydrological Decision Support
-### *Sub-Surface Dielectric & Micro-Topographic SAR Analytics for Root-Zone Hydrology and Adaptive Crop Rotation under Extreme Weather Regimes*
+# SakaSAR
 
-[![NASA Space Apps Challenge 2026](https://img.shields.io/badge/NASA%20Space%20Apps-2026-0B3D91?style=for-the-badge&logo=nasa&logoColor=white)](https://www.spaceappschallenge.org/)
-[![Challenge: Field Shift](https://img.shields.io/badge/Challenge-Field%20Shift%3A%20Adapting%20Farms-2E7D32?style=for-the-badge)](https://www.spaceappschallenge.org/)
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+### Radar-based field drowning risk and crop-rotation guidance for typhoon-hit farms
+
+*Built for the 2026 NASA Space Apps Challenge — **Field Shift: Adapting Farms with NASA Data***
+
+[![NASA Space Apps 2026](https://img.shields.io/badge/NASA%20Space%20Apps-2026-0B3D91?style=for-the-badge&logo=nasa&logoColor=white)](https://www.spaceappschallenge.org/)
+[![Challenge: Field Shift](https://img.shields.io/badge/Challenge-Field%20Shift-2E7D32?style=for-the-badge)](https://www.spaceappschallenge.org/)
+[![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![MapLibre GL JS](https://img.shields.io/badge/MapLibre%20GL-396CB2?style=for-the-badge&logo=maplibre&logoColor=white)](https://maplibre.org/)
+[![MapLibre](https://img.shields.io/badge/MapLibre%20GL-396CB2?style=for-the-badge&logo=maplibre&logoColor=white)](https://maplibre.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
+
+**[Results](#-results-typhoon-kristine-october-2024)** ·
+**[How it works](#%EF%B8%8F-how-it-works)** ·
+**[Validation](#-validation)** ·
+**[Run it](#-run-it-yourself)** ·
+**[Methods](docs/METHODS.md)** ·
+**[Team](#-team)**
 
 </div>
 
 ---
 
-## 🌍 Overview
+## 🌾 In one minute
 
-**SakaSAR** is a cloud-penetrating agro-hydrological decision-support platform built for the **2026 NASA Space Apps Challenge** (*Field Shift: Adapting Farms with NASA Data*).
+When a typhoon hits, **clouds blind optical satellites** exactly when farmers need to know which fields are flooding.
+**Sentinel-1 radar sees through clouds.** SakaSAR compares radar images from before and after the storm,
+adds NASA elevation, rainfall and soil-moisture data on one 30 m grid, and tells:
 
-Optical satellite sensors (Landsat, MODIS) are blinded by cloud cover during typhoons and monsoon events—precisely when smallholder farmers need actionable flood and waterlogging intelligence. **SakaSAR** fuses **C-band Synthetic Aperture Radar (Sentinel-1 SAR)** backscatter shifts with **NASADEM 30 m micro-topography** and **NASA precipitation & agro-meteorology (NASA POWER / GPM IMERG)** on a shared 30 m grid to:
+- **the farmer** which plot will drown first and what to do in the next 48 hours (plain language plus an SMS of 160 characters or fewer),
+- **the Municipal Agriculture Office and MDRRMO** which barangays to visit first,
+- **the cooperative** which of three next-season rotations fits each plot's soil and current crop,
+- **everyone** how long the root zone will stay waterlogged (an LSTM trained on 25 years of NASA data).
 
-1. **Map Field Drowning Risk (`High` / `Watch` / `Low`)** across farm parcels and identify low-lying runoff channels where water pools.
-2. **Validate Risk Against Observed SAR Flooding** by computing the independent spatial hit rate against post-storm standing-water masks.
-3. **Rank Next-Season Crop Rotations** against the farmer's current baseline crop using bare-field windows, soil texture, and farmer priorities (*Water Conservation*, *Soil Nitrogen*, *Cash Income*).
-4. **Deliver Plain-Language Advisories & $\le 160$-Character SMS Alerts** for smallholder farmers, cooperatives, agricultural extension officers, and Municipal DRRM Offices (MDRRMOs).
+Everything runs on **free, open data (₱0 licensing)** and is **reproducible from this repository**.
 
 ---
 
-## 📊 Results: STS Kristine (Trami), October 2024
+## 🧭 The problem
 
-**Pilot:** rice paddies in Brgy. Bagongbong, Taban and Catanusan, **Minalabac, Camarines Sur** (Bicol River basin), about 9 km south of Naga City.
-**Radar:** Sentinel-1 orbit 134. Baseline = median of 4 calm passes (Aug–Sep 2024), just-before = 9 Oct, after = **2 Nov 2024**.
+| Pain point | What SakaSAR does about it |
+| :--- | :--- |
+| Optical satellites (Landsat, MODIS) can't see the ground through typhoon clouds | Uses **C-band SAR (Sentinel-1)**, which penetrates clouds and rain |
+| Damage surveys take weeks of field visits | Maps **35.1 ha of flooded farmland** for the pilot area in about a second from cache |
+| Farmers get generic warnings, not plot-level actions | Gives each plot a **risk class, a 48-hour action and an SMS** |
+| LGUs don't know where to send field teams first | **Ranks barangays** by high-risk farm area |
+| After the flood, "what do we plant next?" | Rates **three rotations** against each plot's soil (SoilGrids), drowning risk and current crop |
+
+---
+
+## 📊 Results: Typhoon Kristine, October 2024
+
+**Pilot:** rice paddies in Brgy. **Bagongbong, Taban and Catanusan, Minalabac, Camarines Sur** (Bicol River basin), about 9 km south of Naga City.
+**Event:** Severe Tropical Storm Kristine (Trami), 21–26 October 2024.
+**Radar:** Sentinel-1, relative orbit 134. Baseline = median of 4 calm passes (Aug–Sep 2024) · just before = 9 Oct · **after = 2 Nov 2024**.
 
 | Demo number | Value |
 | :--- | :--- |
-| Plots rated **high** drowning risk | **2 of 5** (PL-01, PL-02) · 6.2 ha · 18 households *(hectares/households are illustrative until LGU data)* |
-| Flooded farmland seen by Sentinel-1 | **35.1 ha** in the pilot strip |
-| **Hit rate** (flooded area the terrain + rain map had *already* rated high, without seeing the radar) | **31%** |
-| Barangay visit order (extension officers / MDRRMO) | 1. Taban · 2. Bagongbong · 3. Catanusan |
-| Storm rainfall (GPM IMERG; NASA POWER cross-check 510 mm) | **497 mm** (event + 7 days prior) |
+| Plots rated **high** drowning risk | **2 of 5** (PL-01, PL-02) · 6.2 ha · 18 households\* |
+| Flooded farmland observed by Sentinel-1 | **35.1 ha** in the pilot strip |
+| **Hit rate:** share of flooded farmland the terrain + rain map had *already* rated high, without seeing the radar | **31%** |
+| Barangay visit order | 1. Taban · 2. Bagongbong · 3. Catanusan |
+| Storm rainfall, GPM IMERG (NASA POWER cross-check: 510 mm) | **497 mm** (event + 7 days prior) |
 | SMAP root-zone soil moisture during the event | **+2.2σ** above the 30-day baseline |
-| LSTM soil-saturation forecast (test years 2022–2026) | 60% lower error than persistence · Kristine hindcast: 7/7 waterlogged days |
-| Data licensing cost · processing time | **₱0** · ~1 s from cache, ~2–5 min with fresh downloads |
+| LSTM soil-saturation forecast, unseen 2022–2026 | **60%** lower error than persistence · Kristine: **7/7** waterlogged days |
+| Data licensing cost · processing time | **₱0** · ~1 s from cache, 2–5 min with fresh downloads |
 
-| Farmer view | LGU / MDRRMO view |
+<sub>\* Plot outlines, hectares and households are illustrative sample values placed evenly on real farmland. The satellite measurements on them are real. See [Limits](#%EF%B8%8F-limits-and-what-we-do-not-claim).</sub>
+
+| Farmer view: plot risk, action, SMS | LGU / MDRRMO view: barangay priority list |
 | :---: | :---: |
 | ![Farmer view](assets/screenshots/01-farmer-view.jpg) | ![Barangay priority list](assets/screenshots/02-lgu-barangay-priority.jpg) |
-| **Rotation fit vs current crop** | **LSTM soil-saturation outlook** |
+| **Rotation fit versus the current crop** | **LSTM root-zone saturation outlook** |
 | ![Rotation fit](assets/screenshots/03-rotation-fit.jpg) | ![LSTM outlook](assets/screenshots/04-lstm-soil-outlook.jpg) |
 
-Full method, validation and limits: [`docs/METHODS.md`](docs/METHODS.md).
+<details>
+<summary><b>Phone view</b> (the dashboard works on mobile)</summary>
+<br>
+<img src="assets/screenshots/05-phone.jpg" alt="Phone view" width="300" />
+</details>
 
 ---
 
-## 🌿 Branch Architecture & Team Roster
+## ⚙️ How it works
 
-Per our 12-hour engineering checklist, three developers work across **six isolated feature branches** (two each) and merge into `main` only at the verified hour gates:
+```mermaid
+flowchart LR
+    subgraph DATA["Open satellite & ground data"]
+        S1["Sentinel-1 RTC<br/>radar VV/VH"]
+        DEM["NASADEM<br/>30 m elevation"]
+        IM["GPM IMERG<br/>rainfall"]
+        SMAP["SMAP L4<br/>root-zone moisture"]
+        POW["NASA POWER<br/>daily weather 2001–2026"]
+        SG["SoilGrids<br/>soil texture"]
+        WC["ESA WorldCover<br/>land cover"]
+    end
 
-| Branch | Owner | Deliverables |
+    subgraph PIPE["Python pipeline · 30 m grid (EPSG:32651)"]
+        SAR["sar_moisture<br/>Lee filter · ΔVV · flood mask"]
+        TER["terrain_rain<br/>D8 flow · TWI · rainfall"]
+        RISK["risk_engine<br/>risk score · classes · hit rate"]
+        ROT["rotation_engine<br/>soil · rotation fit"]
+        LSTM["soil_lstm<br/>PyTorch LSTM"]
+    end
+
+    subgraph OUT["Outputs"]
+        JSON["mock-data.json<br/>GeoJSON + provenance"]
+        API["FastAPI<br/>/api/*"]
+        UI["3D MapLibre + Three.js<br/>dashboard"]
+    end
+
+    S1 --> SAR
+    WC --> SAR
+    DEM --> SAR
+    DEM --> TER
+    IM --> TER
+    POW --> TER
+    SMAP --> RISK
+    SG --> ROT
+    POW --> LSTM
+    SAR --> RISK
+    TER --> RISK
+    ROT --> RISK
+    LSTM --> JSON
+    RISK --> JSON
+    JSON --> API
+    API --> UI
+```
+
+1. **Radar change (Sentinel-1).** 10 m RTC backscatter is averaged to 30 m and Lee-filtered. The change is
+   `ΔVV = VV(2 Nov) − VV(baseline median)`. Calm floodwater acts like a mirror and turns the radar image dark.
+2. **Observed flood.** A cell is flooded if it is dark (Otsu threshold), dropped by 2 dB or more, is flat (slope < 5°) and is not
+   a permanent river or pond (WorldCover).
+3. **Terrain (NASADEM).** Depression filling, then D8 flow accumulation, then the Topographic Wetness Index `TWI = ln(a / tan β)`,
+   which shows where runoff collects.
+4. **Rain (GPM IMERG).** Event plus 7-day antecedent total, cross-checked against NASA POWER.
+5. **Risk score.** `round(100 × (0.45·S_SAR + 0.35·S_TWI + 0.20·S_Rain))`: **high ≥ 70**, **watch 40–69**, **low < 40**.
+   Built-up and permanent-water cells are excluded, and cells without radar data are flagged as missing rather than scored.
+6. **Rotation fit.** SoilGrids texture and drowning risk rate the legume, deep-rooting cover-crop and short-cycle
+   options for each plot (for example, legumes are marked *caution* on waterlogged plots).
+7. **LSTM outlook.** Forecasts root-zone saturation 1–7 days ahead from 30 days of NASA POWER weather plus the coming week's rain.
+
+**Why the 2 Nov pass and not the storm day?** The 21 Oct pass was taken at Kristine's peak. Typhoon wind roughened every
+water surface: permanent water brightened by a median of +5.3 dB across a 35 × 33 km scan, so floodwater was invisible.
+**Why Minalabac and not Naga City?** C-band cannot see water between buildings (the signal double-bounces off walls), so we
+scanned the floodplain for farmland where the radar did see Kristine's water. The plots were then placed evenly, not hand-picked.
+Full details: [`docs/METHODS.md`](docs/METHODS.md).
+
+---
+
+## ✅ Validation
+
+| Check | Result | What it means |
 | :--- | :--- | :--- |
-| `feature/risk-engine` | **Adrian** *(Main Developer / Integration Lead)* | Shared 30 m grid, rule-based Field Drowning Risk score (`0–100`), per-plot & barangay statistics, independent SAR flood hit-rate validation, and FastAPI endpoints (`api.py`). |
-| `feature/sar-moisture` | **Adrian** | Sentinel-1 VV/VH before & after storm passes, Lee speckle filter, 30 m grid alignment, $\Delta\sigma^0$ wetness-change layer, observed post-storm flood extent mask, and scene provenance. |
-| `feature/terrain-rain` | **Guian** | NASADEM 30 m slope, priority-flood depression filling, D8 flow accumulation, Topographic Wetness Index ($\text{TWI}$), drainage corridor extraction, GPM IMERG / NASA POWER rainfall totals, and SMAP anomaly. |
-| `feature/rotation-engine` | **Guian** | Multi-year NDVI series (bare-field windows & days/year), SoilGrids texture profile, and 3 rule-ranked crop rotation strategies with local verification notes. |
-| `feature/dashboard` | **Marqus** | MapLibre GL JS floating GIS dashboard (`index.html`, `app.js`, `style.css`), 3-class risk symbology, before/after SAR toggle, plot action cards, and SMS alert preview. |
-| `feature/demo-submission` | **Marqus** | Pilot event record, demo storyboard & deck/video, project page text, and final judging package. |
-| *Hour-Gate Review* | **Engr. John Roy V. Galvez** | Monitors Hour 1, Hour 4, Hour 7, Hour 9 (Feature Freeze), and Hour 12 gates. |
+| **Independent hit rate** | **31%** | The terrain + rain model rated 31% of the radar-observed flooded farmland *high* before seeing any radar data. |
+| Full-model hit rate | 100% | Circular (the radar is on both sides). Reported only as a consistency check, never as the headline. |
+| Pre-storm stability | +0.31 dB | 9 Oct vs the Aug–Sep baseline: the pre-storm fields were normal, so the change really comes from the storm. |
+| Rainfall cross-check | 497 vs 510 mm | GPM IMERG and NASA POWER agree within 3%. |
+| LSTM vs persistence (root zone) | −60% RMSE | Test years 2022–2026, never seen in training. In heavy-rain weeks (≥100 mm): −77%. |
+| LSTM vs ridge regression (same inputs) | −25% RMSE | In heavy-rain weeks: −53%. Ridge is slightly better for day +1 only. |
+| Kristine hindcasts | 7/7 · 7/7 | Waterlogged days predicted correctly in the storm week and after the 2 Nov pass. |
+| Automated tests | 23 passing | Risk maths, D8 flow, Lee filter, contract, API, rotation rules, Guian's terrain package. |
 
-### 👥 Team
+---
+
+## 🎯 Challenge alignment
+
+| *Field Shift* asks for | SakaSAR delivers | Where |
+| :--- | :--- | :--- |
+| Use NASA Earth data to help farms adapt | NASADEM, GPM IMERG, SMAP and NASA POWER fused on one 30 m grid | `pipeline/` |
+| Address extreme-weather impacts | Field drowning risk for a real typhoon, checked against observed flooding | Farmer view |
+| Actionable guidance for farmers | Plot-level 48 h action plus an SMS of 160 characters or fewer | Plot card |
+| Support adaptation decisions | Three ranked rotations versus the current crop, using soil and risk | Rotations tab |
+| Serve local decision-makers | Barangay priority list for the MAO and MDRRMO | LGU view |
+| Look ahead | LSTM root-zone saturation outlook with rain scenarios | Soil Outlook panel |
+
+---
+
+## 🛰️ Data
+
+**NASA data used**
+
+| Dataset | Resolution | Role |
+| :--- | :--- | :--- |
+| **NASADEM** | 30 m | Slope, D8 flow accumulation, TWI, drainage corridor |
+| **GPM IMERG V07** | 0.1° (~10 km) | Event (469 mm) + 7-day prior (28 mm) rainfall → rainfall score |
+| **SMAP L4 root-zone soil moisture** | ~11 km | Event anomaly (+2.2σ), shown at native resolution as context |
+| **NASA POWER** | 0.5° · daily | Rainfall cross-check; 2001–2026 weather and `GWETROOT` to train the LSTM |
+| *MODIS NDVI (checked, not used)* | 250 m | Too coarse to see bare paddies, so bare-field days stay a labelled placeholder |
+
+**Partner and other data**
+
+| Dataset | Provider | Role |
+| :--- | :--- | :--- |
+| **Sentinel-1 RTC (VV/VH)** | ESA / Copernicus via Microsoft Planetary Computer | Before/after radar, flood mask |
+| **ESA WorldCover 2021** | ESA | Cropland / built-up / permanent-water mask |
+| **SoilGrids 2.0** | ISRIC | Per-plot sand, silt, clay and organic carbon (0–30 cm) |
+
+The clipped real data is cached in `data/cache/`, so the whole analysis re-runs offline. Raw team exports are in `data/raw/`.
+
+---
+
+## 🚀 Run it yourself
+
+```bash
+git clone https://github.com/venstqs/SakaSAR---NASA-Space-Apps-Challenge.git
+cd SakaSAR---NASA-Space-Apps-Challenge
+pip install -r requirements.txt
+
+python -m pipeline.risk_engine        # full analysis from the cached real data (~1 s); --refresh re-downloads
+uvicorn api:app --port 8000           # dashboard at http://localhost:8000  (add #outlook for the LSTM panel)
+python -m pytest -q                   # 23 tests
+```
+
+<details>
+<summary>More commands</summary>
+
+```bash
+python -m pipeline.sar_moisture        # Sentinel-1 stage only
+python -m pipeline.terrain_rain        # terrain + rainfall stage only
+pip install -r requirements-ml.txt     # PyTorch, to retrain the LSTM
+python -m pipeline.soil_lstm           # retrain + evaluate the LSTM (~30 s on CPU)
+python terrain_rain/scripts/run_all.py # Guian's terrain/rainfall package (works without WhiteboxTools)
+```
+</details>
+
+### API
+
+| Endpoint | Returns |
+| :--- | :--- |
+| `GET /api/data` | Full output: plots, flood extent, SAR layers, drainage corridor, rotations, provenance |
+| `GET /api/plots` | Plot GeoJSON with risk, actions, SMS, soil and rotation fit |
+| `GET /api/risk-map` | All map layers |
+| `GET /api/rotations?priority=water\|nitrogen\|cash` | Rotations ranked by farmer priority |
+| `GET /api/provenance` | Data sources, scene IDs, metrics, barangay ranking |
+| `GET /api/soil-outlook` | LSTM hindcasts, scenarios and accuracy |
+| `GET /docs` | Interactive OpenAPI documentation |
+
+---
+
+## 📁 Repository structure
+
+```
+├── pipeline/               # Adrian: core analytics
+│   ├── sar_moisture.py     #   Sentinel-1 change detection and flood mask
+│   ├── terrain_rain.py     #   NASADEM hydrology, IMERG/POWER rainfall, SMAP anomaly
+│   ├── risk_engine.py      #   risk fusion, hit rates, barangay ranking → mock-data.json
+│   ├── rotation_engine.py  #   SoilGrids profiles and per-plot rotation fit
+│   ├── soil_lstm.py        #   PyTorch LSTM soil-saturation model
+│   └── common.py           #   shared 30 m grid, data access, caching
+├── terrain_rain/           # Guian: terrain & rainfall package (scripts, config, tests)
+├── index.html · app.js · style.css · outlook.*   # Marqus: 3D dashboard (+ LSTM panel)
+├── api.py                  # FastAPI server (API + dashboard)
+├── data/                   # cached real inputs, raw exports, outputs, GeoTIFF layers
+├── models/soil_lstm.pt     # trained LSTM weights (82 KB)
+├── docs/METHODS.md         # full method, validation and limits
+├── docs/SUBMISSION.md      # submission form text
+└── tests/                  # pytest suite
+```
+
+---
+
+## ⚠️ Limits and what we do not claim
+
+- **C-band radar measures surface wetness, not root-zone moisture.** Water under a tall rice canopy can brighten the signal
+  instead of darkening it, so it can be missed.
+- **The 2 Nov pass is 9 days after landfall:** it shows floodwater that stayed, not the peak.
+- **Plot data is illustrative:** outlines, hectares, households, crops and bare-field days are sample values until there is
+  LGU parcel and census data.
+- **Risk weights (0.45 / 0.35 / 0.20) are expert-set, not fitted.** Calibrating them against damage reports is pilot work.
+- **The LSTM learns NASA's regional soil model** (a ~50 km cell), not a paddy sensor.
+- **Not claimed:** L-band dielectric inversion, "7 days early" detection, and "35–50% water saving". These came from the
+  original concept but are not built or tested here.
+
+## 🗺️ Roadmap
+
+- **NISAR L-band** for deeper canopy penetration · **Sentinel-2 / Landsat 30 m NDVI** for real bare-field windows
+- Real **LGU parcel and census data** in place of the sample plots
+- **Calibrate the risk weights** against Municipal Agriculture Office damage reports
+- A real SMS gateway, multi-municipality coverage and live monitoring after each new radar pass
+- ECOSTRESS heat-stress alerts and GRACE groundwater trends
+
+---
+
+## 👥 Team
 
 | Member | GitHub | Role |
 | :--- | :--- | :--- |
-| **Adrian Xavier Moral** | [venstqs](https://github.com/venstqs) | Main developer & integration lead: SAR pipeline, risk engine, LSTM, FastAPI |
-| **Guian** | [Pudges-cmd](https://github.com/Pudges-cmd) | Terrain & rainfall pipeline (`terrain_rain/`): NASADEM, GPM IMERG, SMAP, NASA POWER |
+| **Adrian Xavier Moral** | [venstqs](https://github.com/venstqs) | Main developer & integration lead: SAR pipeline, risk engine, LSTM, API |
+| **Guian** | [Pudges-cmd](https://github.com/Pudges-cmd) | Terrain & rainfall pipeline: NASADEM, GPM IMERG, SMAP, NASA POWER |
 | **Marqus Szymoon Pelagio** | [mzep98](https://github.com/mzep98) | 3D MapLibre / Three.js dashboard, demo & submission |
-| **Engr. John Roy V. Galvez** | — | Hour-gate reviewer |
+| **Engr. John Roy V. Galvez** | — | Mentor and hour-gate reviewer |
 
----
+## 🤖 Use of AI
 
-## 🛰️ Datasets & Sensor Fusion Grid
+AI coding assistants (**Anthropic Claude Code** and **Google Gemini in Antigravity**) helped with code scaffolding,
+geospatial pipeline code, debugging, documentation and tests, and the team reviewed and ran all of it. The one machine-learning
+model, a small PyTorch LSTM, was trained by the team on public NASA POWER data and evaluated on held-out years.
+All satellite results are computed deterministically from open data. No AI-generated images or video are used, and no NASA logos
+appear in AI-generated content.
 
-### Datasets Used in the Build
-| Dataset | Source / Agency | Resolution | Role in SakaSAR |
-| :--- | :--- | :--- | :--- |
-| **Sentinel-1 RTC (VV / VH)** | ESA / Copernicus (via Planetary Computer) | $10\text{ m} \to 30\text{ m}$ / 12-day | Cloud-piercing C-band ($5.405\text{ GHz}$) backscatter change ($\Delta\sigma^0_{\text{VV}}$) for surface wetness shift and post-storm standing-water flood extent. |
-| **NASADEM** | NASA / JPL | $30\text{ m}$ Spatial | Micro-topographic Slope ($\beta$), D8 Flow Accumulation ($a$), drainage corridor routing, and Topographic Wetness Index ($\text{TWI} = \ln(a/\tan\beta)$). |
-| **GPM IMERG V07** | NASA / JAXA | $0.1^\circ$ ($\sim 10\text{ km}$) | Storm-event (469 mm) + 7-day antecedent (28 mm) rainfall → rainfall score $S_{\text{Rain}}$. |
-| **NASA POWER** | NASA LaRC | $0.5^\circ$ / Daily | Rainfall cross-check (510 mm); 2001–2026 daily weather and root-zone wetness (`GWETROOT`) to train the LSTM. |
-| **SMAP L4** | NASA | $\sim 11\text{ km}$ / daily | Event root-zone soil-moisture anomaly (+2.2σ), shown at native resolution as context. |
-| **SoilGrids 2.0** | ISRIC | $250\text{ m}$ | Per-plot sand / silt / clay / organic carbon (0–30 cm) → rotation fit. |
-| **ESA WorldCover 2021** | ESA | $10\text{ m}$ | Cropland / built-up / permanent-water mask (flood counted on farmland only). |
-| **MODIS NDVI** *(checked, not used)* | NASA | $250\text{ m}$ | Tested for bare-field windows: at 250 m a pixel mixes many paddies, so it never looks bare. `bare_field_days_per_year` stays a labelled placeholder (needs 30 m Landsat / Sentinel-2 or the MAO cropping calendar). |
+## 📚 References
 
-### Future Work Datasets (Roadmap)
-- **NISAR (NASA-ISRO L-Band $1.25\text{ GHz}$ SAR):** Deeper canopy and sub-surface root-zone penetration ($10\text{–}30\text{ m}$).
-- **ECOSTRESS (NASA JPL ISS):** $70\text{ m}$ thermal infrared Evapotranspiration ($\text{ET}$) and Evaporative Stress Index ($\text{ESI}$).
-- **GRACE / GRACE-FO (NASA):** Monthly regional deep-aquifer and groundwater storage trends.
+**Data:** [Sentinel-1 RTC](https://planetarycomputer.microsoft.com/dataset/sentinel-1-rtc) ·
+[NASADEM](https://planetarycomputer.microsoft.com/dataset/nasadem) · [GPM IMERG](https://gpm.nasa.gov/data/imerg) ·
+[SMAP L4](https://nsidc.org/data/spl4smgp) · [NASA POWER](https://power.larc.nasa.gov) ·
+[ESA WorldCover](https://esa-worldcover.org) · [SoilGrids](https://soilgrids.org) ·
+[MODIS MOD13Q1](https://lpdaac.usgs.gov/products/mod13q1v061/)
 
----
+**Methods:** Lee (1980) speckle filter · Otsu (1979) thresholding · Beven & Kirkby (1979) Topographic Wetness Index ·
+Barnes et al. (2014) priority-flood · Kratzert et al. (2018) LSTM rainfall–runoff modelling.
+Full citations: [`docs/SUBMISSION.md`](docs/SUBMISSION.md#references).
 
-## 📐 Core Analytics & Frozen JSON Contract
-
-### 1. Field Drowning Risk Formulation (`30 m` Shared Grid, `EPSG:32651` / `EPSG:4326`)
-Each $30\text{ m}$ cell and farm parcel $p$ combines normalized C-band SAR wetness shift ($S_{\text{SAR}}$), Topographic Wetness Index ($S_{\text{TWI}}$), and storm rainfall ($S_{\text{Rain}}$):
-
-$$\text{RiskScore}_p = \text{round}\Big(100 \times \big(0.45 \cdot S_{\text{SAR},p} + 0.35 \cdot S_{\text{TWI},p} + 0.20 \cdot S_{\text{Rain},p}\big)\Big)$$
-
-- **`high` ($\ge 70$):** Immediate micro-drainage trenching / early salvage harvest.
-- **`watch` ($40\text{–}69$):** Clear perimeter furrows and monitor after rain bands.
-- **`low` ($< 40$):** Normal drainage; schedule post-harvest cover or legume rotation.
-- **Hit rate:** the headline 31% comes from the same rule *without* the SAR term (terrain + rain only), so it is an independent test against the radar's flood map. The full model's 100% is circular (radar on both sides) and is reported only as a consistency check.
-- **LSTM soil-saturation outlook** (`pipeline/soil_lstm.py`): forecasts root-zone saturation 1–7 days ahead from 30 days of NASA POWER weather plus the coming week's rain.
-- **Rotation fit** (`pipeline/rotation_engine.py`): each plot's three options are rated against its current crop using SoilGrids texture and drowning risk (e.g. legumes = caution on waterlogged plots).
-
-### 2. Frozen Frontend JSON Schema (`mock-data.json` / `GET /api/data`)
-All branches read and write against the frozen contract:
-- `provenance`: Pilot area, storm event reference, scene IDs, `sar_hit_rate`, `total_high_risk_ha`, `high_risk_plots`, `households_affected`, `avg_bare_field_days`, `processing_time`, `datasets_used`, `future_work_datasets`, and `scientific_limit`.
-- `plots`: GeoJSON `FeatureCollection` (`PL-01` to `PL-05`) with `risk_class`, `risk_score`, `sar_wetness_change_db`, `twi_value`, `current_crop`, `bare_field_days_per_year`, `plain_language_action`, and `sms_alert` ($\le 160$ chars).
-- `observed_flood_extent`: Post-storm Sentinel-1 SAR standing-water GeoJSON polygons.
-- `sar_backscatter_comparison`: `before_event` and `after_event` GeoJSON layers.
-- `drainage_corridor`: NASADEM flow-accumulation channel `LineString`.
-- `rotation_strategies`: Three ranked rotation options (`legume`, `biotillage`, `shortcycle`) with `priorities`, `mechanics`, `benefits`, and `risks_and_gaps`.
-
----
-
-## 🚀 Quick Start & Setup
-
-### 1. Install Python Dependencies (`feature/sar-moisture` & `feature/risk-engine`)
-```bash
-pip install -r requirements.txt
-```
-
-### 2. Run the Data & Risk Pipelines
-```bash
-# Everything in one go (runs SAR + terrain/rain + risk fusion; ~1 s from the committed cache)
-python -m pipeline.risk_engine            # add --refresh to re-download all satellite data
-
-# Or step by step
-python -m pipeline.sar_moisture           # Sentinel-1: Lee filter, ΔVV wetness change, flood mask
-python -m pipeline.terrain_rain           # NASADEM terrain + TWI, GPM IMERG / NASA POWER rainfall
-
-# Optional: retrain the LSTM soil-saturation model (needs PyTorch)
-pip install -r requirements-ml.txt && python -m pipeline.soil_lstm
-
-# Guian's terrain/rainfall package (works without WhiteboxTools)
-python terrain_rain/scripts/run_all.py
-```
-
-### 3. Launch the FastAPI Server & Dashboard
-```bash
-uvicorn api:app --reload --port 8000
-```
-- **Interactive Dashboard:** `http://localhost:8000/` (add `#outlook` to open the LSTM panel)
-- **OpenAPI / Swagger Docs:** `http://localhost:8000/docs`
-- **Run Test Suite:** `python -m pytest -q`
-
----
-
-## ⚠️ Scientific Limitations & AI-Use Disclosure
-
-1. **C-Band Surface Wetness vs. Direct Root-Zone Measurement:**
-   Surface wetness and ponding layers are derived from C-band ($5.6\text{ cm}$ wavelength) Sentinel-1 SAR backscatter and NASADEM micro-topographic pooling ($\text{TWI}$), not direct in-situ sub-surface soil moisture probes. Dense canopy volume scattering and specular water reflection are accounted for separately.
-2. **Decision-Support Scope:**
-   Drowning risk scores and crop rotation rankings are rule-based decision aids. Farmers, cooperatives, and municipal agriculturists must verify local drainage feasibility, seed availability, soil pH, labor, and market demand before planting.
-3. **Illustrative plot data:**
-   The five plot outlines, hectares, household counts, crops and bare-field days are sample values placed evenly across real farmland. The satellite measurements on them are real; replace the plot data with LGU parcel and census records for a pilot.
-4. **Not claimed:** no L-band dielectric inversion, no "7 days early" detection, and no "35–50% water saving". These appear in the original concept but are not built or tested here.
-5. **Use of AI Disclosure (NASA Space Apps Compliance):**
-   AI coding assistants (Anthropic Claude Code and Google Gemini in Antigravity) were used for software scaffolding, geospatial pipeline code, debugging, documentation and test generation. The team trained one machine-learning model itself: a small PyTorch LSTM on public NASA POWER data (`pipeline/soil_lstm.py`), evaluated on held-out years. All satellite datasets, hydrological formulas and validation metrics are computed deterministically from open NASA, ESA/Copernicus and ISRIC data. No AI-generated images or video are used, and no NASA logos appear in AI-generated content.
-
----
+**Software:** NumPy, SciPy, rasterio/GDAL, shapely, pyproj, FastAPI, PyTorch, MapLibre GL JS, Three.js, Lucide.
 
 ## 📜 License
-Released under the **MIT License** for the 2026 NASA Space Apps Challenge.
+
+[MIT](LICENSE) © 2026 SakaSAR team.
