@@ -5,10 +5,6 @@ let appData = null;
 let map = null;
 let is3D = true;
 let playInterval = null;
-<<<<<<< HEAD
-const DEFAULT_CENTER = [123.2057, 13.5416]; // Minalabac pilot strip; overridden by provenance.map_center
-let mapCenter = DEFAULT_CENTER;
-=======
 let timelineStage = 2; // Starts on Post-Storm SAR
 let sarMode = "off";
 let selectedPlotId = "PL-01";
@@ -908,7 +904,6 @@ function updateThreeSelectedPlot(plotId) {
     }
   });
 }
->>>>>>> 2e80ca5 (Implement 3D WebGL water shader, PBR parcel models, and refined SAR animations)
 
 async function initApp() {
   const res = await fetch(DATA_SOURCE_URL);
@@ -950,15 +945,9 @@ async function initApp() {
         }
       ]
     },
-<<<<<<< HEAD
-    center: mapCenter,
-    zoom: 14.8,
-    pitch: 52,
-=======
     center: ORIGIN_LNG_LAT,
     zoom: 15.0,
     pitch: 30,
->>>>>>> 2e80ca5 (Implement 3D WebGL water shader, PBR parcel models, and refined SAR animations)
     bearing: -12,
     attributionControl: { compact: true }
   });
