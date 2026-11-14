@@ -99,23 +99,26 @@ API: `/api/data`, `/api/plots`, `/api/risk-map`, `/api/rotations?priority=water|
 `/api/provenance`, `/api/soil-outlook`, plus whitelisted dashboard files and `/assets/<image>`.
 Never mount the repo root as static files.
 
-## 6. Dashboard (map-first rebuild, 15 Nov 2026)
+## 6. Dashboard (GIS workstation, 15 Nov 2026)
 
-- **The full-screen 3D map is the interface** (MapLibre 4.7.1, Terrarium terrain ×2.2, hillshade, sky). Everything else
-  floats in **windows** (`section.win`) that drag by their header, minimise (− or double-click), close (×) and reopen
-  from the top **dock**. Windows: Simulation, Situation, Layers, Event log, LSTM forecast, Town (opens on click).
-  Phone (≤760 px): windows become one bottom sheet at a time; the dock moves to the bottom.
-- **Bicol Region only.** Minalabac plots are no longer shown in the UI (the pipeline and `mock-data.json` still exist for the API).
-- **Simulation clock** (10 Oct – 8 Nov 2024; play, 1/2/4×, slider, ←/→, space) drives every layer from
-  `data/region/bicol_timeline.json` (`python -m pipeline.bicol_timeline`):
-  EONET storm marker interpolated between 6-hourly fixes, travelled track; NASA POWER daily rain as 3D columns per
-  ~0.5° cell (hidden above zoom 9.6); root-zone wetness grid; LSTM waterlogged-days grid; NASA GIBS imagery for the
-  simulated date (MODIS, VIIRS, IMERG, SMAP). The Sentinel-1 flood overlay and town shading appear from 2 Nov.
-- **Event log** is generated from the data (storm start / closest approach / peak wind, ≥120 mm days with the nearest town,
-  soil saturation, radar passes, flood map, LSTM skill). Nothing hand-written.
-- **LSTM window**: hindcast issued 3 Nov 2024 (forecast vs actual, per cell or region mean) and "Kristine again" on today's soil.
-- Tokens: logo green `#1f8a4c`, water `#2f9fd3`, high `#e2533c`, watch `#ee9f27`, white glass windows. Font: Outfit.
-- Show **only measured values**; SAR shows where water is, not its depth.
+- Layout: top bar (2D/3D, fit Bicol, fit storm track, save map PNG, copy link with view in the URL hash) · left panel with
+  tabs **Layers / Towns / Forecast / Events** (collapsible; bottom sheet on phones) · full map · bottom **timeline**
+  (rain bars = Bicol daily mean, event ticks, drag/arrow-key scrubber, play 1/2/4×, live stats). Bicol Region only.
+- **Heatmaps** are rasters rendered in the browser (`renderField` in app.js): the ~0.5° NASA POWER grid from
+  `data/region/bicol_timeline.json`, bilinear-interpolated in Web Mercator, masked to the town polygons, drawn to a
+  MapLibre canvas source. Fields: rain that day, rain since 10 Oct, root-zone wetness, LSTM waterlogged days. They fade
+  out above zoom 9 because the data are ~50 km.
+- **Flood**: hotspot heatmap = density of Sentinel-1 flooded pixels read from `bicol_flood.png` (binned ~1 km, warm ramp);
+  the 100 m raster from zoom 8.5; towns shaded by share flooded (fades at field zoom). All appear from the 2 Nov pass.
+- **Storm**: NASA EONET track coloured by PAGASA category, daily 00Z labels, live marker interpolated between fixes, and a
+  measured closest-pass line to Naga (≈263 km on 22 Oct). Kristine's centre crossed northern Luzon; Bicol's rain came from
+  its southern bands. Say this; do not imply a direct hit.
+- **Inspector** (click anywhere, draggable): Sentinel-1 pixel class at that point, town stats, NASA POWER values interpolated
+  to the point, distance to the storm, LSTM forecast vs actual for the nearest cell, actions. Hover readout shows coordinates,
+  town and the active heatmap value. Towns tab: provinces, ranking, search, CSV export.
+- NASA GIBS image of the day (MODIS, VIIRS, IMERG, SMAP) and basemaps (Esri satellite, CARTO map) are radio choices.
+- The map background is sea-coloured so tiles still loading never flash white.
+- Tokens: logo green `#1f8a4c` (controls), water `#2f9fd3`/`#1b5fa8`, storm `#e2533c`. Font: Outfit. Only measured values.
 
 ## 7. Honesty rules for code, docs and pitch
 

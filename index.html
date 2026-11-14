@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SakaSAR — Typhoon flood simulation for Bicol farms</title>
-  <meta name="description" content="3D replay of Typhoon Kristine over the Bicol Region: NASA rain and soil data, the storm track, Sentinel-1 flood mapping by town, and an LSTM forecast of waterlogged soil." />
+  <title>SakaSAR — Typhoon flood monitor for Bicol farms</title>
+  <meta name="description" content="GIS replay of Typhoon Kristine over the Bicol Region: NASA rain and soil heatmaps, the storm track, Sentinel-1 flood hotspots by town, and an LSTM forecast of waterlogged soil." />
   <link rel="icon" type="image/x-icon" href="favicon.ico" />
   <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png" />
@@ -20,80 +20,98 @@
   <meta name="twitter:image" content="https://sakasar.vercel.app/assets/logo.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <!-- The 3D map is the whole interface -->
-  <div id="map" aria-label="3D map of the Bicol Region"></div>
+  <div class="app" id="app">
+    <!-- ===== Top bar ===== -->
+    <header class="topbar">
+      <button type="button" class="icon-btn" id="btn-panel" aria-label="Show or hide the side panel" aria-expanded="true"><i data-lucide="panel-left"></i></button>
+      <img src="assets/sakasar-logo.png" alt="" width="30" height="30" class="logo" />
+      <div class="brand"><h1>SakaSAR</h1><p>Typhoon Kristine replay, Bicol Region</p></div>
+      <div class="top-actions">
+        <div class="seg small" role="group" aria-label="View">
+          <button type="button" data-view="2d">2D</button><button type="button" data-view="3d" aria-pressed="true">3D</button>
+        </div>
+        <button type="button" class="tool" id="btn-fit-bicol"><i data-lucide="scan"></i><span>Bicol</span></button>
+        <button type="button" class="tool" id="btn-fit-storm"><i data-lucide="tornado"></i><span>Storm track</span></button>
+        <button type="button" class="tool" id="btn-shot"><i data-lucide="image-down"></i><span>Save image</span></button>
+        <button type="button" class="tool" id="btn-link"><i data-lucide="link"></i><span>Copy link</span></button>
+      </div>
+    </header>
 
-  <header class="brand-bar">
-    <img src="assets/sakasar-logo.png" alt="" width="38" height="38" />
-    <div>
-      <h1>SakaSAR</h1>
-      <p>Typhoon Kristine over Bicol, October 2024</p>
-    </div>
-  </header>
+    <!-- ===== Side panel ===== -->
+    <aside class="panel" id="panel">
+      <nav class="tabs" role="tablist" aria-label="Panel">
+        <button type="button" role="tab" data-tab="layers" aria-selected="true"><i data-lucide="layers"></i>Layers</button>
+        <button type="button" role="tab" data-tab="towns" aria-selected="false"><i data-lucide="map-pin"></i>Towns</button>
+        <button type="button" role="tab" data-tab="forecast" aria-selected="false"><i data-lucide="brain-circuit"></i>Forecast</button>
+        <button type="button" role="tab" data-tab="events" aria-selected="false"><i data-lucide="list"></i>Events</button>
+      </nav>
 
-  <!-- Dock: reopen windows -->
-  <nav class="dock" id="dock" aria-label="Windows"></nav>
+      <section class="tab-body" id="tab-layers" role="tabpanel"></section>
 
-  <!-- ===== Windows (draggable, minimizable) ===== -->
-  <section class="win" id="win-sim" data-title="Simulation" data-icon="play-circle" style="--x:50%;--y:calc(100% - 16px);--w:min(760px, calc(100vw - 32px))" data-anchor="bottom-center">
-    <header class="win-head"><span class="win-title"><i data-lucide="play-circle"></i>Simulation</span><span class="win-ctl"></span></header>
-    <div class="win-body sim">
-      <div class="sim-row">
-        <button type="button" class="play" id="btn-play" aria-label="Play"><i data-lucide="play"></i></button>
-        <div class="sim-date"><b id="sim-date">2 Nov 2024</b><span id="sim-phase">After the storm</span></div>
-        <div class="speed" role="group" aria-label="Speed">
+      <section class="tab-body" id="tab-towns" role="tabpanel" hidden>
+        <div class="summary" id="summary"></div>
+        <h2 class="h">By province</h2>
+        <ul class="provinces" id="provinces"></ul>
+        <div class="h-row"><h2 class="h">Towns ranked by flooded farmland</h2><button type="button" class="link-btn" id="btn-csv"><i data-lucide="download"></i>CSV</button></div>
+        <label class="search"><i data-lucide="search"></i><input type="search" id="town-search" placeholder="Find a town or province" autocomplete="off" /></label>
+        <ol class="towns" id="towns"></ol>
+      </section>
+
+      <section class="tab-body" id="tab-forecast" role="tabpanel" hidden>
+        <div class="seg" role="group" aria-label="Forecast" id="ai-seg">
+          <button type="button" data-ai="hind" aria-pressed="true">After 2 Nov 2024</button>
+          <button type="button" data-ai="again">Kristine again, today</button>
+        </div>
+        <p class="lead" id="ai-lead"></p>
+        <div class="chart-box"><canvas id="ch-ai"></canvas></div>
+        <div class="chart-key" id="ai-key"></div>
+        <button type="button" class="btn" id="btn-ai-map"><i data-lucide="map"></i>Show waterlogged days on the map</button>
+        <p class="note" id="ai-hint"></p>
+        <h2 class="h">About the model</h2>
+        <p class="note">An LSTM trained on 2001–2018 NASA POWER daily weather. It reads 30 days of rain, temperature, humidity, sunlight and soil wetness, then forecasts root-zone wetness for the next 7 days. Each grid cell is about 50 km across: this is regional soil, not a paddy sensor.</p>
+      </section>
+
+      <section class="tab-body" id="tab-events" role="tabpanel" hidden>
+        <p class="note">Generated from the data. Click an event to jump to it.</p>
+        <ol class="events" id="events"></ol>
+      </section>
+    </aside>
+
+    <!-- ===== Map ===== -->
+    <main class="stage">
+      <div id="map" aria-label="Map of the Bicol Region"></div>
+      <div class="legend" id="legend" aria-live="polite"></div>
+      <div class="readout" id="readout">Move over the map to read values</div>
+
+      <section class="inspector" id="inspector" hidden aria-label="Point details">
+        <header class="insp-head"><span><i data-lucide="crosshair"></i><b id="insp-title">Point</b></span>
+          <button type="button" class="icon-btn" id="insp-close" aria-label="Close"><i data-lucide="x"></i></button></header>
+        <div class="insp-body" id="insp-body"></div>
+      </section>
+    </main>
+
+    <!-- ===== Timeline ===== -->
+    <footer class="timeline">
+      <button type="button" class="play" id="btn-play" aria-label="Play"><i data-lucide="play"></i></button>
+      <div class="tl-date"><b id="sim-date">2 Nov 2024</b><span id="sim-phase"></span>
+        <div class="seg tiny" role="group" aria-label="Speed" id="speed">
           <button type="button" data-speed="1" aria-pressed="true">1×</button><button type="button" data-speed="2">2×</button><button type="button" data-speed="4">4×</button>
         </div>
       </div>
-      <div class="sim-chart"><canvas id="ch-sim"></canvas></div>
-      <input type="range" id="sim-slider" min="0" max="29" step="0.05" value="23" aria-label="Day" />
-      <div class="sim-stats" id="sim-stats"></div>
-    </div>
-  </section>
-
-  <section class="win" id="win-situation" data-title="Situation" data-icon="gauge" style="--x:16px;--y:84px;--w:316px">
-    <header class="win-head"><span class="win-title"><i data-lucide="gauge"></i>Situation</span><span class="win-ctl"></span></header>
-    <div class="win-body">
-      <div class="kpis" id="kpis"></div>
-      <h3 class="sub">Towns to reach first</h3>
-      <p class="hint" id="towns-hint"></p>
-      <label class="search"><i data-lucide="search"></i><input type="search" id="town-search" placeholder="Find a town" autocomplete="off" /></label>
-      <ol class="towns" id="towns"></ol>
-    </div>
-  </section>
-
-  <section class="win" id="win-layers" data-title="Layers" data-icon="layers" style="--x:calc(100% - 16px);--y:84px;--w:300px" data-anchor="right" data-start="min">
-    <header class="win-head"><span class="win-title"><i data-lucide="layers"></i>Layers</span><span class="win-ctl"></span></header>
-    <div class="win-body layers" id="layers"></div>
-  </section>
-
-  <section class="win" id="win-log" data-title="Event log" data-icon="list" style="--x:calc(100% - 16px);--y:470px;--w:300px" data-anchor="right">
-    <header class="win-head"><span class="win-title"><i data-lucide="list"></i>Event log</span><span class="win-ctl"></span></header>
-    <div class="win-body"><ol class="log" id="log"></ol></div>
-  </section>
-
-  <section class="win" id="win-ai" data-title="LSTM forecast" data-icon="brain-circuit" style="--x:16px;--y:calc(100% - 16px);--w:340px" data-anchor="bottom-left" data-start="min">
-    <header class="win-head"><span class="win-title"><i data-lucide="brain-circuit"></i>LSTM forecast</span><span class="win-ctl"></span></header>
-    <div class="win-body">
-      <div class="seg" role="group" aria-label="Forecast" id="ai-seg">
-        <button type="button" data-ai="hind" aria-pressed="true">After 2 Nov 2024</button>
-        <button type="button" data-ai="again">Kristine again, today</button>
+      <div class="scrub" id="scrub" tabindex="0" role="slider" aria-label="Day" aria-valuemin="0" aria-valuemax="29">
+        <div class="ticks" id="ticks"></div>
+        <div class="bars" id="bars"></div>
+        <div class="days" id="days"></div>
+        <div class="head" id="playhead"></div>
       </div>
-      <p class="lead" id="ai-lead"></p>
-      <div class="ai-chart"><canvas id="ch-ai"></canvas></div>
-      <p class="hint" id="ai-hint"></p>
-    </div>
-  </section>
-
-  <section class="win" id="win-town" data-title="Town" data-icon="map-pin" style="--x:372px;--y:84px;--w:320px" hidden>
-    <header class="win-head"><span class="win-title"><i data-lucide="map-pin"></i><span id="town-title">Town</span></span><span class="win-ctl"></span></header>
-    <div class="win-body" id="town-body"></div>
-  </section>
+      <div class="tl-stats" id="sim-stats"></div>
+    </footer>
+  </div>
 
   <div class="toast" id="toast" role="status" hidden></div>
 
