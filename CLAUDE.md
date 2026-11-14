@@ -107,6 +107,9 @@ Never mount the repo root as static files.
 - Accuracy: Bicol figures are Bicol-land averages/peaks of the interpolated POWER grid (sea cells excluded); the day axis
   is Philippine time (UTC+8); the closest pass is measured to the EONET track line (≈259 km, 23 Oct 04:49 PHT).
 - Timeline is a short centred bar: play, date, rain bars + event ticks, rain over land, storm wind, speed button.
+- Layout (final): brand chip top-left (white, green wordmark), toolbar top-right, **rail on the right**, legend + readout
+  bottom-left, short timeline bottom-centre, map controls + scale + attribution bottom-right. Intro on white.
+  Workspace = left sidebar + titled page + one card. Details and next tasks: docs/ANTIGRAVITY.md §0.
 - **Windows** (rail buttons): SakaSAR AI, Layers, Towns, Field risk, LSTM forecast, Events, Data & method. Drag by the
   header, resize from the corner, minimise to the rail, close, or maximise/double-click to **teleport** into the
   full-screen **workspace** (section switcher, "Back to 3D map", Esc). Phones open panels straight in the workspace.

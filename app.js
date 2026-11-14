@@ -334,7 +334,7 @@ function initMap() {
     },
     ...(location.hash.includes("view=") ? {} : { center: [124.6, 12.6], zoom: 4.3, pitch: 0, bearing: 0 }),
   });
-  map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
+  map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "bottom-right");
   map.addControl(new maplibregl.ScaleControl({ unit: "metric", maxWidth: 110 }), "bottom-right");
   map.once("style.load", () => { map.setPadding(chromePadding()); addLayers(); S.ready = true; applyLayers(); setTime(S.t, true); renderPilotGrid(); finishIntro(); });
   setTimeout(finishIntro, 5000); // never keep the intro up if tiles are slow
@@ -1186,13 +1186,13 @@ function bindStory() {
 // Home is the 3D map. Each panel is a window: drag by the header, resize from the corner, minimise to the rail,
 // close, or maximise to "teleport" it into the full-screen workspace.
 const APPS = [
-  { id: "ai", title: "SakaSAR AI", icon: "message-square-text", ai: true },
-  { id: "layers", title: "Layers", icon: "layers" },
-  { id: "towns", title: "Towns", icon: "map-pin" },
-  { id: "fields", title: "Field risk", icon: "sprout" },
-  { id: "forecast", title: "LSTM forecast", icon: "brain-circuit" },
-  { id: "events", title: "Events", icon: "list" },
-  { id: "data", title: "Data & method", icon: "database" },
+  { id: "ai", title: "SakaSAR AI", icon: "message-square-text", ai: true, sub: "Ask about the place and day on the map. Every answer is built from SakaSAR's datasets." },
+  { id: "layers", title: "Layers", icon: "layers", sub: "Choose what the 3D map shows: NASA heatmaps, radar flood, storm track, satellite images and terrain." },
+  { id: "towns", title: "Towns", icon: "map-pin", sub: "Bicol towns ranked by farmland the Sentinel-1 radar saw under water on 2 Nov 2024." },
+  { id: "fields", title: "Field risk", icon: "sprout", sub: "30 m Field Drowning Risk for sample fields: score, what to do, the SMS alert and next-season rotations." },
+  { id: "forecast", title: "LSTM forecast", icon: "brain-circuit", sub: "How wet the root zone stays in the 7 days after the radar pass, from an LSTM trained on NASA POWER." },
+  { id: "events", title: "Events", icon: "list", sub: "What happened, day by day, generated from the data. Click one to jump there on the map." },
+  { id: "data", title: "Data & method", icon: "database", sub: "How the score works, the independent check, the datasets used and the limits." },
 ];
 const WM = { z: 30, ws: null, wsFromWin: false, state: {} };
 const phone = () => window.innerWidth <= 760;
@@ -1267,7 +1267,7 @@ function openApp(id) {
 function placeWin(w) {
   w.dataset.placed = "1";
   const W = window.innerWidth, ww = w.offsetWidth, top = 74;
-  const slots = [84, 84 + 392, W - ww - 64, Math.max(84, (W - ww) / 2)];
+  const slots = [W - ww - 84, W - ww - 84 - 392, 260, Math.max(16, (W - ww) / 2)];
   const open = [...document.querySelectorAll(".win:not([hidden])")].filter((x) => x !== w).map((x) => x.getBoundingClientRect());
   const free = slots.find((x) => !open.some((r) => x < r.right - 40 && x + ww > r.left + 40)) ?? slots[0] + open.length * 26;
   w.style.left = `${Math.min(free, W - ww - 12)}px`; w.style.top = `${top + (free === slots[0] + open.length * 26 ? open.length * 22 : 0)}px`;
@@ -1289,7 +1289,7 @@ function focusWin(id) {
 }
 function clampWin(w) {
   const r = w.getBoundingClientRect();
-  w.style.left = `${Math.max(70, Math.min(window.innerWidth - Math.min(r.width, 160), r.left))}px`;
+  w.style.left = `${Math.max(8, Math.min(window.innerWidth - Math.min(r.width, 160) - 70, r.left))}px`;
   w.style.top = `${Math.max(8, Math.min(window.innerHeight - 60, r.top))}px`;
 }
 function dragWin(w, id) {
@@ -1313,19 +1313,18 @@ function refreshCharts() { requestAnimationFrame(() => Object.values(S.charts).f
 
 // --- workspace: the teleport target ---
 function renderWsNav() {
-  $("ws-nav").innerHTML = APPS.map((a) => `<button type="button" data-ws="${a.id}" aria-pressed="${a.id === WM.ws}"><i data-lucide="${a.icon}"></i><span>${a.title}</span></button>`).join("");
+  $("ws-nav").innerHTML = APPS.map((a) => `<button type="button" data-ws="${a.id}" aria-current="${a.id === WM.ws ? "page" : "false"}"><i data-lucide="${a.icon}"></i><span>${a.title}</span></button>`).join("");
   $("ws-nav").querySelectorAll("[data-ws]").forEach((b) => b.addEventListener("click", () => wsShow(b.dataset.ws)));
-  $("ws-nav").querySelector(".seg-pill")?.remove();
-  initSegs($("ws-nav").parentElement);
   icons();
 }
 function wsShow(id) {
   const body = $("ws-body");
   if (WM.ws && WM.ws !== id) $(`win-${WM.ws}`).querySelector(".win-body").appendChild($(`tab-${WM.ws}`));
   WM.ws = id; WM.lastApp = id;
-  body.innerHTML = ""; body.appendChild($(`tab-${id}`)); body.scrollTop = 0;
+  body.innerHTML = ""; body.appendChild($(`tab-${id}`)); $("ws-main").scrollTop = 0;
+  const app = APPS.find((a) => a.id === id); $("ws-h1").textContent = app.title; $("ws-sub").textContent = app.sub || "";
   body.classList.remove("ws-enter"); void body.offsetWidth; body.classList.add("ws-enter");
-  $("ws-nav").querySelectorAll("[data-ws]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.ws === id)));
+  $("ws-nav").querySelectorAll("[data-ws]").forEach((b) => b.setAttribute("aria-current", b.dataset.ws === id ? "page" : "false"));
   refreshCharts();
   if (id === "ai") aiWelcome();
 }

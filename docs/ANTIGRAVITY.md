@@ -1,5 +1,33 @@
 # SakaSAR — brief for Antigravity agents (Gemini)
 
+> **Status, 15 Nov 2026 (last Claude session).** The UI is feature-complete. Adrian is low on tokens, so you continue
+> from here. Work in small commits, run `python -m pytest -q` before each, verify in a browser, and never undo the
+> decisions listed in "Current layout" below: they were requested by the team.
+
+## 0. Current layout (do not undo)
+
+- **Intro**: white screen, the original logo (`assets/sakasar-logo.png`, never redraw or recolour it), green
+  "SakaSAR" wordmark (Inter 800), one line of purpose, then a green scan line wipes to the map. Click skips.
+- **Home = the 3D map.** Top-left: white brand chip (logo + green wordmark, no subtitle). Top-right: toolbar
+  (2D/3D, Story, Bicol, Storm track, save image, copy link). **Right**: launcher rail (windows). **Bottom-left**:
+  legend, coordinate readout under it. **Bottom-centre**: short timeline. **Bottom-right corner**: zoom/tilt
+  controls, scale bar and attribution "i".
+- **Windows** open from the rail, away from it (right side first). Drag header, resize corner, minimise, close,
+  maximise/double-click = **teleport** to the workspace.
+- **Workspace (full frame)**: left sidebar (brand, section list, "Back to 3D map"), page title + one-line
+  description (`APPS[].sub`), content on one white card in two columns. Phone: sidebar becomes a top icon bar.
+- Colours: brand green `#17643a`, controls `#1f8a4c`, water `#2f9fd3`/`#1b5fa8`, storm `#e2533c`, white surfaces.
+  Fonts: Inter (UI, wordmark), Bricolage Grotesque (big figures only).
+
+## 0b. Next tasks, in priority order
+
+1. **Demo video (≤30 s)**: press Story, screen-record the 5 steps at 1534×728, add English subtitles.
+2. **README**: replace `assets/screenshots/*` with: intro, home, a window, the workspace (Field risk), the 30 m TWI layer.
+3. **docs/SUBMISSION.md**: fill the demo link and a published source for the reported Kristine flooding in Bicol.
+4. Small polish (only if time): the legend could collapse to its first item on screens under 800 px tall; add
+   `aria-live="polite"` to the AI chat list.
+5. Do **not** add datasets, change the risk formula, or rename JSON keys without asking Adrian.
+
 Read this first, then `CLAUDE.md` (the source of truth for data, method and honesty rules). This file tells you
 how the app is put together today and what is safe to work on. If the two disagree, `CLAUDE.md` and the code win.
 
@@ -60,7 +88,7 @@ http://localhost:8000. Tests: `python -m pytest -q` (27 must pass before any com
 ## 4. Design rules
 
 - Brand from the logo (`assets/sakasar-logo.png`: satellite, gold radar arcs, green field rings).
-  Tokens: `--night #0c2620`, `--gold #e9b234`, `--lime #8fd16b`, controls green `--green #1f8a4c`,
+  Tokens: brand `--brand #17643a`, `--night #0c2620`, `--gold #e9b234`, `--lime #8fd16b`, controls green `--green #1f8a4c`,
   water `#2f9fd3`/`#1b5fa8`, storm `#e2533c`. Solid white panels, small radii. Fonts: Inter (UI and the wordmark),
   Bricolage Grotesque (big figures only). Logo: always the original `assets/sakasar-logo.png` (do not redraw or recolour it); it sits on a green chip with a white wordmark. Brand = logo + "SakaSAR" only, no subtitle.
 - Home stays clean: map, brand chip, toolbar, rail, timeline, legend. Detail goes in windows or the workspace.

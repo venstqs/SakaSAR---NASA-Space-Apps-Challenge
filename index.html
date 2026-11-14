@@ -132,12 +132,15 @@
 
   <!-- Workspace: full-screen frame a window teleports into -->
   <div class="workspace" id="workspace" hidden>
-    <header class="ws-head">
-      <span class="ws-brand"><img src="assets/sakasar-logo.png" alt="" width="32" height="32" /><span class="wordmark">SakaSAR</span></span>
-      <nav class="seg ws-nav" id="ws-nav" aria-label="Workspace sections"></nav>
+    <aside class="ws-side">
+      <span class="ws-brand"><img src="assets/sakasar-logo.png" alt="" width="34" height="34" /><span class="wordmark">SakaSAR</span></span>
+      <nav class="ws-nav" id="ws-nav" aria-label="Workspace sections"></nav>
       <button type="button" class="btn" id="ws-back"><i data-lucide="globe-2"></i><span>Back to 3D map</span></button>
-    </header>
-    <main class="ws-body" id="ws-body"></main>
+    </aside>
+    <main class="ws-main" id="ws-main">
+      <header class="ws-title"><h1 id="ws-h1"></h1><p id="ws-sub"></p></header>
+      <div class="ws-body" id="ws-body"></div>
+    </main>
   </div>
 
   <!-- Intro: the SakaSAR logo, then a Sentinel-1 style swath wipes to the map -->
