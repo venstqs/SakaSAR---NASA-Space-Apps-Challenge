@@ -33,8 +33,8 @@ Screenshots are in `assets/screenshots/`.
 ## Link to final project
 
 - Repository: https://github.com/venstqs/SakaSAR---NASA-Space-Apps-Challenge
-- Live dashboard: https://venstqs.github.io/SakaSAR---NASA-Space-Apps-Challenge/
-  (LSTM panel opens directly at https://venstqs.github.io/SakaSAR---NASA-Space-Apps-Challenge/#outlook). Test both in a private window before submitting.
+- Live dashboard: https://sakasar.earth (mirrors: https://sakasar.vercel.app ·
+  https://venstqs.github.io/SakaSAR---NASA-Space-Apps-Challenge/). Test in a private window before submitting.
 
 ## Detailed project description
 

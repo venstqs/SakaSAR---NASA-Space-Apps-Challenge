@@ -43,7 +43,8 @@ Read this first, then `CLAUDE.md` (the source of truth for data, method and hone
 how the app is put together today and what is safe to work on. If the two disagree, `CLAUDE.md` and the code win.
 
 Deadline: **Sun 15 Nov 2026, 11:59 PM** (NASA Space Apps 2026, Field Shift challenge).
-Live: https://venstqs.github.io/SakaSAR---NASA-Space-Apps-Challenge/ (GitHub Pages from `main`) · Vercel mirror.
+Live: https://sakasar.earth (Vercel, deploys from `main`; also https://sakasar.vercel.app) · GitHub Pages mirror:
+https://venstqs.github.io/SakaSAR---NASA-Space-Apps-Challenge/
 
 ## 1. What the app is
 
