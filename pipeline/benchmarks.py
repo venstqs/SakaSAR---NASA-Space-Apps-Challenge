@@ -56,7 +56,8 @@ def main():
     v = ro["validation"]
     B["runoff"] = {**{k: v[k] for k in ("flooded_pixels_checked", "share_rated_high", "farmland_share_high", "land_share_high")},
                    "lift_over_farmland": round(v["share_rated_high"] / v["farmland_share_high"], 2),
-                   "lift_over_land": round(v["share_rated_high"] / v["land_share_high"], 2), "streams": ro["streams"]}
+                   "lift_over_land": round(v["share_rated_high"] / v["land_share_high"], 2), "streams": ro["streams"],
+                   "largest_catchment_km2": ro.get("largest_catchment_km2"), "bicol_river_basin_published_km2": ro.get("bicol_river_basin_published_km2")}
 
     # 3. Soil forecast (LSTM) at the pilot cell
     m = so["metrics"]
@@ -179,9 +180,12 @@ project's own outputs; rerun the command after changing a pipeline. Honest readi
 | Baseline: all farmland rated high | {pct(ru['farmland_share_high'])} (lift ×{ru['lift_over_farmland']}) |
 | Baseline: all land rated high | {pct(ru['land_share_high'])} (lift ×{ru['lift_over_land']}) |
 | Drainage lines (≥ 10 km² upstream) | {ru['streams']} |
+| Largest catchment in the 200 m DEM | {ru.get('largest_catchment_km2')} km² vs about {ru.get('bicol_river_basin_published_km2')} km² published for the Bicol River basin |
 
 Reading: the model never sees the radar. The fair comparison is against all farmland, because farmland is low-lying by
-nature; a ×{ru['lift_over_farmland']} lift is a real but modest signal.
+nature; a ×{ru['lift_over_farmland']} lift is a real but modest signal. The drainage network recovers about
+{round(100 * ru['largest_catchment_km2'] / ru['bicol_river_basin_published_km2']) if ru.get('largest_catchment_km2') else 'n/a'}% of the Bicol River basin: at 200 m, flat floodplains and lake surfaces (Bato, Baao, Buhi)
+send part of the upper basin elsewhere, so watershed tracing is a screening tool, not a basin map.
 
 ## 3. Soil forecast (root-zone wetness, 7 days ahead, pilot cell)
 

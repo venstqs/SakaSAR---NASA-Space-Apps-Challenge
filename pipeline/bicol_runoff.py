@@ -64,7 +64,11 @@ def main():
     to_utm = Transformer.from_crs("EPSG:4326", BR.CRS, always_xy=True).transform
     munis = json.loads((OUT / "bicol_municipalities.geojson").read_text(encoding="utf-8"))
     geoms = [shp_transform(to_utm, shape(f["geometry"])) for f in munis["features"]]
-    land = rasterize(((gm, 1) for gm in geoms), out_shape=(H, W), transform=t, fill=0, dtype="uint8").astype(bool)
+    land = rasterize(((gm, 1) for gm in geoms), out_shape=(H, W), transform=t, fill=0, dtype="uint8", all_touched=True).astype(bool)
+    # Rivers often ARE municipal boundaries: thin gaps between town polygons would act as sea outlets and cut the
+    # Bicol River into pieces. Close small gaps and fill enclosed holes so only true sea drains water off the grid.
+    from scipy import ndimage
+    land = ndimage.binary_fill_holes(ndimage.binary_closing(land, structure=np.ones((3, 3)), iterations=2))
     town_id = rasterize(((gm, i + 1) for i, gm in enumerate(geoms)), out_shape=(H, W), transform=t, fill=0, dtype="int32")
 
     work = np.where(land, np.nan_to_num(dem, nan=0.0), -50.0)  # sea is a low outlet
@@ -209,8 +213,33 @@ def main():
         "cell_m": CELL, "formula": "round(100 × (0.35·S_TWI + 0.20·S_Rain) / 0.55); S_TWI = clip((TWI−5)/10), S_Rain = clip(R/300), R = NASA POWER 14–26 Oct 2024",
         "rain_window": ["2024-10-14", "2024-10-26"], "stream_threshold_km2": STREAM_KM2, "streams": len(feats),
         "validation": validation, "towns": towns,
+        "largest_catchment_km2": round(float(up_km2[land].max()), 0), "bicol_river_basin_published_km2": 3770,
         "sources": ["NASADEM (via Microsoft Planetary Computer, 100 m → 200 m)", "NASA POWER regional daily rain", "Bicol municipal boundaries"],
     }
+    # ---------- flow directions for in-browser watershed tracing ----------
+    # R = D8 receiver 0-7 (terrain_rain.OFFSETS order), 254 = not Bicol land (trace stops at the coast), 255 = outlet
+    code = np.where(land, np.where(rec >= 0, rec, 255), 254).astype("uint8")
+    Image.fromarray(code, "L").save(OUT / "bicol_flowdir.png", optimize=True)
+    # cell (col,row) <-> lon/lat as 2nd-order polynomials fitted on a dense sample (UTM is smooth over Bicol)
+    sc, sr = np.meshgrid(np.linspace(0, W, 40), np.linspace(0, H, 40))
+    sx, sy = t * (sc.ravel(), sr.ravel())
+    slon, slat = Transformer.from_crs(BR.CRS, "EPSG:4326", always_xy=True).transform(sx, sy)
+    def design(a, b):
+        return np.stack([np.ones_like(a), a, b, a * a, a * b, b * b], axis=1)
+    A = design(sc.ravel(), sr.ravel()); Bm = design(np.asarray(slon), np.asarray(slat))
+    fwd_lon = np.linalg.lstsq(A, slon, rcond=None)[0]; fwd_lat = np.linalg.lstsq(A, slat, rcond=None)[0]
+    inv_c = np.linalg.lstsq(Bm, sc.ravel(), rcond=None)[0]; inv_r = np.linalg.lstsq(Bm, sr.ravel(), rcond=None)[0]
+    err_m = float(np.max(np.hypot((A @ fwd_lon - slon) * 111320 * math.cos(math.radians(13)), (A @ fwd_lat - slat) * 110540)))
+    flow = {"image": "data/region/bicol_flowdir.png", "width": W, "height": H, "cell_m": CELL,
+            "offsets": [list(o) for o in OFFSETS], "codes": {"254": "not Bicol land", "255": "outlet"},
+            "cell_to_lonlat": {"lon": [float(v) for v in fwd_lon], "lat": [float(v) for v in fwd_lat]},
+            "lonlat_to_cell": {"col": [float(v) for v in inv_c], "row": [float(v) for v in inv_r]},
+            "terms": "[1, a, b, a*a, a*b, b*b]", "fit_max_error_m": round(err_m, 1),
+            "source": "NASADEM 200 m, priority-flood filled, D8 (pipeline/bicol_runoff.py)"}
+    (OUT / "bicol_flowdir.json").write_text(json.dumps(flow), encoding="utf-8")
+    log(f"flow directions exported; polynomial fit max error {err_m:.1f} m")
+    log(f"largest catchment {up_km2[land].max():.0f} km2 (Bicol River basin is about 3,770 km2)")
+
     (OUT / "bicol_runoff.json").write_text(json.dumps(doc, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     log(f"done in {time.perf_counter() - t0:.0f} s")
 

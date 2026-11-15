@@ -118,6 +118,7 @@ async function init() {
   ]);
   fetchJSON("data/region/pilot_grids.json").then((g) => { S.pgrid = g; renderPilotGrid(); });
   fetchJSON("data/region/bicol_runoff.json").then((r) => { S.runoff = r; loadRunoff(); renderData(); });
+  fetchJSON("data/region/bicol_flowdir.json").then((f) => f && loadFlow(f));
   fetchJSON("data/region/benchmarks.json").then((b) => { S.bench = b; renderData(); renderAI(); });
   S.pilot = pilot && pilot.plots ? pilot : null;
   if (!tl || !munis) { toast("Could not load the Bicol data files. Run the API from the project folder."); return; }
@@ -527,7 +528,8 @@ function inspect(lon, lat) {
       ${pgInspectHTML(lon, lat)}
     </dl>
     ${h ? `<div class="insp-chart"><canvas id="ch-insp"></canvas></div>` : ""}
-    ${t ? `<button type="button" class="btn report-btn" data-report="${esc(t.name)}|${esc(t.province)}"><i data-lucide="file-text"></i>Town flood report</button>` : ""}
+    <div class="insp-actions">${S.flow ? `<button type="button" class="btn water-btn" data-water="${lon},${lat}"><i data-lucide="waves"></i>Where does the water go?</button>` : ""}
+    ${t ? `<button type="button" class="btn report-btn" data-report="${esc(t.name)}|${esc(t.province)}"><i data-lucide="file-text"></i>Town flood report</button>` : ""}</div>
     ${acts.length ? `<div class="kv"><div class="sec">What to do</div></div><ul class="actions">${acts.map((a, i) => `<li class="${i === 0 && share >= 0.15 ? "warn" : ""}">${esc(a)}</li>`).join("")}</ul>` : ""}`;
   const box = $("inspector");
   box.style.zIndex = String(++WM.z); // above any open window
@@ -540,6 +542,7 @@ function inspect(lon, lat) {
     box.style.setProperty("--oy", `${Math.max(0, Math.min(100, ((pt.y + r.top - br.top) / br.height) * 100))}%`);
     box.classList.remove("pop"); void box.offsetWidth; box.classList.add("pop");
   }
+  $("insp-body").querySelector("[data-water]")?.addEventListener("click", (e) => { const [a, b] = e.currentTarget.dataset.water.split(",").map(Number); traceWater(a, b); });
   $("insp-body").querySelector("[data-report]")?.addEventListener("click", (e) => { const [n, p] = e.currentTarget.dataset.report.split("|"); townReport(n, p); });
   aiOnInspect();
   if (h && window.Chart) {
@@ -573,7 +576,6 @@ function setTime(t, force) {
   if (di !== S.dayShown || force) {
     S.dayShown = di;
     $("sim-date").textContent = label(iso);
-    if ($("brand-status")) $("brand-status").textContent = `Kristine replay, ${short(iso)} 2024`;
     $("sim-phase").textContent = iso < "2024-10-20" ? "Before the storm" : iso < "2024-10-22" ? "Outer rain bands reach Bicol" : iso < "2024-10-24" ? "Heaviest rain as Kristine passes north of Bicol" : iso < "2024-10-26" ? "Kristine crosses northern Luzon" : iso < "2024-11-02" ? "Floodwater spreads; no usable radar pass yet" : "Sentinel-1 flood map available";
     document.querySelectorAll("#bars i").forEach((b, i) => b.classList.toggle("past", i <= di));
     renderStats(di);
@@ -872,6 +874,11 @@ function renderLayers() {
     <p class="h">Runoff, all of Bicol (terrain + rain, 200 m)</p>
     ${toggle("runoff", "Runoff & ponding risk", "Where Kristine's rain collects: NASADEM wetness index + NASA POWER rain. Modelled, not observed")}
     ${toggle("streams", "Drainage network", "NASADEM flow paths draining 10 km² or more; thicker = bigger catchment")}
+    <div class="whatif">
+      <div class="whatif-head"><b>What if more rain fell?</b><button type="button" class="link-btn" id="wi-reset">Kristine</button></div>
+      <input type="range" id="wi-rain" min="0" max="400" step="10" value="0" aria-label="Storm rain for the what-if, mm" />
+      <div class="whatif-out" id="wi-out">Drag to test a uniform storm rain over Bicol (event + the week before). 0 = Kristine's real rain.</div>
+    </div>
     <p class="h">Field Drowning Risk, 30 m (sample fields)</p>
     ${toggle("pilot", "Risk zones and fields", "High, watch and low cells; field outlines, flood edge and drainage channel. From zoom 11")}
     ${toggle("sarchange", "Radar wetness change", "Cells where Sentinel-1 VV dropped by 1 dB or more after the storm")}
@@ -916,6 +923,8 @@ function renderLayers() {
   const fillRange = (el) => el.style.setProperty("--p", `${((el.value - el.min) / (el.max - el.min)) * 100}%`);
   tab.querySelectorAll('input[type="range"]').forEach(fillRange);
   $("field-op").addEventListener("input", (e) => { fillRange(e.target); S.fieldOpacity = Number(e.target.value); $("field-op-v").textContent = `${Math.round(S.fieldOpacity * 100)}%`; if (S.ready) map.setPaintProperty("field", "raster-opacity", fieldOp()); });
+  $("wi-rain").addEventListener("input", (e) => { fillRange(e.target); whatIf(Number(e.target.value)); });
+  $("wi-reset").addEventListener("click", () => { $("wi-rain").value = 0; fillRange($("wi-rain")); whatIf(0); });
   $("exag").addEventListener("input", (e) => { fillRange(e.target); $("exag-v").textContent = `${Number(e.target.value).toFixed(1)}×`; applyLayers(); });
 }
 function setField(k) {
@@ -1537,7 +1546,8 @@ function aiSuggestions(c) {
     t ? `What should farmers in ${t} do?` : "Which towns need help first?",
     t ? `How bad is the flooding in ${t}?` : "How much farmland flooded?",
     "Will the soil drain this week?",
-    t ? `Where does runoff collect in ${t}?` : "Where does runoff collect?",
+    t ? `Where does runoff collect in ${t}?` : "What if 150 mm fell?",
+    c.lon != null ? "Where does the water go from here?" : "Where does runoff collect?",
     S.pilot ? `Explain the risk for ${S.plot}` : "Where was the storm?",
     t ? `Make a flood report for ${t}` : "What should farmers plant next season?",
     "How accurate is this?",
@@ -1568,6 +1578,17 @@ function aiAnswer(q, c) {
       ${pv ? `<li>Of the farmland the radar saw flooded on 2 Nov, <b>${esc(pv.sar_hit_rate)}</b> had already been rated high by the terrain + rain model, which never saw the radar.</li>` : ""}
       ${tl.lstm_hindcast ? `<li>The 7-day soil forecast issued 3 Nov was right within 1 day in <b>${tl.lstm_hindcast.cells.filter((x) => x && Math.abs(x.days_pred - x.days_actual) <= 1).length} of ${tl.lstm_hindcast.cells.filter(Boolean).length}</b> Bicol grid cells.</li>` : ""}
       <li>Limits: C-band radar sees surface water, not root-zone moisture; NASA POWER cells are about 50 km.</li></ul>` };
+  }
+  if (has("water go", "where does the water", "catchment", "watershed", "upstream", "downstream", "flow path")) {
+    if (c.lon == null) return { who: "bot", html: "<p>Click a place on the map first, then ask where its water goes.</p>" };
+    const w = traceWater(c.lon, c.lat, true);
+    if (!w) return { who: "bot", html: "<p>That spot is outside Bicol's land, so there is no flow path to trace.</p>" };
+    return { who: "bot", src: ["NASADEM 200 m"], html: `<p>Water at this spot comes from <b>${fmt(w.areaKm2, 1)} km²</b> of land upstream${w.upTowns.length ? `, across ${w.upTowns.slice(0, 4).map(esc).join(", ")}${w.upTowns.length > 4 ? " and more" : ""}` : ""}. It then flows <b>${fmt(w.lengthKm, 1)} km</b> ${w.endsAtSea ? "to the sea" : "to a low point"}${w.downTowns.length ? `, through ${w.downTowns.map(esc).join(", ")}` : ""}.</p><p>I drew both on the map. Small ditches and canals are not in the 200 m elevation model.</p>` };
+  }
+  if (has("what if", "more rain", "if it rains")) {
+    const m = s.match(/(\d{2,3})\s*mm/); if (!m || !S.runoffVals) return { who: "bot", html: "<p>Tell me an amount, for example \"what if 150 mm fell?\". The slider in Layers does the same.</p>" };
+    const r = whatIf(Number(m[1]));
+    return { who: "bot", src: ["NASADEM", "Runoff model"], html: `<p>With ${m[1]} mm everywhere, <b>${pct(r.high)}</b> of Bicol's land would be rated high for runoff and ponding (Kristine: ${pct(S.runoff.validation.land_share_high)}). The map now shows that scenario; press Kristine in Layers to reset.</p>` };
   }
   if (has("report", "print", "damage report", "summary for")) {
     const t = c.town; if (!t) return { who: "bot", html: "<p>Click a town on the map first, then ask for its report.</p>" };
@@ -1889,6 +1910,142 @@ function bindDraw() {
   $("draw-cancel").addEventListener("click", () => { drawStop(); S.draw.pts = []; drawRender(); });
   $("draw-finish").addEventListener("click", drawFinish);
   document.addEventListener("keydown", (e) => { if (S.draw.on && e.key === "Escape") { drawStop(); S.draw.pts = []; drawRender(); } if (S.draw.on && e.key === "Enter") drawFinish(); });
+}
+
+// ================= Watershed tracing on NASADEM D8 (all of Bicol, 200 m) =================
+// Upstream catchment = every cell whose flow path passes through the clicked cell (breadth-first over reversed D8);
+// downstream path = follow receivers to the coast or a low point. Cell↔lon/lat via a fitted 2nd-order polynomial.
+async function loadFlow(meta) {
+  const c = await loadImageCanvas(meta.image); if (!c) return;
+  const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data, code = new Uint8Array(meta.width * meta.height);
+  for (let i = 0; i < code.length; i++) code[i] = d[i * 4];
+  // flow accumulation (cells draining through each cell), topological order over D8 — used to snap clicks to channels
+  const W = meta.width, H = meta.height, off = meta.offsets, recv = new Int32Array(W * H).fill(-1), indeg = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) { const k = code[i]; if (k > 7) continue; const r = (i / W) | 0, nr = r + off[k][0], nc = i - r * W + off[k][1];
+    if (nr >= 0 && nc >= 0 && nr < H && nc < W) { recv[i] = nr * W + nc; indeg[recv[i]]++; } }
+  const acc = new Float32Array(W * H).fill(1), q = new Int32Array(W * H); let qh = 0, qt = 0;
+  for (let i = 0; i < W * H; i++) if (!indeg[i] && code[i] <= 7) q[qt++] = i;
+  while (qh < qt) { const i = q[qh++], j = recv[i]; if (j < 0) continue; acc[j] += acc[i]; if (--indeg[j] === 0 && code[j] <= 7) q[qt++] = j; }
+  S.flow = { ...meta, code, acc };
+}
+const poly2 = (k, a, b) => k[0] + k[1] * a + k[2] * b + k[3] * a * a + k[4] * a * b + k[5] * b * b;
+const cellLL = (c, r) => [poly2(S.flow.cell_to_lonlat.lon, c + 0.5, r + 0.5), poly2(S.flow.cell_to_lonlat.lat, c + 0.5, r + 0.5)];
+function llCell(lon, lat) { const F = S.flow; return [Math.floor(poly2(F.lonlat_to_cell.col, lon, lat)), Math.floor(poly2(F.lonlat_to_cell.row, lon, lat))]; }
+function traceWater(lon, lat, quiet) {
+  const F = S.flow; if (!F) return null;
+  let [c, r] = llCell(lon, lat); const W = F.width, H = F.height, code = F.code, off = F.offsets;
+  if (c < 0 || r < 0 || c >= W || r >= H || code[r * W + c] === 254) { if (!quiet) toast("Outside Bicol's land: no flow path to trace."); return null; }
+  // pour-point snapping: move the click to the biggest drainage line within ~1 km (5 cells), as GIS tools do
+  let start = r * W + c, snappedM = 0;
+  if (F.acc && F.acc[start] < 25) {
+    let best = start;
+    for (let dr = -5; dr <= 5; dr++) for (let dc = -5; dc <= 5; dc++) {
+      const rr = r + dr, cc2 = c + dc; if (rr < 0 || cc2 < 0 || rr >= H || cc2 >= W) continue;
+      const j = rr * W + cc2; if (code[j] <= 7 && F.acc[j] > F.acc[best]) best = j;
+    }
+    if (best !== start && F.acc[best] >= 25) { const br = (best / W) | 0; snappedM = Math.round(Math.hypot(br - r, best - br * W - c) * F.cell_m); start = best; r = br; c = best - br * W; }
+  }
+  // upstream: reversed D8, breadth-first
+  const seen = new Uint8Array(W * H), q = new Int32Array(W * H); let qh = 0, qt = 0; q[qt++] = start; seen[start] = 1;
+  let mnc = c, mxc = c, mnr = r, mxr = r;
+  while (qh < qt) {
+    const i = q[qh++], ir = (i / W) | 0, ic = i - ir * W;
+    for (let k = 0; k < 8; k++) {
+      const nr = ir - off[k][0], nc = ic - off[k][1]; // neighbour that would drain INTO i via direction k
+      if (nr < 0 || nc < 0 || nr >= H || nc >= W) continue;
+      const j = nr * W + nc; if (seen[j] || code[j] !== k) continue;
+      seen[j] = 1; q[qt++] = j; if (nc < mnc) mnc = nc; if (nc > mxc) mxc = nc; if (nr < mnr) mnr = nr; if (nr > mxr) mxr = nr;
+    }
+  }
+  const n = qt, areaKm2 = n * (F.cell_m / 1000) ** 2;
+  // downstream path
+  const path = [cellLL(c, r)]; let lengthM = 0, cur = start, endsAtSea = false;
+  for (let step = 0; step < 6000; step++) {
+    const k = code[cur]; if (k === 255) break; if (k === 254) { endsAtSea = true; break; }
+    const cr = (cur / W) | 0, cc = cur - cr * W, nr = cr + off[k][0], ncl = cc + off[k][1];
+    if (nr < 0 || ncl < 0 || nr >= H || ncl >= W) { endsAtSea = true; break; }
+    lengthM += off[k][0] && off[k][1] ? F.cell_m * Math.SQRT2 : F.cell_m; cur = nr * W + ncl; path.push(cellLL(ncl, nr));
+    if (code[cur] === 254) { endsAtSea = true; break; }
+  }
+  // towns along the way (sampled)
+  const downTowns = [...new Set(path.filter((_, i) => i % 5 === 0).map((p) => townAt(p[0], p[1])?.name).filter(Boolean))];
+  const upSet = new Set(); for (let i = 0; i < n; i += Math.max(1, Math.floor(n / 400))) { const ir = (q[i] / W) | 0, [a, b] = cellLL(q[i] - ir * W, ir); const t = townAt(a, b); if (t) upSet.add(t.name); }
+  // draw: catchment as a raster (cells → Web Mercator canvas), path as a line
+  const [w0, n0] = cellLL(mnc, mnr), [e0, s0] = cellLL(mxc + 1, mxr + 1), pad = 0.003;
+  const bw = Math.min(w0, cellLL(mnc, mxr + 1)[0]) - pad, be = Math.max(e0, cellLL(mxc + 1, mnr)[0]) + pad;
+  const bn = Math.max(n0, cellLL(mxc + 1, mnr)[1]) + pad, bs = Math.min(s0, cellLL(mnc, mxr + 1)[1]) - pad;
+  const PX = Math.min(1400, Math.max(64, (mxc - mnc + 3) * 2)), PY = Math.max(32, Math.round(PX * (mercY(bn) - mercY(bs)) / (((be - bw) * Math.PI) / 180)));
+  const cv = document.createElement("canvas"); cv.width = PX; cv.height = PY; const g = cv.getContext("2d");
+  g.fillStyle = "rgba(0, 170, 190, 0.42)";
+  const cellPx = Math.max(1, Math.ceil((PX / (be - bw)) * (F.cell_m / 111320)) + 1);
+  for (let i = 0; i < n; i++) { const ir = (q[i] / W) | 0, [a, b] = cellLL(q[i] - ir * W, ir); g.fillRect(((a - bw) / (be - bw)) * PX - cellPx / 2, ((mercY(bn) - mercY(b)) / (mercY(bn) - mercY(bs))) * PY - cellPx / 2, cellPx, cellPx); }
+  registerRaster("catch", cv, bw, be, bn, bs, false);
+  const key = Date.now();
+  if (!map.getSource("catch")) {
+    map.addSource("catch", { type: "raster", tiles: [`saka://catch/${key}/{z}/{x}/{y}`], tileSize: 256, maxzoom: 14 });
+    map.addLayer({ id: "catch", type: "raster", source: "catch", paint: { "raster-opacity": 0.9, "raster-fade-duration": 0 } });
+    map.addSource("flowpath", { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: path } } });
+    map.addLayer({ id: "flowpath-casing", type: "line", source: "flowpath", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#063b52", "line-width": 6 } });
+    map.addLayer({ id: "flowpath", type: "line", source: "flowpath", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#7fe9ff", "line-width": 3, "line-dasharray": [2, 1.4] } });
+  } else {
+    map.getSource("catch").setTiles([`saka://catch/${key}/{z}/{x}/{y}`]);
+    map.getSource("flowpath").setData({ type: "Feature", geometry: { type: "LineString", coordinates: path } });
+  }
+  ["catch", "flowpath-casing", "flowpath"].forEach((id) => vis(id, true));
+  const res = { areaKm2, lengthKm: lengthM / 1000, endsAtSea, downTowns, upTowns: [...upSet], cells: n, snappedM };
+  if (!quiet) {
+    const box = $("inspector");
+    $("insp-title").textContent = "Where the water goes";
+    $("insp-body").innerHTML = `<div class="water-card">
+      <div><b>${fmt(areaKm2, areaKm2 < 10 ? 2 : 0)} km²</b><span>of land drains to this spot (upstream catchment)</span></div>
+      <div><b>${fmt(res.lengthKm, 1)} km</b><span>flow path ${endsAtSea ? "to the sea" : "to a low point"}</span></div></div>
+      <dl class="kv">
+        <dt>Upstream towns</dt><dd>${res.upTowns.length ? res.upTowns.slice(0, 6).map(esc).join(", ") + (res.upTowns.length > 6 ? ` +${res.upTowns.length - 6}` : "") : "this town only"}</dd>
+        <dt>Downstream towns</dt><dd>${downTowns.length ? downTowns.map(esc).join(" → ") : "n/a"}</dd>
+        <div class="sec">What it means</div>
+      </dl>
+      <ul class="actions">
+        <li>${areaKm2 > 50 ? "A large area drains here: water keeps arriving for days after the rain stops. Clear the outlet channel before the next storm." : areaKm2 > 5 ? "A medium catchment drains here: expect runoff for a day or two after heavy rain." : "A small catchment: local rain matters most; field outlets and bunds are the main defence."}</li>
+        <li>Coordinate drainage work with the upstream barangays listed above; their runoff reaches this spot.</li>
+        <li>The dashed line shows where to keep channels open so water can leave.</li>
+      </ul>
+      ${snappedM ? `<p class="note">Snapped ${fmt(snappedM)} m to the nearest drainage line, where the water from your spot joins.</p>` : ""}
+      <p class="note" style="margin-top:10px">NASADEM 200 m, depressions filled, D8 flow (${n.toLocaleString()} cells). Small ditches, canals and culverts are not in the elevation model.</p>
+      <button type="button" class="btn ghost" id="water-clear" style="margin-top:10px"><i data-lucide="eraser"></i>Clear</button>`;
+    box.hidden = false; box.style.zIndex = String(++WM.z); $("insp-body").scrollTop = 0; icons();
+    $("water-clear").addEventListener("click", () => { ["catch", "flowpath-casing", "flowpath"].forEach((id) => vis(id, false)); box.hidden = true; });
+    if (areaKm2 > 1) map.fitBounds([[bw, bs], [be, bn]].map((p, i) => p), { padding: chromePadding(), maxZoom: 13, duration: 1200, pitch: tilt(30) });
+  }
+  return res;
+}
+
+// ================= Rain what-if: recompute the Bicol runoff layer for a uniform storm rain =================
+const WI_STOPS = [[60, [190, 225, 240, 0]], [66, [150, 205, 235, 110]], [70, [47, 159, 211, 170]], [82, [27, 95, 170, 200]], [100, [40, 30, 120, 225]]];
+function whatIf(mm) {
+  const V = S.runoffVals; if (!V) return null;
+  const real = mm <= 0, c = document.createElement("canvas"); c.width = V.W; c.height = V.H;
+  const g = c.getContext("2d"), img = g.createImageData(V.W, V.H), d = img.data, sRain = Math.min(1, mm / 300);
+  let land = 0, high = 0;
+  for (let i = 0; i < V.W * V.H; i++) {
+    if (!V.d[i * 4 + 3]) continue;
+    land++;
+    const sc = real ? V.d[i * 4] : Math.round((100 * (0.35 * Math.min(1, Math.max(0, (V.d[i * 4 + 1] / 10 - 5) / 10)) + 0.2 * sRain)) / 0.55);
+    if (sc >= 70) high++;
+    if (sc < 60) continue;
+    let j = WI_STOPS.findIndex((s) => s[0] >= sc); if (j <= 0) j = 1;
+    const a = WI_STOPS[j - 1], b = WI_STOPS[j], f = Math.min(1, (sc - a[0]) / (b[0] - a[0]));
+    for (let k = 0; k < 4; k++) d[i * 4 + k] = a[1][k] + (b[1][k] - a[1][k]) * f;
+  }
+  g.putImageData(img, 0, 0);
+  const ro = S.runoff, [[w, n], [e], , [, s]] = ro.coordinates;
+  registerRaster("runoff", c, w, e, n, s, false);
+  map.getSource("runoff")?.setTiles([`saka://runoff/wi${mm}-${Date.now()}/{z}/{x}/{y}`]);
+  if (!S.layers.runoff) { S.layers.runoff = true; const cb = document.querySelector('input[data-layer="runoff"]'); if (cb) cb.checked = true; applyLayers(); }
+  const res = { high: land ? high / land : 0 };
+  const out = $("wi-out");
+  if (out) out.innerHTML = real ? `Kristine's real rain: <b>${pct(ro.validation.land_share_high)}</b> of Bicol land rated high.`
+    : `<b>${mm} mm</b> everywhere: <b>${pct(res.high)}</b> of Bicol land rated high (Kristine: ${pct(ro.validation.land_share_high)}). ${mm >= 300 ? "Rain is capped at 300 mm in the score, as in the field risk formula." : ""}`;
+  return res;
 }
 
 init();
