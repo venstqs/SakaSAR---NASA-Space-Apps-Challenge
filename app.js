@@ -488,7 +488,7 @@ function applyLayers() {
   renderLegend();
 }
 function setBasemap(k) {
-  S.basemap = k;
+  S.basemap = k; $("app").dataset.basemap = k;
   const src = map.getSource("base"); if (!src) return;
   src.setTiles(BASEMAPS[k].tiles);
   map.setPaintProperty("towns-line", "line-color", k === "sat" ? "rgba(255,255,255,0.75)" : "rgba(19,38,28,0.35)");
