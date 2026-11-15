@@ -140,6 +140,7 @@ async function init() {
   renderFields();
   renderData();
   bindStory();
+  bindDraw();
   buildWindows();
   buildTimeline();
   initMap();
@@ -349,9 +350,11 @@ function initMap() {
       requestAnimationFrame(() => { rttQueued = false; map.terrain?.sourceCache?.freeRtt?.(); map.triggerRepaint(); });
     }
   });
+  map.on("dblclick", (e) => { if (S.draw?.on) { e.preventDefault(); drawFinish(); } });
   map.on("mousemove", onHover);
   map.on("mouseout", () => { $("readout").innerHTML = "Move over the map to read values"; hoverPopup?.remove(); });
   map.on("click", (e) => {
+    if (S.draw?.on) { drawAdd(e.lngLat); return; }
     const hit = S.ready && map.getLayer("plots-fill") && S.layers.pilot ? map.queryRenderedFeatures(e.point, { layers: ["plots-fill"] }) : [];
     if (hit.length) { selectPlot(hit[0].properties.plot_id, true); return; }
     inspect(e.lngLat.lng, e.lngLat.lat);
@@ -500,7 +503,7 @@ function inspect(lon, lat) {
     : share >= 0.03 ? ["Check low-lying barangays near rivers and lakes first.", "Advise farmers to open field outlets and dig drainage trenches.", "Re-check after the next Sentinel-1 pass (every 12 days)."]
       : ["Little flooded farmland seen by radar: routine monitoring.", "Radar can miss water under tall crops; confirm with barangay reports."];
   $("insp-title").textContent = t ? `${t.name}, ${t.province}` : "Point outside Bicol towns";
-  $("insp-body").innerHTML = `
+  $("insp-body").innerHTML = `${farmerCard(farmerAt(lon, lat, t))}
     <p class="coord">${lat.toFixed(5)}° N, ${lon.toFixed(5)}° E${elevAt(lon, lat) != null ? `, about ${fmt(elevAt(lon, lat))} m above sea level` : ""}</p>
     <dl class="kv">
       <dt>Radar flood map (this pixel)</dt><dd>${flPill}</dd>
@@ -570,6 +573,7 @@ function setTime(t, force) {
   if (di !== S.dayShown || force) {
     S.dayShown = di;
     $("sim-date").textContent = label(iso);
+    if ($("brand-status")) $("brand-status").textContent = `Kristine replay, ${short(iso)} 2024`;
     $("sim-phase").textContent = iso < "2024-10-20" ? "Before the storm" : iso < "2024-10-22" ? "Outer rain bands reach Bicol" : iso < "2024-10-24" ? "Heaviest rain as Kristine passes north of Bicol" : iso < "2024-10-26" ? "Kristine crosses northern Luzon" : iso < "2024-11-02" ? "Floodwater spreads; no usable radar pass yet" : "Sentinel-1 flood map available";
     document.querySelectorAll("#bars i").forEach((b, i) => b.classList.toggle("past", i <= di));
     renderStats(di);
@@ -1101,7 +1105,7 @@ function renderFields() {
   box.innerHTML = `
     <div class="pilot-head">
       <div><h2>Field Drowning Risk, 30 m</h2><p>Every 30 m cell scored from Sentinel-1 radar, NASADEM terrain and GPM rain. Shown here for five sample fields in Minalabac, Camarines Sur, in the worst-hit part of Bicol.</p></div>
-      <button type="button" class="btn ghost" id="btn-fly-pilot"><i data-lucide="locate-fixed"></i>Go</button>
+      <span style="display:grid;gap:6px"><button type="button" class="btn ghost" id="btn-fly-pilot"><i data-lucide="locate-fixed"></i>Go</button><button type="button" class="btn ghost" onclick="drawStart()"><i data-lucide="pen-tool"></i>Trace</button></span>
     </div>
     <div class="metrics">
       <div><b>${fmt(pv.total_high_risk_ha, 1)} ha</b><span>of the sample fields rated high risk${pending("hectares")}</span></div>
@@ -1118,6 +1122,10 @@ function renderFields() {
       <p class="sub2">${esc(p.barangay)}, ${fmt(p.hectares, 1)} ha${pending("hectares")}, ${esc(p.current_crop)}${pending("current_crop")}</p>
       <div class="score"><div class="num">${p.risk_score}<small>/100</small></div>
         <div><span class="cls">${RISK_W[p.risk_class]} drowning risk</span><div class="scale"><i style="left:${p.risk_score}%"></i></div><div class="scale-l"><span>0</span><span>Watch 40</span><span>High 70</span><span>100</span></div></div></div>
+      ${p.risk_zone_shares ? `<div class="why"><b style="font-size:12px;color:var(--muted)">How much of this field is at risk (30 m cells)</b>
+        <div class="why-bar">${["high", "watch", "low"].map((k) => `<i style="width:${(p.risk_zone_shares[`${k}_share`] || 0) * 100}%;background:${RISK_C[k]}"></i>`).join("")}</div>
+        <div class="why-rows">${["high", "watch", "low"].map((k) => `<div><i style="background:${RISK_C[k]}"></i><span>${RISK_W[k]}</span><span>${pct(p.risk_zone_shares[`${k}_share`] || 0)}, ${fmt(p.risk_zone_shares[`${k}_ha`] || 0, 1)} ha</span></div>`).join("")}</div>
+        <p class="note" style="margin-top:6px">The field score is the median of its 30 m cells. Outlines are samples; trace your real field with <b>Check my field</b>.</p></div>` : ""}
       <div class="why"><b style="font-size:12px;color:var(--muted)">What drives the score</b>
         <div class="why-bar">${parts.map((x) => `<i style="width:${x.w}%;background:${x.c}"></i>`).join("")}</div>
         <div class="why-rows">${parts.map((x) => `<div><i style="background:${x.c}"></i><span>${x.k} <b>${x.v}</b></span><span>+${Math.round(x.w)}</span></div>`).join("")}</div></div>
@@ -1727,6 +1735,160 @@ function townReport(name, province) {
   <p class="muted" style="margin-top:20px">Sources: Copernicus Sentinel-1 (ESA), NASA POWER, NASA EONET, NASADEM, ESA WorldCover. Screening estimate to support, not replace, the Municipal Agriculture Office's verification. sakasar.earth</p>
   </body></html>`);
   w.document.close();
+}
+
+// ================= Farmer card: one traffic light, one sentence, three actions, one SMS =================
+const FARM_ACTS = {
+  high: ["Open field outlets and cut a 30 cm trench along the lowest bund within 48 hours.", "Harvest mature rice early instead of risking root rot.", "Hold fertiliser and seed until the water drains."],
+  watch: ["Check the low corners after each heavy rain.", "Keep outlets clear; reopen the trench if it silts up.", "Delay fertiliser by a few days if puddles stay."],
+  low: ["Normal field work; keep outlets clear.", "Plan the next crop (see next-season options).", "Re-check after the next storm warning."],
+};
+const FARM_SAY = { high: "Your field is likely to drown. Act in the next 48 hours.", watch: "Parts of your field may stay waterlogged. Check it after rain.", low: "Low drowning risk. Keep outlets clear." };
+// best available evidence at a point: 30 m risk grid (pilot) → radar flood + 200 m runoff (all of Bicol)
+function farmerAt(lon, lat, town) {
+  const sc = pgValue("score", lon, lat);
+  if (sc != null && pgValue("cls", lon, lat) !== -2) return { score: Math.round(sc), cls: runoffClass(sc), basis: "30 m Field Drowning Risk (radar + terrain + rain)", town, flooded: pgValue("flood", lon, lat) === 1 };
+  const r = runoffAt(lon, lat), fl = floodAt(lon, lat);
+  if (!r) return null;
+  // evidence ladder: radar water (observed) > runoff model (modelled, capped at watch); never call non-farmland a field
+  if (fl === "other") return { score: null, cls: "low", nonfarm: true, town, basis: "ESA WorldCover land cover via the radar map", say: "This spot is not farmland on the land-cover map. Click on a field, or trace one with Check my field." };
+  if (fl === "flooded") return { score: null, seen: true, cls: "high", town, flooded: true, basis: "Radar saw water here after Kristine (Sentinel-1)", say: "The radar saw water on this farmland after Kristine. Act in the next 48 hours." };
+  const cls = r.score >= 70 ? "watch" : runoffClass(r.score);
+  return { score: r.score, cls, town, coarse: true, basis: "200 m runoff model (terrain + rain); radar saw no water here",
+    say: cls === "watch" ? "Water tends to collect here (terrain + rain model, not observed). Check this field after heavy rain." : null };
+}
+function smsFor(f, areaHa) {
+  const where = f.town ? f.town.name : "your area";
+  const act = f.cls === "high" ? "Open outlets, trench lowest bund in 48h; harvest mature rice early." : f.cls === "watch" ? "Check low corners after rain; keep outlets clear." : "Normal work; keep outlets clear.";
+  const s = `SAKASAR: Field${areaHa ? ` ${fmt(areaHa, 1)}ha` : ""} in ${where}: ${f.cls.toUpperCase()} drowning risk${f.score != null ? ` (${f.score}/100)` : f.seen ? " (radar saw water)" : ""}. ${act}`;
+  return s.length <= 160 ? s : s.slice(0, 157) + "...";
+}
+function farmerCard(f, areaHa) {
+  if (!f) return "";
+  if (f.nonfarm) return `<div class="farmer na"><div class="farmer-top"><span class="light"></span><div><b>Not farmland</b><p>${esc(f.say)}</p></div></div></div>`;
+  const sms = smsFor(f, areaHa);
+  return `<div class="farmer ${f.cls}">
+    <div class="farmer-top"><span class="light"></span><div><b>${RISK_W[f.cls]} drowning risk${f.score != null ? `, ${f.score}/100` : f.seen ? ": radar saw water" : ""}${f.coarse ? " (modelled)" : ""}</b><p>${esc(f.say || FARM_SAY[f.cls])}</p></div></div>
+    <ol>${FARM_ACTS[f.cls].map((a) => `<li>${esc(a)}</li>`).join("")}</ol>
+    <div class="sms small">${esc(sms)}</div>
+    <div class="sms-meta"><span>${sms.length}/160, ${esc(f.basis)}</span><button type="button" class="link-btn" data-sms="${esc(sms)}"><i data-lucide="copy"></i>Copy</button></div>
+  </div>`;
+}
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-sms]"); if (!b) return;
+  try { await navigator.clipboard.writeText(b.dataset.sms); toast("SMS text copied."); } catch (_) { toast("Select the text to copy it."); }
+});
+
+// ================= Check my field: trace a real field, score exactly the cells inside it =================
+S.draw = { on: false, pts: [] };
+function drawStart() {
+  if (WM.ws) backToMap();
+  S.draw = { on: true, pts: [] };
+  $("drawbar").hidden = false; $("draw-finish").disabled = true;
+  map.doubleClickZoom.disable(); map.getCanvas().style.cursor = "crosshair";
+  if (map.getZoom() < 12) flyToPilot();
+  drawRender(); icons();
+}
+function drawStop() {
+  S.draw.on = false; $("drawbar").hidden = true; map.getCanvas().style.cursor = "";
+  setTimeout(() => map.doubleClickZoom.enable(), 300);
+}
+function drawAdd(ll) {
+  S.draw.pts.push([ll.lng, ll.lat]); drawRender();
+  $("draw-finish").disabled = S.draw.pts.length < 3;
+  if (S.draw.pts.length >= 3) $("draw-msg").textContent = `${S.draw.pts.length} corners, about ${fmt(polyHa(S.draw.pts), 2)} ha. Double-click or press Finish.`;
+}
+function drawRender() {
+  const pts = S.draw.pts, ring = pts.length >= 3 ? [...pts, pts[0]] : pts;
+  const fc = { type: "FeatureCollection", features: [
+    ...(pts.length >= 3 ? [{ type: "Feature", geometry: { type: "Polygon", coordinates: [ring] }, properties: {} }] : []),
+    ...(pts.length >= 2 ? [{ type: "Feature", geometry: { type: "LineString", coordinates: ring }, properties: {} }] : []),
+    ...pts.map((p) => ({ type: "Feature", geometry: { type: "Point", coordinates: p }, properties: {} })) ] };
+  if (!map.getSource("myfield")) {
+    map.addSource("myfield", { type: "geojson", data: fc });
+    map.addLayer({ id: "myfield-fill", type: "fill", source: "myfield", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": "#ffd166", "fill-opacity": 0.12 } });
+    map.addLayer({ id: "myfield-line", type: "line", source: "myfield", filter: ["==", ["geometry-type"], "LineString"], paint: { "line-color": "#ffd166", "line-width": 3 } });
+    map.addLayer({ id: "myfield-pts", type: "circle", source: "myfield", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 5, "circle-color": "#fff", "circle-stroke-color": "#e0a800", "circle-stroke-width": 2 } });
+  } else map.getSource("myfield").setData(fc);
+}
+function polyHa(pts) {
+  const lat0 = pts.reduce((a, p) => a + p[1], 0) / pts.length, kx = 111320 * Math.cos((lat0 * Math.PI) / 180), ky = 110540;
+  let a = 0; for (let i = 0; i < pts.length; i++) { const [x1, y1] = pts[i], [x2, y2] = pts[(i + 1) % pts.length]; a += x1 * kx * y2 * ky - x2 * kx * y1 * ky; }
+  return Math.abs(a) / 2 / 10000;
+}
+// statistics from exactly the cells whose centres fall inside the traced field
+function fieldStats(pts) {
+  const ring = [...pts, pts[0]], xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  const [mnx, mxx, mny, mxy] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const G = S.pgrid, out = { ha: polyHa(pts), lon: (mnx + mxx) / 2, lat: (mny + mxy) / 2 };
+  out.town = townAt(out.lon, out.lat);
+  if (G) {
+    const [w, s, e, n] = G.bounds, yN = mercY(n), yS = mercY(s), sc = [], fl = [], dv = [], tw = [], lc = {};
+    for (let y = 0; y < G.height; y++) {
+      const la = latFromMercY(yN - ((y + 0.5) / G.height) * (yN - yS)); if (la < mny || la > mxy) continue;
+      for (let x = 0; x < G.width; x++) {
+        const lo = w + ((x + 0.5) / G.width) * (e - w); if (lo < mnx || lo > mxx || !pointInRing(lo, la, ring)) continue;
+        const i = y * G.width + x, v = G.layers.score.values[i]; if (v === G.missing) continue;
+        sc.push(v); fl.push(G.layers.flood.values[i]); dv.push(G.layers.dvv.values[i] / 10); tw.push(G.layers.twi.values[i] / 10);
+        const k = G.worldcover[String(G.layers.lc.values[i])] || "Other"; lc[k] = (lc[k] || 0) + 1;
+      }
+    }
+    if (sc.length) {
+      const sorted = [...sc].sort((a, b) => a - b), mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+      Object.assign(out, { basis: "30m", cells: sc.length, score: sorted[Math.floor(sorted.length / 2)], high: sc.filter((v) => v >= 70).length / sc.length,
+        watch: sc.filter((v) => v >= 40 && v < 70).length / sc.length, low: sc.filter((v) => v < 40).length / sc.length,
+        flooded: mean(fl), dvv: mean(dv), twi: mean(tw), lc });
+      return out;
+    }
+  }
+  // outside the 30 m pilot: radar flood pixels + 200 m runoff cells inside the field
+  const V = S.runoffVals, rs = []; let fpx = 0, fflood = 0;
+  if (V) for (let y = 0; y < V.H; y++) {
+    const la = latFromMercY(V.yN - ((y + 0.5) / V.H) * (V.yN - V.yS)); if (la < mny || la > mxy) continue;
+    for (let x = 0; x < V.W; x++) { const lo = V.w + ((x + 0.5) / V.W) * (V.e - V.w); if (lo >= mnx && lo <= mxx && pointInRing(lo, la, ring) && V.d[(y * V.W + x) * 4 + 3]) rs.push(V.d[(y * V.W + x) * 4]); }
+  }
+  if (R.flood) for (let y = 0; y < R.fh; y++) {
+    const la = latFromMercY(R.fyN - ((y + 0.5) / R.fh) * (R.fyN - R.fyS)); if (la < mny || la > mxy) continue;
+    for (let x = 0; x < R.fw; x++) { const lo = R.fW + ((x + 0.5) / R.fw) * (R.fE - R.fW); if (lo < mnx || lo > mxx || !pointInRing(lo, la, ring)) continue;
+      const a = R.flood[(y * R.fw + x) * 4 + 3]; if (a > 0) { fpx++; if (a >= 200) fflood++; } }
+  }
+  if (!rs.length) { const r = runoffAt(out.lon, out.lat); if (r) rs.push(r.score); }
+  rs.sort((a, b) => a - b);
+  Object.assign(out, { basis: "coarse", cells: rs.length, score: rs.length ? rs[Math.floor(rs.length / 2)] : null, farmPx: fpx, flooded: fpx ? fflood / fpx : null });
+  return out;
+}
+function drawFinish() {
+  if (S.draw.pts.length < 3) return;
+  const pts = S.draw.pts.slice(); drawStop();
+  const st = fieldStats(pts);
+  const cls = st.basis === "30m" ? runoffClass(st.score) : st.flooded > 0.2 ? "high" : Math.min(st.score ?? 0, 69) >= 40 ? "watch" : "low";
+  const f = { score: st.score, cls, town: st.town, basis: st.basis === "30m" ? `${st.cells} cells of the 30 m risk grid` : "radar flood map + 200 m runoff (coarser outside the 30 m pilot)" };
+  const box = $("inspector");
+  $("insp-title").textContent = `Your field${st.town ? `, ${st.town.name}` : ""}`;
+  $("insp-body").innerHTML = `${farmerCard(f, st.ha)}
+    <dl class="kv">
+      <dt>Area traced</dt><dd>${fmt(st.ha, 2)} ha</dd>
+      ${st.basis === "30m" ? `<div class="sec">Inside your field (30 m cells)</div>
+      <dt>Field score (median)</dt><dd>${st.score}/100</dd>
+      <dt>High / watch / low</dt><dd>${pct(st.high)} / ${pct(st.watch)} / ${pct(st.low)}</dd>
+      <dt>Under water on 2 Nov (radar)</dt><dd>${pct(st.flooded)}</dd>
+      <dt>Radar change ΔVV (mean)</dt><dd>${st.dvv.toFixed(1)} dB</dd>
+      <dt>Terrain wetness index (mean)</dt><dd>${st.twi.toFixed(1)}</dd>
+      <dt>Land cover</dt><dd>${Object.entries(st.lc).map(([k, v]) => `${esc(k)} ${Math.round((100 * v) / st.cells)}%`).join(", ")}</dd>`
+      : `<div class="sec">Inside your field (outside the 30 m pilot)</div>
+      <dt>Runoff & ponding score (median of ${st.cells} cells)</dt><dd>${st.score ?? "n/a"}/100</dd>
+      <dt>Farmland seen under water (radar)</dt><dd>${st.flooded != null ? pct(st.flooded) : "no farmland pixels"}</dd>
+      <p class="note" style="grid-column:1/-1">Outside the pilot only coarser data exist (radar flood map ~150 m, runoff 200 m). Treat this as a screening; a 30 m run for your barangay needs the risk engine.</p>`}
+    </dl>`;
+  box.hidden = false; box.style.zIndex = String(++WM.z); box.classList.remove("pop"); void box.offsetWidth; box.classList.add("pop");
+  icons();
+}
+function bindDraw() {
+  $("btn-check").addEventListener("click", () => (S.draw.on ? drawStop() : drawStart()));
+  $("draw-undo").addEventListener("click", () => { S.draw.pts.pop(); drawRender(); $("draw-finish").disabled = S.draw.pts.length < 3; });
+  $("draw-cancel").addEventListener("click", () => { drawStop(); S.draw.pts = []; drawRender(); });
+  $("draw-finish").addEventListener("click", drawFinish);
+  document.addEventListener("keydown", (e) => { if (S.draw.on && e.key === "Escape") { drawStop(); S.draw.pts = []; drawRender(); } if (S.draw.on && e.key === "Enter") drawFinish(); });
 }
 
 init();

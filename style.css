@@ -744,3 +744,35 @@ h2, h3, h4, .pilot-head h2, .plot-card h3, .story h2, .insp-head b { font-family
 .report-btn { margin: 12px 0 2px; width: 100%; justify-content: center; background: var(--brand); }
 .plot-label { flex-direction: row; gap: 5px; padding: 2px 7px; border-radius: 6px; font-size: 10.5px; box-shadow: var(--shadow), inset 3px 0 0 var(--rc); }
 .plot-label b { font-size: 11px; }
+
+/* brand chip: logo badge, live status line, faint field-ring texture from the logo */
+.brandchip { position: relative; padding: 6px 16px 6px 6px; gap: 11px; overflow: hidden;
+  background: radial-gradient(circle at 26px 50%, rgba(143, 209, 107, 0.0) 0 20px, rgba(143, 209, 107, 0.18) 21px 22px, transparent 23px 30px, rgba(143, 209, 107, 0.12) 31px 32px, transparent 33px 42px, rgba(143, 209, 107, 0.08) 43px 44px, transparent 45px), #fff; }
+.brandchip .logo { width: 42px; height: 42px; box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px rgba(23, 100, 58, 0.25), 0 4px 10px -3px rgba(12, 38, 32, 0.4); }
+.brand-text { display: grid; gap: 1px; }
+.brand-status { font: 500 11.5px/1.2 var(--ui); color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.brand-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px rgba(31, 138, 76, 0.18); }
+.check-btn { background: #fff4d6; color: #7a5300; }
+.check-btn:hover { background: #ffe9ad; color: #5e4000; }
+/* farmer card */
+.farmer { border-radius: 12px; padding: 12px; margin: 4px 0 10px; background: var(--surface); box-shadow: inset 4px 0 0 var(--lc, var(--green)); }
+.farmer.high { --lc: #e2533c; background: rgba(226, 83, 60, 0.07); }
+.farmer.watch { --lc: #ee9f27; background: rgba(238, 159, 39, 0.09); }
+.farmer.low { --lc: #4caf7a; background: rgba(76, 175, 122, 0.08); }
+.farmer-top { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; }
+.farmer .light { width: 18px; height: 18px; border-radius: 50%; background: var(--lc); margin-top: 2px; box-shadow: 0 0 0 4px color-mix(in srgb, var(--lc) 22%, transparent); }
+.farmer b { font: 700 15px/1.25 var(--ui); }
+.farmer p { font-size: 13px; color: var(--ink-2); margin-top: 2px; }
+.farmer ol { margin: 8px 0 8px 18px; padding: 0; list-style: decimal; font-size: 13px; line-height: 1.45; }
+.farmer ol li { margin: 2px 0; }
+.sms.small { font-size: 12.5px; padding: 8px 10px; margin-top: 4px; background: #fff; }
+/* draw bar */
+.drawbar { position: absolute; z-index: 9500; top: calc(var(--gap) + 58px); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 14px; border-radius: 12px; background: #fff; box-shadow: var(--shadow); font-size: 13px; max-width: calc(100% - 24px); }
+.drawbar > [data-lucide] { color: #b07a00; }
+.drawbar .btn { margin: 0; height: 32px; }
+.drawbar .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+@media (max-width: 760px) { .drawbar { flex-wrap: wrap; left: var(--gap); right: var(--gap); transform: none; } .check-btn span { display: none; } }
+
+.farmer.na { --lc: #9aa59f; background: var(--surface); }
+.brand-status { white-space: nowrap; }
+@media (max-width: 760px) { .brand-status { font-size: 10.5px; } .brandchip { padding-right: 12px; } }

@@ -49,13 +49,14 @@
     <header class="topbar">
       <a class="brandchip" href="./" aria-label="SakaSAR home">
         <img src="assets/sakasar-logo.png" alt="" width="38" height="38" class="logo" id="brand-logo" />
-        <span class="wordmark">SakaSAR</span>
+        <span class="brand-text"><span class="wordmark">SakaSAR</span><span class="brand-status" id="brand-status">Kristine replay</span></span>
       </a>
       <div class="toolbar" role="toolbar" aria-label="Map tools">
         <div class="seg" role="group" aria-label="View">
           <button type="button" data-view="2d">2D</button><button type="button" data-view="3d" aria-pressed="true">3D</button>
         </div>
         <span class="tb-sep" aria-hidden="true"></span>
+        <button type="button" class="tool check-btn" id="btn-check" data-tip="Trace your field on the map and get its risk"><i data-lucide="pen-tool"></i><span>Check my field</span></button>
         <button type="button" class="tool story-btn" id="btn-story" data-tip="Walk through the storm in 5 steps"><i data-lucide="presentation"></i><span>Story</span></button>
         <span class="tb-sep" aria-hidden="true"></span>
         <button type="button" class="tool" id="btn-fit-bicol" data-tip="Zoom to Bicol"><i data-lucide="scan"></i><span>Bicol</span></button>
@@ -123,6 +124,13 @@
           <button type="button" class="btn" id="story-next">Next<i data-lucide="arrow-right"></i></button>
         </div>
       </section>
+
+      <div class="drawbar" id="drawbar" hidden>
+        <i data-lucide="pen-tool"></i><span id="draw-msg">Click the corners of your field on the map. Double-click or press Finish when done.</span>
+        <button type="button" class="tool" id="draw-undo"><i data-lucide="undo-2"></i>Undo</button>
+        <button type="button" class="tool" id="draw-cancel">Cancel</button>
+        <button type="button" class="btn" id="draw-finish" disabled><i data-lucide="check"></i>Finish</button>
+      </div>
 
       <section class="inspector" id="inspector" hidden aria-label="Point details">
         <header class="insp-head"><span><i data-lucide="crosshair"></i><b id="insp-title">Point</b></span>
