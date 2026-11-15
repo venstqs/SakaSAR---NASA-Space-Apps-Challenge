@@ -826,3 +826,36 @@ h2, h3, h4, .pilot-head h2, .plot-card h3, .story h2, .insp-head b { font-family
   .mode-seg .lg { display: none; } .mode-seg .sm { display: inline; }
   #btn-fit-bicol, #btn-fit-storm, #btn-shot { display: none; }
 }
+
+/* ================= workspace pages: KPI strip + card grid ================= */
+.ws-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1px; margin-top: 18px; border-radius: 14px; overflow: hidden; background: var(--edge); box-shadow: 0 0 0 1px var(--edge); }
+.ws-kpis div { background: #fff; padding: 14px 16px; }
+.ws-kpis b { display: block; font: 700 22px/1.15 var(--display); letter-spacing: -0.02em; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ws-kpis span { display: block; font-size: 12px; color: var(--muted); margin-top: 3px; }
+.ws-kpis div:first-child b { color: var(--brand); }
+.ws-body .tab-body.ws-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px; align-items: start;
+  column-width: auto; column-rule: none; background: none; box-shadow: none; padding: 0; border-radius: 0; }
+.ws-panel { background: #fff; border-radius: 16px; padding: 18px 20px 20px; box-shadow: 0 0 0 1px var(--edge), 0 10px 24px -18px rgba(15, 40, 28, 0.35); min-width: 0; }
+.ws-panel > .h:first-child, .ws-panel > .h-row:first-child { margin-top: 0; }
+.ws-panel > .h:first-child { font-size: 13px; color: var(--ink); }
+.ws-panel:has(.towns), .ws-panel:has(.events), .ws-panel:has(.rots), .ws-panel:has(.bench) { grid-row: span 2; }
+.ws-body .chart-box { height: 280px; }
+.ws-enter > .tab-body > .ws-panel { animation: wsIn 0.45s var(--ease) both; }
+.ws-enter > .tab-body > .ws-panel:nth-child(2) { animation-delay: 50ms; }
+.ws-enter > .tab-body > .ws-panel:nth-child(3) { animation-delay: 100ms; }
+.ws-enter > .tab-body > .ws-panel:nth-child(n+4) { animation-delay: 150ms; }
+/* ================= layers window: sticky group headers ================= */
+.win .tab-body > .h { position: sticky; top: 0; z-index: 2; background: var(--glass-strong); margin-left: -16px; margin-right: -16px; padding: 10px 16px 6px; border-bottom: 1px solid var(--edge); }
+.ws-panel .h { position: static; background: none; border: 0; padding: 0; margin-left: 2px; margin-right: 2px; }
+/* ================= SakaSAR AI ================= */
+.suggest::before { content: "Try asking"; flex-basis: 100%; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.ws-body #tab-ai { background: #fff; border-radius: 16px; padding: 22px 26px; box-shadow: 0 0 0 1px var(--edge); }
+.msg.bot { box-shadow: 0 0 0 1px var(--edge), 0 6px 14px -12px rgba(15, 40, 28, 0.4); }
+@media (max-width: 760px) {
+  .ws-body .tab-body.ws-grid { grid-template-columns: 1fr; }
+  .ws-panel:has(.towns), .ws-panel:has(.events), .ws-panel:has(.rots), .ws-panel:has(.bench) { grid-row: auto; }
+  .ws-kpis { grid-template-columns: 1fr 1fr; }
+  .ws-kpis b { font-size: 18px; }
+}
+
+.ws-body .fc-kpis { display: none; }

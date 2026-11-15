@@ -1028,6 +1028,13 @@ function lstmValue(i) {
   if (S.aiMode === "hind") { const c = S.tl.lstm_hindcast?.cells?.[i]; return c ? c.days_pred : NaN; }
   const c = S.tl.lstm_kristine_again?.cells?.[i]; return c ? c.days_waterlogged : NaN;
 }
+// shade the waterlogged zone (root zone ≥ 0.97) behind the forecast lines
+const WATERLOG_BAND = { id: "waterlog", beforeDatasetsDraw(c) {
+  const y = c.scales.y, a = c.chartArea; if (!y || !a) return;
+  const top = y.getPixelForValue(1), bot = y.getPixelForValue(0.97), g = c.ctx;
+  g.save(); g.fillStyle = "rgba(226, 83, 60, 0.07)"; g.fillRect(a.left, top, a.right - a.left, bot - top);
+  g.fillStyle = "rgba(160, 50, 31, 0.7)"; g.font = "600 10px Inter, sans-serif"; g.fillText("waterlogged", a.left + 6, top + 12); g.restore();
+} };
 function renderAI() {
   const tl = S.tl, hind = tl.lstm_hindcast, again = tl.lstm_kristine_again;
   document.querySelectorAll("#ai-seg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.ai === S.aiMode)));
@@ -1051,8 +1058,12 @@ function renderAI() {
     $("ai-hint").textContent = "Each grid cell gets its own Kristine-week rain from October 2024.";
   }
   const data = { labels, datasets: [...ds, { data: labels.map(() => 0.97), borderColor: STORM, borderWidth: 1, pointRadius: 0, borderDash: [3, 3] }] };
-  if (S.charts.ai) { S.charts.ai.data = data; S.charts.ai.update(); }
-  else if (window.Chart) S.charts.ai = new Chart($("ch-ai"), { type: "line", data, options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { suggestedMin: 0.75, max: 1, grid: { color: "#eef3f0" } }, x: { grid: { display: false }, ticks: { font: { size: 10 } } } } } });
+  const lo = Math.min(...ds.flatMap((d) => d.data).filter(Number.isFinite));
+  const yMin = Math.max(0.5, Math.floor((Math.min(lo, 0.96) - 0.02) * 50) / 50);
+  if (S.charts.ai) { S.charts.ai.data = data; S.charts.ai.options.scales.y.min = yMin; S.charts.ai.update(); }
+  else if (window.Chart) S.charts.ai = new Chart($("ch-ai"), { type: "line", data, plugins: [WATERLOG_BAND], options: { maintainAspectRatio: false, plugins: { legend: { display: false } },
+    elements: { point: { radius: 3, hoverRadius: 5 } }, interaction: { mode: "index", intersect: false },
+    scales: { y: { min: yMin, max: 1, grid: { color: "#eef3f0" }, ticks: { font: { size: 10 }, callback: (v) => v.toFixed(2) } }, x: { grid: { display: false }, ticks: { font: { size: 10 } } } } } });
   if (!renderAI.bound) {
     renderAI.bound = true;
     document.querySelectorAll("#ai-seg button").forEach((b) => b.addEventListener("click", () => { S.aiMode = b.dataset.ai; renderAI(); if (S.field === "lstm") { renderField(); renderLegend(); } }));
@@ -1427,11 +1438,22 @@ function renderWsNav() {
   $("ws-nav").querySelectorAll("[data-ws]").forEach((b) => b.addEventListener("click", () => wsShow(b.dataset.ws)));
   icons();
 }
+// Sections are MOVED between their window and the workspace, never recreated, so listeners survive.
+// Never clear #ws-body with innerHTML: that destroys the section (the old "blank page" bug).
+function wsReturn(id) {
+  const sec = $(`tab-${id}`); if (!sec) return;
+  unpanelize(sec);
+  $(`win-${id}`).querySelector(".win-body").appendChild(sec);
+}
 function wsShow(id) {
-  const body = $("ws-body");
-  if (WM.ws && WM.ws !== id) $(`win-${WM.ws}`).querySelector(".win-body").appendChild($(`tab-${WM.ws}`));
+  const body = $("ws-body"), sec = $(`tab-${id}`);
+  if (!sec) return;
+  if (WM.ws && WM.ws !== id) wsReturn(WM.ws);
   WM.ws = id; WM.lastApp = id;
-  body.innerHTML = ""; body.appendChild($(`tab-${id}`)); $("ws-main").scrollTop = 0;
+  if (sec.parentElement !== body) body.appendChild(sec);
+  panelize(sec);
+  $("ws-main").scrollTop = 0;
+  renderWsKpis(id);
   const app = APPS.find((a) => a.id === id); $("ws-h1").textContent = app.title; $("ws-sub").textContent = app.sub || "";
   body.classList.remove("ws-enter"); void body.offsetWidth; body.classList.add("ws-enter");
   $("ws-nav").querySelectorAll("[data-ws]").forEach((b) => b.setAttribute("aria-current", b.dataset.ws === id ? "page" : "false"));
@@ -1456,7 +1478,7 @@ function backToMap() {
   const W = window.innerWidth, H = window.innerHeight;
   const done = () => {
     ws.hidden = true;
-    $(`win-${id}`).querySelector(".win-body").appendChild($(`tab-${id}`));
+    wsReturn(id);
     if (WM.wsFromWin && !phone()) { const w = $(`win-${id}`); w.hidden = false; WM.state[id] = "open"; focusWin(id); w.animate([{ transform: "scale(1.04)", opacity: 0.4 }, { transform: "none", opacity: 1 }], { duration: 300, easing: ease }); }
     WM.ws = null; syncDock(); refreshCharts(); map?.resize();
   };
@@ -1562,7 +1584,7 @@ function renderAIPane() {
   const c = aiContext();
   $("tab-ai").innerHTML = `
     <div class="ai-ctx">
-      <span><i data-lucide="calendar"></i>${short(c.iso)}</span>
+      <span><i data-lucide="calendar"></i>${S.mode === "now" ? `Latest data, ${short(S.tl.lstm_kristine_again?.soil_as_of || c.iso)}` : `Kristine replay, ${short(c.iso)}`}</span>
       <span><i data-lucide="map-pin"></i>${c.town ? esc(c.town.name) : "All of Bicol"}</span>
       ${S.storm?.active ? `<span><i data-lucide="tornado"></i>Kristine ${S.storm.wind} kt</span>` : ""}
     </div>
@@ -2153,6 +2175,48 @@ function introPlay() {
     if (t < 2.3) requestAnimationFrame(frame); else end();
   };
   requestAnimationFrame(frame);
+}
+
+// ---------- workspace cards: group a section's blocks under their headings ----------
+const PANEL_BREAK = ".h, .h-row, .pilot-head, .summary, .metrics, .seg, #ai-seg, .ai-ctx, .formula";
+let panelObs = null;
+function panelize(sec) {
+  if (sec.id === "tab-ai") return; // the chat stays one column
+  panelObs?.disconnect();
+  unpanelize(sec);
+  let cur = null;
+  [...sec.children].forEach((ch) => {
+    const lead = ch.matches(".h, .h-row, .pilot-head, .summary");
+    if (!cur || lead) { cur = document.createElement("div"); cur.className = "ws-panel"; sec.insertBefore(cur, ch); }
+    cur.appendChild(ch);
+  });
+  sec.classList.add("ws-grid");
+  // sections re-render themselves (innerHTML); re-group when that happens
+  panelObs = new MutationObserver(() => { if (WM.ws && sec.querySelector(":scope > :not(.ws-panel)")) panelize(sec); });
+  panelObs.observe(sec, { childList: true });
+}
+function unpanelize(sec) {
+  if (!sec.classList.contains("ws-grid")) return;
+  panelObs?.disconnect();
+  sec.querySelectorAll(":scope > .ws-panel").forEach((pn) => { while (pn.firstChild) sec.insertBefore(pn.firstChild, pn); pn.remove(); });
+  sec.classList.remove("ws-grid");
+}
+// a strip of live headline numbers under each page title
+function renderWsKpis(id) {
+  const box = $("ws-kpis"); if (!box) return;
+  const sm = S.summary, pv = S.pilot?.provenance, B = S.bench, ro = S.runoff;
+  const towns = S.munis?.features.map((f) => f.properties) || [];
+  const k = {
+    ai: [["Datasets it reads", "8"], ["Towns it knows", `${towns.length}`], ["Topics it answers", "13"], ["Place in focus", AI.town?.name || (S.inspect ? "Clicked spot" : "All of Bicol")]],
+    layers: [["Heatmap", FIELDS[S.field]?.name || "None"], ["Mode", S.mode === "now" ? "This week" : "Kristine 2024"], ["View", S.view3d ? "3D terrain" : "2D"], ["Overlays on", `${Object.values(S.layers).filter(Boolean).length}`]],
+    towns: sm ? [["Flooded farmland", `${fmt(sm.flooded_farmland_ha)} ha`], ["Towns affected", `${towns.filter((t) => t.flooded_farmland_ha >= 1).length} of ${towns.length}`], ["Hardest hit", `${towns.sort((a, b) => a.rank - b.rank)[0]?.name || ""}`], ["Radar coverage", pct(sm.radar_coverage)]] : [],
+    fields: pv ? [["Rated high", `${fmt(pv.total_high_risk_ha, 1)} ha`], ["Independent hit rate", pv.sar_hit_rate], ["Flooded farmland", `${fmt(pv.flooded_farmland_ha, 1)} ha`], ["Grid", "30 m"]] : [],
+    forecast: B ? [["Lower error than no-change", `${B.forecast.root_zone.skill_vs_persistence_pct}%`], ["In wet weeks", `${B.forecast.root_zone.skill_vs_persistence_wet_weeks_pct}%`], ["Bicol cells right ±1 day", `${B.forecast_regional.within_1_day} of ${B.forecast_regional.cells}`], ["Lead time", "7 days"]] : [],
+    events: [["Events", `${S.events.length}`], ["From", short(S.tl.days[0])], ["To", short(S.tl.days[S.tl.days.length - 1])], ["Closest pass", `${fmt(S.closest?.km)} km`]],
+    data: B ? [["Field risk, independent", B.field_risk.independent_hit_rate], ["Runoff check", `${pct(ro?.validation.share_rated_high)} vs ${pct(ro?.validation.farmland_share_high)}`], ["Data licensing", "₱0"], ["Algorithms benchmarked", "12"]] : [],
+  }[id] || [];
+  box.innerHTML = k.map(([l, v]) => `<div><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join("");
+  box.hidden = !k.length;
 }
 
 init();
