@@ -138,13 +138,14 @@
 
       <section class="inspector" id="inspector" hidden aria-label="Point details">
         <header class="insp-head"><span><i data-lucide="crosshair"></i><b id="insp-title">Point</b></span>
-          <button type="button" class="icon-btn" id="insp-close" aria-label="Close"><i data-lucide="x"></i></button></header>
+          <span class="insp-ctl"><button type="button" class="icon-btn" id="insp-min" aria-label="Minimise details"><i data-lucide="minus"></i></button><button type="button" class="icon-btn" id="insp-close" aria-label="Close"><i data-lucide="x"></i></button></span></header>
         <div class="insp-body" id="insp-body"></div>
       </section>
     </main>
 
     <!-- ===== Timeline ===== -->
     <footer class="timeline">
+      <button type="button" class="tl-fold" id="tl-fold" aria-label="Minimise timeline" title="Minimise timeline"><i data-lucide="chevron-down"></i></button>
       <button type="button" class="play" id="btn-play" aria-label="Play"><i data-lucide="play"></i></button>
       <div class="tl-date"><b id="sim-date">2 Nov 2024</b><span id="sim-phase"></span>
         <div class="seg tiny" role="group" aria-label="Speed" id="speed">
@@ -176,14 +177,10 @@
 
   <!-- Intro: the SakaSAR logo, then a Sentinel-1 style swath wipes to the map -->
   <div class="intro" id="splash" aria-hidden="true">
-    <div class="intro-stage">
-      <div class="intro-copy">
-        <img class="intro-logo" src="assets/sakasar-logo.png" alt="" width="96" height="96" />
-        <p class="intro-word" id="intro-word">SakaSAR</p>
-        <p class="intro-line">Radar sees the flood through the cloud. Farmers get a plan.</p>
-        <dl class="intro-stats" id="intro-stats"></dl>
-      </div>
-      <canvas class="intro-canvas" id="intro-canvas"></canvas>
+    <div class="intro-simple">
+      <div class="intro-badge"><span class="intro-ping"></span><span class="intro-ping two"></span><img class="intro-logo" src="assets/sakasar-logo.png" alt="" width="132" height="132" /></div>
+      <p class="intro-word" id="intro-word" aria-label="SakaSAR"><span>S</span><span>a</span><span>k</span><span>a</span><span class="sar">S</span><span class="sar">A</span><span class="sar">R</span></p>
+      <p class="intro-line">Radar sees the flood through the cloud. Farmers get a plan.</p>
     </div>
     <p class="intro-skip">Click to skip</p>
   </div>

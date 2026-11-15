@@ -138,7 +138,7 @@ async function init() {
   });
   prepareGrid();
   S.closest = closestPass(tl.storm, NAGA);
-  requestAnimationFrame(introPlay);
+  introPlay();
   if (window.Chart) { Chart.defaults.font.family = "Geist, system-ui, sans-serif"; Chart.defaults.color = "#5f7468"; }
   buildEvents();
   bindChrome();
@@ -565,6 +565,7 @@ function inspect(lon, lat) {
     ${acts.length ? `<div class="kv"><div class="sec">What to do</div></div><ul class="actions">${acts.map((a, i) => `<li class="${i === 0 && share >= 0.15 ? "warn" : ""}">${esc(a)}</li>`).join("")}</ul>` : ""}`;
   const box = $("inspector");
   box.style.zIndex = String(++WM.z); // above any open window
+  if (box.hidden && box.classList.contains("folded")) { box.classList.remove("folded"); $("insp-min").innerHTML = `<i data-lucide="minus"></i>`; } // a fresh open unfolds; date changes keep the fold
   if (!box._front) { box._front = true; box.addEventListener("pointerdown", () => (box.style.zIndex = String(++WM.z))); }
   if (box.hidden) {
     const pt = map.project([lon, lat]), r = box.parentElement.getBoundingClientRect();
@@ -837,6 +838,10 @@ function bindChrome() {
   $("btn-link").addEventListener("click", async () => {
     try { await navigator.clipboard.writeText(location.href); toast("Link to this view copied."); } catch (_) { toast("Copy the address bar to share this view."); }
   });
+  $("insp-min").addEventListener("click", () => { const box = $("inspector"); box.classList.toggle("folded");
+    $("insp-min").innerHTML = `<i data-lucide="${box.classList.contains("folded") ? "plus" : "minus"}"></i>`; icons(); });
+  $("tl-fold").addEventListener("click", () => { const tl = document.querySelector(".timeline"); tl.classList.toggle("folded");
+    $("tl-fold").innerHTML = `<i data-lucide="${tl.classList.contains("folded") ? "chevron-up" : "chevron-down"}"></i>`; icons(); });
   $("insp-close").addEventListener("click", () => { $("inspector").hidden = true; pinMarker?.remove(); S.inspect = null; map.setFilter("towns-active", ["==", ["get", "name"], ""]); });
   // drag the inspector by its header
   const box = $("inspector"), head = box.querySelector(".insp-head");
@@ -1350,6 +1355,11 @@ function buildWindows() {
     WM.state[a.id] = "closed";
   });
   const sep = document.createElement("span"); sep.className = "dock-sep"; dock.appendChild(sep);
+  const mn = document.createElement("button");
+  mn.type = "button"; mn.className = "dock-btn"; mn.dataset.tip = "Minimise all windows"; mn.setAttribute("aria-label", "Minimise all windows");
+  mn.innerHTML = `<i data-lucide="minimize-2"></i>`;
+  mn.addEventListener("click", () => { let n = 0; APPS.forEach((a) => { if (WM.state[a.id] === "open") { minimiseWin(a.id); n++; } }); if (!n) toast("No open windows."); });
+  dock.appendChild(mn);
   const ws = document.createElement("button");
   ws.type = "button"; ws.className = "dock-btn"; ws.dataset.tip = "Open the full workspace"; ws.setAttribute("aria-label", "Open the full workspace");
   ws.innerHTML = `<i data-lucide="layout-dashboard"></i>`;
@@ -2126,55 +2136,11 @@ function bindModes() {
 }
 
 // ================= Intro: Bicol traced, a radar swath finds the rivers and the flood, the numbers count in =================
+// Simple intro: spring physics in CSS (logo drop + settle, one radar ping, letters bounce in). It only needs time.
 function introPlay() {
-  const cv = $("intro-canvas");
-  const end = () => { intro.played = true; };
-  if (!cv || !S.munis || reduceMotion) { end(); return; }
-  const rect = cv.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
-  if (rect.width < 50) { end(); return; }
-  cv.width = rect.width * dpr; cv.height = rect.height * dpr;
-  const g = cv.getContext("2d"); g.scale(dpr, dpr);
-  const W = rect.width, H = rect.height, pad = 18, kx = Math.cos((13.1 * Math.PI) / 180);
-  const bw = (R.e - R.w) * kx, bh = R.n - R.s, sc = Math.min((W - 2 * pad) / bw, (H - 2 * pad) / bh);
-  const ox = (W - bw * sc) / 2, oy = (H - bh * sc) / 2, P = (lo, la) => [ox + (lo - R.w) * kx * sc, oy + (R.n - la) * sc];
-  const polys = [];
-  S.munis.features.forEach((f) => (f.geometry.type === "Polygon" ? [f.geometry.coordinates] : f.geometry.coordinates).forEach((p) => {
-    const path = new Path2D(); let x0 = 0; p[0].forEach(([lo, la], i) => { const [x, y] = P(lo, la); x0 += x; i ? path.lineTo(x, y) : path.moveTo(x, y); }); path.closePath();
-    polys.push({ path, x: x0 / p[0].length });
-  }));
-  polys.sort((a, b) => a.x - b.x);
-  const rivers = (S.streamsGJ?.features || []).map((f) => { const path = new Path2D(); f.geometry.coordinates.forEach(([lo, la], i) => { const [x, y] = P(lo, la); i ? path.lineTo(x, y) : path.moveTo(x, y); }); return { path, w: Math.min(2.4, 0.5 + Math.log10(f.properties.up_km2) * 0.55) }; });
-  const ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : 1 - (1 - x) ** 3), slope = 0.32, t0 = performance.now();
-  // stats beside the logo
-  const stats = [[S.munis.features.length, "towns screened"], [S.summary?.flooded_farmland_ha || 0, "ha of flooded farmland seen through cloud"], [S.streamsGJ?.features?.length || 0, "rivers traced from NASADEM"]];
-  $("intro-stats").innerHTML = stats.map((s, i) => `<div style="--d:${1.5 + i * 0.12}s"><dt data-v="0">0</dt><dd>${s[1]}</dd></div>`).join("");
-  setTimeout(() => $("intro-stats").querySelectorAll("dt").forEach((el, i) => countTo(el, stats[i][0])), 1500);
-  const frame = (now) => {
-    const t = (now - t0) / 1000;
-    g.clearRect(0, 0, W, H);
-    // 1. outlines draw in west → east
-    const nOut = Math.floor(polys.length * ease(t / 1.0));
-    g.lineWidth = 0.7; g.strokeStyle = "rgba(23, 100, 58, 0.5)";
-    for (let i = 0; i < nOut; i++) g.stroke(polys[i].path);
-    // 2. the radar swath sweeps; behind it, land fills, rivers and the flood light up
-    const sweep = ease((t - 0.55) / 1.45), bx = -H * slope - 80 + sweep * (W + H * slope + 160);
-    g.save(); g.beginPath(); g.moveTo(-10, -10); g.lineTo(bx + 10 * slope, -10); g.lineTo(bx - H * slope, H + 10); g.lineTo(-10, H + 10); g.closePath(); g.clip();
-    g.fillStyle = "rgba(143, 209, 107, 0.16)"; polys.forEach((p) => g.fill(p.path));
-    g.strokeStyle = "rgba(23, 100, 58, 0.75)"; g.lineWidth = 0.8; polys.forEach((p) => g.stroke(p.path));
-    g.strokeStyle = "rgba(47, 159, 211, 0.85)"; g.lineCap = "round"; rivers.forEach((r) => { g.lineWidth = r.w; g.stroke(r.path); });
-    (R.hot || []).forEach((h) => { const [x, y] = P(...h.geometry.coordinates), rr = 2 + h.properties.w * 9;
-      const gr = g.createRadialGradient(x, y, 0, x, y, rr); gr.addColorStop(0, "rgba(226, 83, 60, 0.9)"); gr.addColorStop(0.5, "rgba(255, 176, 0, 0.45)"); gr.addColorStop(1, "rgba(255, 176, 0, 0)");
-      g.fillStyle = gr; g.beginPath(); g.arc(x, y, rr, 0, 7); g.fill(); });
-    g.restore();
-    if (sweep > 0 && sweep < 1) {
-      const gr = g.createLinearGradient(bx - 90, 0, bx, 0); gr.addColorStop(0, "rgba(23, 100, 58, 0)"); gr.addColorStop(1, "rgba(23, 100, 58, 0.18)");
-      g.fillStyle = gr; g.beginPath(); g.moveTo(bx - 90, 0); g.lineTo(bx, 0); g.lineTo(bx - H * slope, H); g.lineTo(bx - 90 - H * slope, H); g.closePath(); g.fill();
-      g.strokeStyle = "#17643a"; g.lineWidth = 2; g.beginPath(); g.moveTo(bx, 0); g.lineTo(bx - H * slope, H); g.stroke();
-      g.fillStyle = "#17643a"; g.font = "600 11px Inter, sans-serif"; g.fillText("Sentinel-1 radar pass", Math.min(W - 130, Math.max(6, bx - H * slope * 0.12 + 8)), 18);
-    }
-    if (t < 2.3) requestAnimationFrame(frame); else end();
-  };
-  requestAnimationFrame(frame);
+  const done = () => { intro.played = true; };
+  if (reduceMotion) { done(); return; }
+  setTimeout(done, 1900);
 }
 
 // ---------- workspace cards: group a section's blocks under their headings ----------
