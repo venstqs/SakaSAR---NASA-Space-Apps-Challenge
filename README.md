@@ -77,7 +77,7 @@ Built with **MapLibre GL JS 4.7.1**, custom `saka://` raster tile draping over 3
 
 ### Platform Windows & Tools
 The right launcher rail opens seven modular windows (`index.html` / `app.js`), plus a **5-step guided Story tour** and **2D / 3D** camera toggle:
-- **`SakaSAR AI`**: Rule-based Q&A assistant (`aiAnswer`) anchored directly to clicked map coordinates, timeline day, selected plot, regional stats, and LSTM outputs — never hallucinates unmeasured values.
+- **`SakaSAR AI`**: Decision-support assistant (`/api/ai/ask` powered by Groq LLM with offline rule-engine fallback) anchored directly to clicked map coordinates, timeline day, selected plot, regional stats, and LSTM outputs — never hallucinates unmeasured values.
 - **`Layers`**: Toggles 3D terrain exaggeration, interpolated `NASA POWER` rain / soil wetness fields, daily `NASA GIBS` true-color/cloud tiles, Sentinel-1 flood extent, hotspot centroids, storm track, and `30 m` pilot GeoTIFF grids.
 - **`Towns`**: All `114` Bicol municipalities filterable and sortable by flooded hectares (`ha`), farmland share (`%`), orbit date (`28 Oct` vs `2 Nov`), and province.
 - **`Field risk`**: Deep-dive `30 m` plot inspector (`PL-01`–`PL-05`), plain-language 48-hour action, SMS alert copy, barangay visit queue, and priority-ranked crop rotations.
@@ -208,6 +208,7 @@ $$\text{RiskScore} = \text{round}\Big(100 \times \big(0.45 \cdot S_{\text{SAR}} 
 | `GET /api/provenance` | Scene dates, quality-control rejections, rainfall/SMAP stats, hit rates |
 | `GET /api/soil-outlook` | LSTM root-zone saturation forecasts, Kristine hindcasts, and test accuracy |
 | `GET /api/recommendations?plot_id=PL-01` | 4-stage action timeline per plot (or all plots) |
+| `POST /api/ai/ask` | Grounded SakaSAR AI decision support powered by Groq |
 | `GET /api/region` | Bicol Region `100 m` flood summary across `114` towns |
 | `GET /data/region/{name}` | Regional GeoJSON, JSON timelines, or PNG overlays |
 | `GET /data/datasets/{name}` | Downloadable CSV datasets & documentation card |

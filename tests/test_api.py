@@ -71,6 +71,11 @@ def test_soil_outlook_endpoint_and_file():
     assert client.post("/api/advisor/chat", json={"message": "hi"}).status_code in (404, 405)
 
 
+def test_ai_ask_endpoint():
+    r = client.post("/api/ai/ask", json={"question": "ping"})
+    assert r.status_code in (200, 502, 503)
+
+
 def test_region_files_served_and_locked_down():
     if not (ROOT / "data" / "region" / "bicol_summary.json").exists():
         return  # regional layer not built in this checkout

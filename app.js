@@ -1609,7 +1609,7 @@ function renderAIPane() {
     <div class="chat" id="chat">${AI.msgs.map(msgHTML).join("")}</div>
     <div class="suggest${AI.msgs.some((m) => m.who === "user") ? " row" : ""}" id="suggest">${aiSuggestions(c).map((q) => `<button type="button">${esc(q)}</button>`).join("")}</div>
     <form class="ask" id="ask"><input id="ask-in" placeholder="Ask about a town, a field, rain, soil or what to do" autocomplete="off" aria-label="Ask SakaSAR AI" /><button class="btn" aria-label="Send"><i data-lucide="send"></i></button></form>
-    <p class="ai-note">Rule-based answers from SakaSAR's data. Not a chat model.</p>`;
+    <p class="ai-note">Answers grounded in NASA &amp; Sentinel-1 data. Powered by Groq AI.</p>`;
   $("suggest").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => aiAsk(b.textContent)));
   $("ask").addEventListener("submit", (e) => { e.preventDefault(); const v = $("ask-in").value.trim(); if (v) { $("ask-in").value = ""; aiAsk(v); } });
   icons();
@@ -1642,13 +1642,39 @@ function aiWelcome() {
   }
   renderAIPane();
 }
-function aiAsk(q) {
+async function aiAsk(q) {
   AI.msgs.push({ who: "user", text: q });
   const tn = S.munis.features.map((f) => f.properties).find((t) => q.toLowerCase().includes(t.name.toLowerCase()));
   if (tn) AI.town = tn;
   const pm = q.match(/PL-0?(\d)/i); if (pm && S.pilot) S.plot = `PL-0${pm[1]}`;
+  const c = aiContext();
+  if (tn && !WM.ws) openTown(tn.name, tn.province);
+
+  AI.msgs.push({ who: "bot", typing: true });
   renderAIPane();
-  AI.msgs.push(aiAnswer(q, aiContext())); renderAIPane(); if (tn && !WM.ws) openTown(tn.name, tn.province);
+
+  try {
+    const res = await fetch("/api/ai/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: q, context: c }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.html) {
+        AI.msgs.pop();
+        AI.msgs.push({ who: "bot", src: data.src || ["SakaSAR AI (Groq)"], html: data.html });
+        renderAIPane();
+        return;
+      }
+    }
+  } catch (err) {
+    // Backend unavailable or offline — continue to deterministic fallback
+  }
+
+  AI.msgs.pop();
+  AI.msgs.push(aiAnswer(q, c));
+  renderAIPane();
 }
 function aiAnswer(q, c) {
   const s = q.toLowerCase(), tl = S.tl, sm = S.summary;
@@ -1731,13 +1757,12 @@ function aiAnswer(q, c) {
   return { who: "bot", html: `<p>I answer from SakaSAR's data, so try one of the questions below, or name a Bicol town (for example "flooding in Bula").</p>` };
 }
 // proactive tip when a place is clicked while the AI window is open
-function aiOnInspect() {
+async function aiOnInspect() {
   if (WM.state.ai !== "open" && WM.ws !== "ai") return;
   AI.town = null;
   const c = aiContext();
   if (!c.town) return;
-  AI.msgs.push(aiAnswer(`what should farmers do in ${c.town.name}`, c));
-  renderAIPane();
+  await aiAsk(`what should farmers do in ${c.town.name}`);
 }
 
 // ================= Bicol-wide runoff & ponding risk (terrain + rain) and drainage network =================
