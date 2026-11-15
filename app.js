@@ -323,6 +323,7 @@ function initMap() {
     container: "map", hash: "view", preserveDrawingBuffer: true, maxPitch: 75, attributionControl: { compact: true },
     style: {
       version: 8,
+      glyphs: "https://fonts.openmaptiles.org/{fontstack}/{range}.pbf",
       sources: {
         base: { type: "raster", tiles: BASEMAPS.sat.tiles, tileSize: 256, maxzoom: 19, attribution: BASEMAPS.sat.attr },
         dem: { type: "raster-dem", tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"], encoding: "terrarium", tileSize: 256, maxzoom: 13, attribution: "Terrain: AWS Terrain Tiles" },
@@ -371,7 +372,7 @@ function addLayers() {
   map.addSource("munis", { type: "geojson", data: S.munis, promoteId: "rank" });
   map.addLayer({ id: "towns-fill", type: "fill", source: "munis",
     paint: { "fill-opacity": ["interpolate", ["linear"], ["zoom"], 8.5, 1, 10, 0], "fill-color": ["interpolate", ["linear"], ["get", "flooded_share"], 0, "rgba(47,159,211,0)", 0.01, "rgba(47,159,211,0.12)", 0.05, "rgba(47,159,211,0.3)", 0.15, "rgba(27,95,168,0.45)", 0.3, "rgba(16,50,120,0.6)"] } });
-  map.addLayer({ id: "towns-line", type: "line", source: "munis", paint: { "line-color": "rgba(255,255,255,0.75)", "line-width": ["interpolate", ["linear"], ["zoom"], 7, 0.4, 11, 1.4] } });
+  map.addLayer({ id: "towns-line", type: "line", source: "munis", paint: { "line-color": "rgba(255,255,255,0.75)", "line-opacity": ["interpolate", ["linear"], ["zoom"], 7, 0.3, 9, 0.6, 11, 0.9], "line-width": ["interpolate", ["linear"], ["zoom"], 7, 0.4, 11, 1.4] } });
   map.addLayer({ id: "towns-hover", type: "line", source: "munis", paint: { "line-color": "#fff", "line-width": ["case", ["boolean", ["feature-state", "hover"], false], 2.5, 0] } });
   map.addLayer({ id: "towns-active", type: "line", source: "munis", filter: ["==", ["get", "name"], ""], paint: { "line-color": "#ffd166", "line-width": 3 } });
 
@@ -412,8 +413,8 @@ function addLayers() {
   const ref = document.createElement("div"); ref.className = "ref-label";
   ref.textContent = `Closest pass ${fmt(cp.km)} km from Naga, ${short(phDay(cp.t))}`;
   S.refLabel = new maplibregl.Marker({ element: ref }).setLngLat([mid.lon, mid.lat]).addTo(map);
-  const naga = document.createElement("div"); naga.className = "ref-label"; naga.textContent = "Naga City";
-  S.nagaLabel = new maplibregl.Marker({ element: naga, anchor: "top", offset: [0, 6] }).setLngLat([NAGA.lon, NAGA.lat]).addTo(map);
+  const naga = document.createElement("div"); naga.className = "ref-dot"; naga.title = "Naga City";
+  S.nagaLabel = new maplibregl.Marker({ element: naga }).setLngLat([NAGA.lon, NAGA.lat]).addTo(map);
 
   const el = document.createElement("div");
   el.className = "storm-marker";
@@ -421,6 +422,7 @@ function addLayers() {
   stormMarker = new maplibregl.Marker({ element: el }).setLngLat([st[0].lon, st[0].lat]).addTo(map);
 
   addPilotLayers();
+  addLabels();
 
   let hovered = null;
   map.on("mousemove", "towns-fill", (e) => {
@@ -442,6 +444,21 @@ function addLayers() {
 
 // heatmaps are ~50 km data: fade them as you zoom into fields so the satellite and radar layers show
 const fieldOp = () => ["interpolate", ["linear"], ["zoom"], 8.5, S.fieldOpacity, 11, S.fieldOpacity * 0.2];
+function addLabels() {
+  const provs = {};
+  S.townCenters.forEach((c) => { const q = (provs[c.province] = provs[c.province] || { x: 0, y: 0, n: 0 }); q.x += c.lon; q.y += c.lat; q.n++; });
+  map.addSource("prov-labels", { type: "geojson", data: { type: "FeatureCollection", features: Object.entries(provs).map(([name, q]) => ({ type: "Feature", properties: { name }, geometry: { type: "Point", coordinates: [q.x / q.n, q.y / q.n] } })) } });
+  map.addSource("town-labels", { type: "geojson", data: { type: "FeatureCollection", features: S.munis.features.map((f) => { const c = S.townCenters.find((x) => x.name === f.properties.name && x.province === f.properties.province);
+    return { type: "Feature", properties: { name: f.properties.name.replace(/^City of /, ""), rank: f.properties.rank, ha: f.properties.flooded_farmland_ha }, geometry: { type: "Point", coordinates: [c.lon, c.lat] } }; }) } });
+  const halo = { "text-color": "#ffffff", "text-halo-color": "rgba(8, 28, 22, 0.85)", "text-halo-width": 1.4, "text-halo-blur": 0.4 };
+  map.addLayer({ id: "prov-labels", type: "symbol", source: "prov-labels", maxzoom: 9,
+    layout: { "text-field": ["get", "name"], "text-font": ["Open Sans Semibold"], "text-size": ["interpolate", ["linear"], ["zoom"], 6, 11, 8.5, 15], "text-letter-spacing": 0.08, "text-max-width": 7 },
+    paint: { ...halo, "text-opacity": ["interpolate", ["linear"], ["zoom"], 8.2, 0.95, 9, 0] } });
+  map.addLayer({ id: "town-labels", type: "symbol", source: "town-labels", minzoom: 7.8,
+    filter: ["any", [">=", ["zoom"], 8.8], ["<=", ["get", "rank"], 6]],
+    layout: { "text-field": ["get", "name"], "text-font": ["Open Sans Semibold"], "text-size": ["interpolate", ["linear"], ["zoom"], 8, 10.5, 11, 13], "symbol-sort-key": ["get", "rank"], "text-padding": 6, "text-max-width": 7, "text-variable-anchor": ["center", "top", "bottom"], "text-radial-offset": 0.3 },
+    paint: halo });
+}
 function vis(id, on) { if (map?.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none"); }
 function applyLayers() {
   if (!S.ready) return;
@@ -449,7 +466,7 @@ function applyLayers() {
   vis("hotspots", L.hotspots && after);
   vis("flood", L.flood && after);
   vis("towns-fill", L.towns && after);
-  ["towns-line", "towns-hover", "towns-active"].forEach((id) => vis(id, L.towns));
+  ["towns-line", "towns-hover", "towns-active", "prov-labels", "town-labels"].forEach((id) => vis(id, L.towns));
   ["track-casing", "track", "track-done", "track-pts", "closest"].forEach((id) => vis(id, L.storm));
   [stormMarker, S.refLabel, S.nagaLabel, ...(S.trackLabels || [])].forEach((m) => m && (m.getElement().style.visibility = L.storm ? "" : "hidden"));
   vis("hillshade", L.hillshade);
@@ -464,6 +481,7 @@ function setBasemap(k) {
   const src = map.getSource("base"); if (!src) return;
   src.setTiles(BASEMAPS[k].tiles);
   map.setPaintProperty("towns-line", "line-color", k === "sat" ? "rgba(255,255,255,0.75)" : "rgba(19,38,28,0.35)");
+  ["prov-labels", "town-labels"].forEach((id) => { if (!map.getLayer(id)) return; map.setPaintProperty(id, "text-color", k === "sat" ? "#ffffff" : "#13261c"); map.setPaintProperty(id, "text-halo-color", k === "sat" ? "rgba(8,28,22,0.85)" : "rgba(255,255,255,0.9)"); });
 }
 
 // ---------------- hover readout + inspector ----------------
@@ -791,7 +809,7 @@ function bindChrome() {
     setView3d(b.dataset.view === "3d");
     applyLayers();
   }));
-  $("btn-fit-bicol").addEventListener("click", () => map.fitBounds([[R.w, R.s], [R.e, R.n]], { padding: chromePadding(), pitch: S.view3d ? 30 : 0, bearing: 0, duration: 1200 }));
+  $("btn-fit-bicol").addEventListener("click", () => flyBicol(30));
   $("btn-fit-storm").addEventListener("click", () => {
     const st = S.tl.storm, lons = [...st.map((p) => p.lon), R.w, R.e], lats = [...st.map((p) => p.lat), R.s, R.n];
     map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: chromePadding(), pitch: 0, bearing: 0, duration: 1400 });
@@ -824,6 +842,11 @@ function bindChrome() {
 }
 function chromePadding() {
   return window.innerWidth <= 760 ? { top: 60, bottom: 150, left: 10, right: 10 } : { top: 70, bottom: 130, left: 80, right: 60 };
+}
+// Frame Bicol: zoom from the flat fit, then tilt. fitBounds with a pitch backs the camera off far too much.
+function flyBicol(pitch, bearing = 0, duration = 1400) {
+  const cam = map.cameraForBounds([[R.w, R.s], [R.e, R.n]], { padding: 12 }); // the map's own padding already reserves the chrome
+  map.flyTo({ center: cam.center, zoom: cam.zoom + (S.view3d ? 0.1 : 0), pitch: tilt(pitch), bearing: S.view3d ? bearing : 0, duration: reduceMotion ? 0 : duration, essential: true });
 }
 // 2D = flat, north-up, no tilt or rotation; 3D = terrain on, tilt and rotate allowed.
 // Terrain must change before the camera moves: switching terrain mid-animation cancels the ease.
@@ -1145,7 +1168,8 @@ function renderFields() {
         <dt>Bare field each year</dt><dd>${p.bare_field_days_per_year} days${pending("bare_field_days_per_year")}</dd>
       </dl>
       ${soil ? `<b style="font-size:12px;color:var(--muted)">Topsoil 0–30 cm (SoilGrids): ${esc(soil.texture)}, organic carbon ${soil.soc_g_per_kg} g/kg</b>
-      <div class="soilbar"><span style="width:${soil.sand_pct}%;background:#c9a66b">Sand ${Math.round(soil.sand_pct)}%</span><span style="width:${soil.silt_pct}%;background:#9c8b6e">Silt ${Math.round(soil.silt_pct)}%</span><span style="width:${soil.clay_pct}%;background:#6e5a44">Clay ${Math.round(soil.clay_pct)}%</span></div>` : ""}
+      <div class="soilbar"><span style="width:${soil.sand_pct}%;background:#c9a66b">Sand ${Math.round(soil.sand_pct)}%</span><span style="width:${soil.silt_pct}%;background:#9c8b6e">Silt ${Math.round(soil.silt_pct)}%</span><span style="width:${soil.clay_pct}%;background:#6e5a44">Clay ${Math.round(soil.clay_pct)}%</span></div>
+      <p class="note" style="margin-top:8px"><b style="color:var(--ink)">Soil health check:</b> organic carbon is ${soil.soc_g_per_kg >= 20 ? "high" : soil.soc_g_per_kg >= 12 ? "moderate" : "low"} (${soil.soc_g_per_kg} g/kg); ${soil.clay_pct >= 30 ? `${Math.round(soil.clay_pct)}% clay holds nutrients well but drains slowly, so standing water lingers` : "the texture drains fairly freely"}. Rule of thumb from SoilGrids 250 m (low under 12, high from 20 g/kg); confirm with a soil test.</p>` : ""}
     </article>
     <h2 class="h">What to do</h2>
     <ol class="steps">${(p.recommendations || []).map((r) => `<li><span><b>${esc(r.when)}</b><p>${esc(r.action)}</p><small>${esc(r.why)}</small>${(r.sources || []).map((x) => `<span class="src">${esc(x)}</span>`).join("")}</span></li>`).join("")}</ol>
@@ -1218,7 +1242,7 @@ function renderData() {
 // ================= Story mode: the 30-second demo path =================
 const STORY = [
   { title: "Kristine soaks Bicol", text: () => { const rd = regionDaily(), pk = rd.reduce((m, d, i) => (d.max > rd[m].max ? i : m), 0); return `21–26 Oct 2024. The storm's centre stays ${fmt(S.closest?.km)} km from Naga at its closest, yet its rain bands drop up to ${fmt(rd[pk].max)} mm in a day on Bicol land (${short(S.tl.days[pk])}). The heatmap is NASA POWER daily rain.`; },
-    go: () => { setField("rain"); setGibs("none"); setTime(tAt("2024-10-22") + 0.5, true); map.fitBounds([[R.w, R.s], [R.e, R.n]], { padding: chromePadding(), pitch: tilt(30), bearing: 0, duration: 1400 }); } },
+    go: () => { setField("rain"); setGibs("none"); setTime(tAt("2024-10-22") + 0.5, true); flyBicol(30); } },
   { title: "Clouds blind optical satellites", text: () => "NASA MODIS on 23 Oct sees only cloud over Bicol. Optical images cannot show where the water is during a typhoon.",
     go: () => { setField("none"); setGibs("modis"); setTime(tAt("2024-10-23") + 0.5, true); } },
   { title: "Radar sees through the cloud", text: () => `Sentinel-1 radar (28 Oct and 2 Nov passes): ${fmt(S.summary?.flooded_farmland_ha)} ha of Bicol farmland still under water, worst in Bula, Baao and Nabua. Orange marks the flood hotspots.`,
@@ -1437,7 +1461,7 @@ function finishIntro(now) {
     brand.style.opacity = 1;
     sp.animate([{ clipPath: "inset(0 0 0 0)" }, { clipPath: "inset(0 0 0 100%)" }], { duration: dur, easing: "cubic-bezier(0.65, 0, 0.35, 1)", fill: "forwards" }).onfinish = () => { sp.remove(); scan.remove(); };
     scan.animate([{ transform: "translateX(0)", opacity: 1 }, { transform: `translateX(${W}px)`, opacity: 1 }], { duration: dur, easing: "cubic-bezier(0.65, 0, 0.35, 1)", fill: "forwards" });
-    if (!intro.hadView && map) map.fitBounds([[R.w, R.s], [R.e, R.n]], { padding: chromePadding(), pitch: tilt(42), bearing: S.view3d ? -8 : 0, duration: reduceMotion ? 0 : 2600, essential: true });
+    if (!intro.hadView && map) flyBicol(38, -6, 2600);
   }, wait);
 }
 document.addEventListener("click", (e) => { if (e.target.closest("#splash")) finishIntro(true); });
@@ -1676,9 +1700,9 @@ async function loadRunoff() {
       map.addLayer({ id: "runoff", type: "raster", source: "runoff", paint: { "raster-opacity": ["interpolate", ["linear"], ["zoom"], 7, 0.85, 11, 0.45, 13, 0.2], "raster-resampling": "linear", "raster-fade-duration": 0 } }, map.getLayer("towns-fill") ? "towns-fill" : undefined);
       map.addSource("streams", { type: "geojson", data: "data/region/bicol_streams.geojson" });
       map.addLayer({ id: "streams-casing", type: "line", source: "streams", layout: { "line-cap": "round", "line-join": "round" },
-        paint: { "line-opacity": ["interpolate", ["linear"], ["zoom"], 10.5, 1, 11.8, 0], "line-color": "rgba(8,40,70,0.55)", "line-width": ["interpolate", ["linear"], ["get", "up_km2"], 10, 1.4, 100, 2.4, 1000, 3.8, 5000, 5.6] } }, map.getLayer("towns-line") ? "towns-line" : undefined);
+        paint: { "line-opacity": ["interpolate", ["linear"], ["zoom"], 7, ["case", [">=", ["get", "up_km2"], 120], 1, 0], 8.4, ["case", [">=", ["get", "up_km2"], 35], 1, 0], 9.4, 1, 10.5, 1, 11.8, 0], "line-color": "rgba(8,40,70,0.55)", "line-width": ["interpolate", ["linear"], ["get", "up_km2"], 10, 1.4, 100, 2.4, 1000, 3.8, 5000, 5.6] } }, map.getLayer("towns-line") ? "towns-line" : undefined);
       map.addLayer({ id: "streams", type: "line", source: "streams", layout: { "line-cap": "round", "line-join": "round" },
-        paint: { "line-opacity": ["interpolate", ["linear"], ["zoom"], 10.5, 1, 11.8, 0], "line-color": ["interpolate", ["linear"], ["get", "up_km2"], 10, "#9fe3ff", 300, "#4ec4de", 3000, "#2f9fd3"], "line-width": ["interpolate", ["linear"], ["get", "up_km2"], 10, 0.6, 100, 1.2, 1000, 2.4, 5000, 3.8] } }, map.getLayer("towns-line") ? "towns-line" : undefined);
+        paint: { "line-opacity": ["interpolate", ["linear"], ["zoom"], 7, ["case", [">=", ["get", "up_km2"], 120], 1, 0], 8.4, ["case", [">=", ["get", "up_km2"], 35], 1, 0], 9.4, 1, 10.5, 1, 11.8, 0], "line-color": ["interpolate", ["linear"], ["get", "up_km2"], 10, "#9fe3ff", 300, "#4ec4de", 3000, "#2f9fd3"], "line-width": ["interpolate", ["linear"], ["get", "up_km2"], 10, 0.6, 100, 1.2, 1000, 2.4, 5000, 3.8] } }, map.getLayer("towns-line") ? "towns-line" : undefined);
     }
     applyLayers();
   };

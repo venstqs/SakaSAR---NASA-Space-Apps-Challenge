@@ -789,3 +789,5 @@ h2, h3, h4, .pilot-head h2, .plot-card h3, .story h2, .insp-head b { font-family
 .whatif { margin: 6px 6px 4px; padding: 10px 12px; border-radius: 10px; background: var(--surface); }
 .whatif-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
 .whatif-out { font-size: 12px; color: var(--ink-2); line-height: 1.4; margin-top: 4px; }
+
+.ref-dot { width: 9px; height: 9px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px rgba(8, 28, 22, 0.8); pointer-events: none; }

@@ -24,6 +24,8 @@
 **[Datasets & API](#-open-datasets--api)** ·
 **[Run Locally](#-run-it-yourself)** ·
 **[Methods](docs/METHODS.md)** ·
+**[Benchmarks](docs/BENCHMARKS.md)** ·
+**[Concept → Prototype](docs/CONCEPT_TO_PROTOTYPE.md)** ·
 **[Team](#-team)**
 
 </div>
