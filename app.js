@@ -30,11 +30,11 @@ const cat = (kt) => CATS.find((c) => (kt ?? 0) <= c.max);
 // Heatmap fields: colour stops are [value, [r,g,b,a]]
 const FIELDS = {
   none: { name: "None" },
-  rain: { name: "Rain that day", sub: "NASA POWER daily rain (PRECTOTCORR), about 50 km grid", unit: "mm", min: 0, max: 250,
+  rain: { name: "Rain that day", sub: "NASA POWER daily rain, about 50 km grid", unit: "mm", min: 0, max: 250,
     stops: [[0, [170, 215, 235, 0]], [3, [150, 210, 235, 80]], [15, [100, 195, 215, 150]], [40, [60, 175, 215, 190]], [80, [33, 120, 190, 205]], [140, [30, 70, 150, 215]], [250, [100, 40, 150, 225]]], ticks: [0, 60, 125, 190, "250+"] },
   rainsum: { name: "Rain since 10 Oct", sub: "Running total of NASA POWER daily rain", unit: "mm", min: 0, max: 700,
     stops: [[0, [170, 215, 235, 0]], [40, [150, 210, 235, 100]], [150, [100, 195, 215, 165]], [300, [47, 159, 211, 200]], [500, [27, 95, 168, 215]], [700, [88, 40, 150, 225]]], ticks: [0, 200, 400, "700+"] },
-  soil: { name: "Root-zone soil wetness", sub: "NASA POWER GWETROOT. 1 = pores full of water; 0.97+ waterlogged", unit: "", min: 0.6, max: 1,
+  soil: { name: "Root-zone soil wetness", sub: "NASA POWER root zone. 1 = pores full of water; 0.97+ waterlogged", unit: "", min: 0.6, max: 1,
     stops: [[0.6, [201, 166, 107, 150]], [0.8, [233, 226, 184, 150]], [0.9, [143, 211, 176, 170]], [0.95, [47, 159, 211, 190]], [0.97, [27, 95, 168, 215]], [1, [16, 50, 120, 230]]], ticks: [0.6, 0.8, 0.9, 1] },
   soilnow: { name: "Soil wetness now", sub: "NASA POWER root zone on the latest available day: dry, moist, wet, waterlogged (0.97+)", unit: "", min: 0.55, max: 1,
     stops: [[0.55, [214, 130, 50, 185]], [0.68, [236, 190, 90, 175]], [0.78, [120, 190, 110, 175]], [0.9, [52, 160, 200, 195]], [0.97, [27, 95, 168, 220]], [1, [16, 50, 120, 230]]], ticks: ["dry", "moist", "wet", "full"] },
@@ -1017,10 +1017,10 @@ function renderTowns() {
     .map((p) => `<li><span>${esc(p.province)}</span><span class="bar"><i style="width:${(100 * p.flooded_farmland_ha) / pmax}%"></i></span><span class="v">${fmt(p.flooded_farmland_ha)} ha</span></li>`).join("");
   const list = (q) => {
     const query = (q || "").trim().toLowerCase();
-    const rows = towns.filter((t) => !query || t.name.toLowerCase().includes(query) || t.province.toLowerCase().includes(query)).slice(0, query ? 60 : 30);
+    const rows = towns.filter((t) => query ? t.name.toLowerCase().includes(query) || t.province.toLowerCase().includes(query) : t.flooded_farmland_ha >= 1).slice(0, 60);
     $("towns").innerHTML = rows.map((t) => `<li><button type="button" class="town" data-n="${esc(t.name)}" data-p="${esc(t.province)}">
       <span class="rk">${t.rank}</span><span><b>${esc(t.name)}</b><small>${esc(t.province)}</small></span>
-      <span class="val">${fmt(t.flooded_farmland_ha)} ha<small>${pct(t.flooded_share)} of farmland</small></span></button></li>`).join("") || `<li class="note">No town matches “${esc(q)}”.</li>`;
+      <span class="val">${fmt(t.flooded_farmland_ha)} ha<small>${pct(t.flooded_share)} of farmland</small></span></button></li>`).join("") + (query ? "" : `<li class="note">The other ${towns.length - affected} towns: no flooded farmland seen by the radar. Search to find one.</li>`) || `<li class="note">No town matches “${esc(q)}”.</li>`;
     $("towns").querySelectorAll(".town").forEach((b) => b.addEventListener("click", () => openTown(b.dataset.n, b.dataset.p)));
   };
   list("");
@@ -1055,7 +1055,7 @@ function renderAI() {
     const start = new Date(hind.issued + "T00:00:00");
     labels = Array.from({ length: 7 }, (_, d) => { const x = new Date(start); x.setDate(x.getDate() + d); return `${x.getDate()} ${MONTHS[x.getMonth()]}`; });
     ds = [{ data: avg("pred"), borderColor: GREEN, backgroundColor: GREEN, tension: 0.3, borderWidth: 3 }, { data: avg("actual"), borderColor: WATER, backgroundColor: WATER, borderDash: [5, 4], tension: 0.3, borderWidth: 2 }];
-    $("ai-lead").innerHTML = `Forecast issued <strong>3 Nov 2024</strong>, the day after the radar pass. Across Bicol the number of waterlogged days was right within 1 day in <strong>${ok} of ${v.length}</strong> grid cells.`;
+    $("ai-lead").innerHTML = `Forecast issued <strong>3 Nov 2024</strong>, the day after the radar pass, compared with what happened.`;
     $("ai-key").innerHTML = `<span><i style="background:${GREEN}"></i>Forecast, Bicol average</span><span><i style="background:${WATER}"></i>What happened</span><span><i style="background:${STORM}"></i>Waterlogged (0.97)</span>`;
     $("ai-hint").textContent = "Click anywhere on the map to see the forecast for that spot.";
     if (S.bench) renderForecastKpis();
@@ -1232,13 +1232,15 @@ function renderFields() {
 
 function renderData() {
   const P = S.pilot, pv = P?.provenance || {}, sm = S.summary;
-  const split = (d) => { const i = d.indexOf(" ("); return i > 0 ? [d.slice(0, i), d.slice(i + 2, -1)] : [d, ""]; };
-  const regional = [
-    ["NASA EONET", "Kristine's storm track, every 6 hours"],
-    ["NASA POWER regional daily", "rain and root-zone wetness for every 0.5° cell in Bicol (heatmaps, runoff score, soil forecast inputs)"],
-    ["NASADEM, all of Bicol", "200 m flow accumulation, wetness index and drainage network for the runoff layer"],
-    ["NASA GIBS", "MODIS, VIIRS, IMERG and SMAP imagery for each day of the replay"],
-    ["Sentinel-1 RTC, both orbits", "Bicol flood screening at 100 m (2 Nov and 28 Oct passes)"],
+  const datasets = [
+    ["Sentinel-1 radar (ESA)", "flood map and wetness change: 30 m pilot, 100 m for all of Bicol"],
+    ["NASADEM", "slope, wetness index, drainage network and watersheds"],
+    ["GPM IMERG", "storm rain in the risk score"],
+    ["NASA POWER", "daily rain and soil wetness maps; 2001–2026 history for the soil forecast"],
+    ["SMAP", "soil moisture anomaly during Kristine, as context"],
+    ["NASA EONET and GIBS", "Kristine's track and daily satellite imagery"],
+    ["SoilGrids", "soil texture and organic carbon per field, for rotations"],
+    ["ESA WorldCover", "which cells are farmland, built-up or water"],
   ];
   $("tab-data").innerHTML = `
     <p class="h">How the Field Drowning Risk score works</p>
@@ -1248,24 +1250,23 @@ function renderData() {
       <div style="margin-top:8px">High 70+ · Watch 40–69 · Low under 40. Built-up and permanent water are not scored.</div></div>
     <p class="h">Does it work? The independent check</p>
     <div class="hitbox"><b>${esc(pv.sar_hit_rate || "n/a")}</b><p>Of the farmland the radar saw flooded on 2 Nov, this share had already been rated high by the terrain + rain part of the model, which never saw the radar. The full model scores ${esc(pv.sar_hit_rate_full_model || "")}, but that number is circular because radar is in both the score and the flood map, so we do not headline it.</p></div>
-    ${S.runoff ? `<p class="h">The same check across all of Bicol</p>
-    <div class="hitbox"><b>${pct(S.runoff.validation.share_rated_high)}</b><p>of the farmland the radar saw flooded (28 Oct + 2 Nov) was rated high by the terrain + rain model at 200 m, against ${pct(S.runoff.validation.farmland_share_high)} of all farmland and ${pct(S.runoff.validation.land_share_high)} of all land. A real signal, but farmland is low-lying by nature, so the gap over farmland is the fair measure.</p></div>` : ""}
+    ${S.bench?.field_risk_bicol ? `<p class="h">The same check across all of Bicol</p>
+    <div class="hitbox"><b>${pct(S.bench.field_risk_bicol.terrain_rain_share_high)}</b><p>of the farmland the radar saw flooded was rated high by terrain + rain alone at 100 m, against ${pct(S.bench.field_risk_bicol.farmland_share_high)} of all farmland.</p></div>` : ""}
     ${S.bench ? benchHTML(S.bench) : ""}
     <p class="h">NASA and partner data used</p>
-    <ul class="ds">${regional.map(([a, b]) => `<li><span><b>${a}</b><small>${b}</small></span></li>`).join("")}
-      ${(pv.datasets_used || []).map((d) => { const [a, b] = split(d); return `<li><span><b>${esc(a)}</b><small>${esc(b)}</small></span></li>`; }).join("")}</ul>
+    <ul class="ds">${datasets.map(([a, b]) => `<li><span><b>${a}</b><small>${b}</small></span></li>`).join("")}</ul>
+    <p class="note">Checked, not used: MODIS NDVI at 250 m, too coarse for paddy fields.</p>
     <p class="h">Future work (not used yet)</p>
     <ul class="ds future">${(pv.future_work_datasets || []).map((d) => `<li><span><b>${esc(d)}</b></span></li>`).join("")}</ul>
     <p class="h">Cost and speed</p>
     <div class="facts2">
       <div><b>₱0</b><span>data licensing: open NASA and Copernicus data</span></div>
-      <div><b>${esc(pv.processing_time || "n/a")}</b><span>to rebuild the 30 m risk map from cache</span></div>
       ${sm ? `<div><b>${fmt(sm.processing_time_sec / 60, 0)} min</b><span>to screen all ${sm.municipalities} Bicol towns at 100 m</span></div>
       <div><b>${pct(sm.radar_coverage)}</b><span>of Bicol farmland covered by radar</span></div>` : ""}
     </div>
-    <p class="h">Limits, stated plainly</p>
+    <p class="h">Limits</p>
     <ul class="limits">
-      <li>${esc(pv.scientific_limit || "C-band radar measures surface wetness, not root-zone moisture.")}</li>
+      <li>C-band radar measures surface wetness, not root-zone moisture, and cannot see water between buildings.</li>
       <li>NASA POWER and the soil forecast work on about 50 km cells: regional soil, not a paddy sensor.</li>
       <li>Field sizes, households, crops and bare-field days are sample values until the LGU shares parcel and census data.</li>
       <li>Not claimed: L-band dielectric inversion, "7 days early" detection, or a 35–50% water saving. None is built or tested.</li>
@@ -1606,13 +1607,15 @@ function renderAIPane() {
       ${S.storm?.active ? `<span><i data-lucide="tornado"></i>Kristine ${S.storm.wind} kt</span>` : ""}
     </div>
     <div class="chat" id="chat">${AI.msgs.map(msgHTML).join("")}</div>
-    <div class="suggest" id="suggest">${aiSuggestions(c).map((q) => `<button type="button">${esc(q)}</button>`).join("")}</div>
+    <div class="suggest${AI.msgs.some((m) => m.who === "user") ? " row" : ""}" id="suggest">${aiSuggestions(c).map((q) => `<button type="button">${esc(q)}</button>`).join("")}</div>
     <form class="ask" id="ask"><input id="ask-in" placeholder="Ask about a town, a field, rain, soil or what to do" autocomplete="off" aria-label="Ask SakaSAR AI" /><button class="btn" aria-label="Send"><i data-lucide="send"></i></button></form>
-    <p class="ai-note">SakaSAR AI builds every answer from this project's data (Sentinel-1, NASA POWER, EONET, NASADEM, the soil forecast and the risk engine) with fixed rules. It is not a chat model.</p>`;
+    <p class="ai-note">Rule-based answers from SakaSAR's data. Not a chat model.</p>`;
   $("suggest").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => aiAsk(b.textContent)));
   $("ask").addEventListener("submit", (e) => { e.preventDefault(); const v = $("ask-in").value.trim(); if (v) { $("ask-in").value = ""; aiAsk(v); } });
   icons();
-  const body = $("tab-ai").parentElement; body.scrollTop = body.scrollHeight;
+  // newest exchange in view: start at the last question so the answer reads top-down below it
+  const chat = $("chat"), qs = chat.querySelectorAll(".msg.user"), lastQ = qs[qs.length - 1];
+  chat.scrollTop = lastQ ? Math.max(0, lastQ.offsetTop - 8) : chat.scrollHeight;
 }
 function msgHTML(m) {
   if (m.who === "user") return `<div class="msg user">${esc(m.text)}</div>`;
@@ -1774,21 +1777,19 @@ function runoffClass(v) { return v >= 70 ? "high" : v >= 40 ? "watch" : "low"; }
 
 // ================= Benchmarks (pipeline/benchmarks.py → data/region/benchmarks.json, docs/BENCHMARKS.md) =================
 function benchHTML(B) {
-  const fr = B.forecast_regional, fo = B.forecast.root_zone, ri = B.rain_interpolation, ru = B.runoff, sp = B.speed;
+  const fr = B.forecast_regional, fo = B.forecast.root_zone, ri = B.rain_interpolation, ru = B.runoff;
   const row = (k, v, n) => `<tr><td>${k}</td><td><b>${v}</b></td><td>${n}</td></tr>`;
   return `<p class="h">Benchmarks</p>
     <table class="bench"><thead><tr><th>Algorithm</th><th>Result</th><th>Compared with</th></tr></thead><tbody>
       ${row("Field Drowning Risk, terrain + rain", B.field_risk.independent_hit_rate, "radar-flooded farmland, 30 m pilot")}
+      ${B.field_risk_bicol ? row("Field Drowning Risk, all of Bicol", pct(B.field_risk_bicol.terrain_rain_share_high), `${pct(B.field_risk_bicol.farmland_share_high)} of all farmland (100 m)`) : ""}
       ${row("Runoff &amp; ponding, all of Bicol", pct(ru.share_rated_high), `${pct(ru.farmland_share_high)} of all farmland (×${ru.lift_over_farmland})`)}
       ${row("Soil forecast, 7 days", `${fo.skill_vs_persistence_pct}% lower error`, `persistence; ${fo.skill_vs_ridge_pct}% vs ridge regression`)}
       ${row("Soil forecast, wet weeks", `${fo.skill_vs_persistence_wet_weeks_pct}% lower error`, `persistence, ${fo.wet_weeks} wet weeks`)}
       ${row("Forecast, all Bicol cells", `${fr.within_1_day} of ${fr.cells}`, "waterlogged days right within 1 day")}
       ${row("Rain interpolation (bilinear)", `${ri.mae_bilinear_mm} mm`, `${ri.mae_nearest_mm} mm nearest neighbour (leave-one-out)`)}
-      ${row("Closest pass to Naga", `${B.storm_geometry.track_line_km} km`, `${B.storm_geometry.nearest_fix_km} km to the nearest fix`)}
-      ${row("Hydrology, 1.8 M cells", `${(sp.priority_flood_sec + sp.d8_sec + sp.flow_accumulation_sec).toFixed(1)} s`, "fill + D8 + accumulation")}
-      ${sp.forecast_inference_35_cells_ms ? row("Forecast inference", `${sp.forecast_inference_35_cells_ms} ms`, `35 cells, ${sp.forecast_parameters.toLocaleString()} parameters`) : ""}
     </tbody></table>
-    <p class="note">The soil forecast is an LSTM neural network trained on NASA POWER (2001–2018), validated 2019–2021 and tested 2022–2026. Full tables: docs/BENCHMARKS.md, rebuilt with <b>python -m pipeline.benchmarks</b>.</p>`;
+    <p class="note">The soil forecast is an LSTM neural network trained on NASA POWER (2001–2018), validated 2019–2021 and tested 2022–2026. Full tables in docs/BENCHMARKS.md on GitHub.</p>`;
 }
 function renderForecastKpis() {
   const B = S.bench; if (!B || $("fc-kpis")) return;
@@ -1867,13 +1868,16 @@ function smsFor(f, areaHa) {
 }
 function farmerCard(f, areaHa) {
   if (!f) return "";
-  if (f.nonfarm) return `<div class="farmer na"><div class="farmer-top"><span class="light"></span><div><b>Not farmland</b><p>${esc(f.say)}</p></div></div></div>`;
+  if (f.nonfarm) return `<div class="farmer na"><div class="farmer-head"><span class="badge">Not farmland</span></div><p class="farmer-say">${esc(f.say)}</p></div>`;
   const sms = smsFor(f, areaHa);
+  const score = f.score != null ? `<span class="score">${f.score}<small>/100</small></span>` : f.seen ? `<span class="score txt">Radar saw water</span>` : "";
   return `<div class="farmer ${f.cls}">
-    <div class="farmer-top"><span class="light"></span><div><b>${RISK_W[f.cls]} drowning risk${f.score != null ? `, ${f.score}/100` : f.seen ? ": radar saw water" : ""}${f.coarse ? " (modelled)" : ""}</b><p>${esc(f.say || FARM_SAY[f.cls])}</p></div></div>
+    <div class="farmer-head"><span class="badge">${RISK_W[f.cls]} risk${f.coarse ? " (modelled)" : ""}</span>${score}</div>
+    <p class="farmer-say">${esc(f.say || FARM_SAY[f.cls])}</p>
+    <p class="farmer-sub">What to do</p>
     <ol>${FARM_ACTS[f.cls].map((a) => `<li>${esc(a)}</li>`).join("")}</ol>
-    <div class="sms small">${esc(sms)}</div>
-    <div class="sms-meta"><span>${sms.length}/160, ${esc(f.basis)}</span><button type="button" class="link-btn" data-sms="${esc(sms)}"><i data-lucide="copy"></i>Copy</button></div>
+    <div class="sms-box"><div class="sms-h"><span>SMS alert · ${sms.length}/160</span><button type="button" class="link-btn" data-sms="${esc(sms)}"><i data-lucide="copy"></i>Copy</button></div><p>${esc(sms)}</p></div>
+    <p class="farmer-basis">${esc(f.basis)}</p>
   </div>`;
 }
 document.addEventListener("click", async (e) => {
@@ -2197,7 +2201,7 @@ function renderWsKpis(id) {
     fields: pv ? [["Rated high", `${fmt(pv.total_high_risk_ha, 1)} ha`], ["Independent hit rate", pv.sar_hit_rate], ["Flooded farmland", `${fmt(pv.flooded_farmland_ha, 1)} ha`], ["Grid", "30 m"]] : [],
     forecast: B ? [["Lower error than no-change", `${B.forecast.root_zone.skill_vs_persistence_pct}%`], ["In wet weeks", `${B.forecast.root_zone.skill_vs_persistence_wet_weeks_pct}%`], ["Bicol cells right ±1 day", `${B.forecast_regional.within_1_day} of ${B.forecast_regional.cells}`], ["Lead time", "7 days"]] : [],
     events: [["Events", `${S.events.length}`], ["From", short(S.tl.days[0])], ["To", short(S.tl.days[S.tl.days.length - 1])], ["Closest pass", `${fmt(S.closest?.km)} km`]],
-    data: B ? [["Field risk, independent", B.field_risk.independent_hit_rate], ["Runoff check", `${pct(ro?.validation.share_rated_high)} vs ${pct(ro?.validation.farmland_share_high)}`], ["Data licensing", "₱0"], ["Algorithms benchmarked", "12"]] : [],
+    data: B ? [["Field risk, independent", B.field_risk.independent_hit_rate], B.field_risk_bicol ? ["All-Bicol check", `${pct(B.field_risk_bicol.terrain_rain_share_high)} vs ${pct(B.field_risk_bicol.farmland_share_high)}`] : ["Runoff check", `${pct(ro?.validation.share_rated_high)} vs ${pct(ro?.validation.farmland_share_high)}`], ["Data licensing", "₱0"], ["Datasets used", "8"]] : [],
   }[id] || [];
   box.innerHTML = k.map(([l, v]) => `<div><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join("");
   box.hidden = !k.length;

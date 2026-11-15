@@ -8,7 +8,7 @@
     "event_reference": "STS Kristine (Trami) — Oct 21-26, 2024 (Sentinel-1 Pass 2024-11-02)",
     "grid_resolution": "30m Shared Grid",
     "licensing_cost": "₱0 (Open NASA & Copernicus Data)",
-    "processing_time": "1.5 sec",
+    "processing_time": "1.4 sec",
     "sar_hit_rate": "31%",
     "total_high_risk_ha": 6.2,
     "high_risk_plots": 2,
@@ -458,17 +458,17 @@
             {
               "when": "This week",
               "action": "Keep outlets open all week and do not replant or apply fertiliser yet: the root zone is forecast to stay waterlogged.",
-              "why": "LSTM forecast issued 2024-11-03 (day after the 2 Nov radar pass): root zone 0.98 of saturation, waterlogged on 7 of the next 7 days.",
+              "why": "Soil forecast issued 2024-11-03 (day after the 2 Nov radar pass): root zone 0.98 of saturation, waterlogged on 7 of the next 7 days.",
               "sources": [
-                "LSTM (NASA POWER)"
+                "Soil forecast (NASA POWER)"
               ]
             },
             {
               "when": "Before the next storm",
               "action": "Before the next typhoon warning: desilt the tertiary canal and pre-cut the drainage trench; this plot floods first.",
-              "why": "LSTM scenario from 2026-11-09: root zone now 0.76 (moist); a Kristine-like week (436 mm) would leave it 'wet'.",
+              "why": "Soil forecast scenario from 2026-11-09: root zone now 0.76 (moist); a Kristine-like week (436 mm) would leave it 'wet'.",
               "sources": [
-                "LSTM (NASA POWER)"
+                "Soil forecast (NASA POWER)"
               ]
             },
             {
@@ -588,17 +588,17 @@
             {
               "when": "This week",
               "action": "Keep outlets open all week and do not replant or apply fertiliser yet: the root zone is forecast to stay waterlogged.",
-              "why": "LSTM forecast issued 2024-11-03 (day after the 2 Nov radar pass): root zone 0.98 of saturation, waterlogged on 7 of the next 7 days.",
+              "why": "Soil forecast issued 2024-11-03 (day after the 2 Nov radar pass): root zone 0.98 of saturation, waterlogged on 7 of the next 7 days.",
               "sources": [
-                "LSTM (NASA POWER)"
+                "Soil forecast (NASA POWER)"
               ]
             },
             {
               "when": "Before the next storm",
               "action": "Before the next typhoon warning: desilt the tertiary canal and pre-cut the drainage trench; this plot floods first.",
-              "why": "LSTM scenario from 2026-11-09: root zone now 0.76 (moist); a Kristine-like week (436 mm) would leave it 'wet'.",
+              "why": "Soil forecast scenario from 2026-11-09: root zone now 0.76 (moist); a Kristine-like week (436 mm) would leave it 'wet'.",
               "sources": [
-                "LSTM (NASA POWER)"
+                "Soil forecast (NASA POWER)"
               ]
             },
             {
@@ -718,17 +718,17 @@
             {
               "when": "This week",
               "action": "Keep outlets open all week and do not replant or apply fertiliser yet: the root zone is forecast to stay waterlogged.",
-              "why": "LSTM forecast issued 2024-11-03 (day after the 2 Nov radar pass): root zone 0.98 of saturation, waterlogged on 7 of the next 7 days.",
+              "why": "Soil forecast issued 2024-11-03 (day after the 2 Nov radar pass): root zone 0.98 of saturation, waterlogged on 7 of the next 7 days.",
               "sources": [
-                "LSTM (NASA POWER)"
+                "Soil forecast (NASA POWER)"
               ]
             },
             {
               "when": "Before the next storm",
               "action": "Before the next typhoon warning: clear furrows and check that outlets drain to the canal.",
-              "why": "LSTM scenario from 2026-11-09: root zone now 0.76 (moist); a Kristine-like week (436 mm) would leave it 'wet'.",
+              "why": "Soil forecast scenario from 2026-11-09: root zone now 0.76 (moist); a Kristine-like week (436 mm) would leave it 'wet'.",
               "sources": [
-                "LSTM (NASA POWER)"
+                "Soil forecast (NASA POWER)"
               ]
             },
             {
@@ -848,17 +848,17 @@
             {
               "when": "This week",
               "action": "Keep outlets open all week and do not replant or apply fertiliser yet: the root zone is forecast to stay waterlogged.",
-              "why": "LSTM forecast issued 2024-11-03 (day after the 2 Nov radar pass): root zone 0.98 of saturation, waterlogged on 7 of the next 7 days.",
+              "why": "Soil forecast issued 2024-11-03 (day after the 2 Nov radar pass): root zone 0.98 of saturation, waterlogged on 7 of the next 7 days.",
               "sources": [
-                "LSTM (NASA POWER)"
+                "Soil forecast (NASA POWER)"
               ]
             },
             {
               "when": "Before the next storm",
               "action": "Before the next typhoon warning: clear furrows and check that outlets drain to the canal.",
-              "why": "LSTM scenario from 2026-11-09: root zone now 0.76 (moist); a Kristine-like week (436 mm) would leave it 'wet'.",
+              "why": "Soil forecast scenario from 2026-11-09: root zone now 0.76 (moist); a Kristine-like week (436 mm) would leave it 'wet'.",
               "sources": [
-                "LSTM (NASA POWER)"
+                "Soil forecast (NASA POWER)"
               ]
             },
             {
@@ -978,17 +978,17 @@
             {
               "when": "This week",
               "action": "Soil stays very wet this week; avoid heavy machinery on the field so it does not compact.",
-              "why": "LSTM forecast issued 2024-11-03 (day after the 2 Nov radar pass): root zone 0.98 of saturation, waterlogged on 7 of the next 7 days.",
+              "why": "Soil forecast issued 2024-11-03 (day after the 2 Nov radar pass): root zone 0.98 of saturation, waterlogged on 7 of the next 7 days.",
               "sources": [
-                "LSTM (NASA POWER)"
+                "Soil forecast (NASA POWER)"
               ]
             },
             {
               "when": "Before the next storm",
               "action": "Before the next typhoon warning: routine outlet check is enough for this plot.",
-              "why": "LSTM scenario from 2026-11-09: root zone now 0.76 (moist); a Kristine-like week (436 mm) would leave it 'wet'.",
+              "why": "Soil forecast scenario from 2026-11-09: root zone now 0.76 (moist); a Kristine-like week (436 mm) would leave it 'wet'.",
               "sources": [
-                "LSTM (NASA POWER)"
+                "Soil forecast (NASA POWER)"
               ]
             },
             {

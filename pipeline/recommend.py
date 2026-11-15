@@ -77,9 +77,9 @@ def plot_recommendations(p: dict, outlook: dict | None, rotations: list, rain_mm
         else:
             act = "The root zone is forecast to drain this week; resume normal field work as it dries."
         recs.append({"when": "This week", "action": act,
-                     "why": (f"LSTM forecast issued {h['issued']} (day after the 2 Nov radar pass): root zone "
+                     "why": (f"Soil forecast issued {h['issued']} (day after the 2 Nov radar pass): root zone "
                              f"{h['root_zone_today']:.2f} of saturation, waterlogged on {days} of the next 7 days."),
-                     "sources": ["LSTM (NASA POWER)"]})
+                     "sources": ["Soil forecast (NASA POWER)"]})
 
     # 3. Before the next storm — LSTM scenario from today's soil
     k = _kristine_case(outlook) if outlook else None
@@ -93,10 +93,10 @@ def plot_recommendations(p: dict, outlook: dict | None, rotations: list, rain_mm
         else:
             act = "Before the next typhoon warning: routine outlet check is enough for this plot."
         recs.append({"when": "Before the next storm", "action": act,
-                     "why": (f"LSTM scenario from {so.get('issued_after')}: root zone now "
+                     "why": (f"Soil forecast scenario from {so.get('issued_after')}: root zone now "
                              f"{so.get('root_zone_today', 0):.2f} ({so.get('root_zone_class_today')}); a Kristine-like week "
                              f"({k['rain_total_mm']:.0f} mm) would leave it '{k['end_of_week_class']}'."),
-                     "sources": ["LSTM (NASA POWER)"]})
+                     "sources": ["Soil forecast (NASA POWER)"]})
 
     # 4. Next season — rotation fit
     fit = p.get("rotation_fit") or {}
