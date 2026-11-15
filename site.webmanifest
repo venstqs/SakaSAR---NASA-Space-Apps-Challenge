@@ -1,7 +1,7 @@
 {
-  "name": "SakaSAR — Bicol Typhoon Flood Monitor & Field Drowning Risk",
+  "name": "SakaSAR — Radar Flood & Soil Intelligence",
   "short_name": "SakaSAR",
-  "description": "Multi-scale C-band SAR flood mapping and short-lead soil-waterlogging forecasting for typhoon-hit farms in Bicol, Philippines.",
+  "description": "Satellite radar flood mapping and soil-waterlogging forecasting for Philippine farms. Built with Sentinel-1, NASADEM, GPM, and PyTorch for NASA Space Apps.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

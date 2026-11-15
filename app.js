@@ -1270,8 +1270,8 @@ function renderData() {
       <li>Field sizes, households, crops and bare-field days are sample values until the LGU shares parcel and census data.</li>
       <li>Not claimed: L-band dielectric inversion, "7 days early" detection, or a 35–50% water saving. None is built or tested.</li>
     </ul>
-    <p class="h">Team</p>
-    <p class="note">Adrian Xavier Moral (main developer: radar, risk engine, API, soil forecast model), Guian Emmanuel Beriso (terrain and rain, rotation inputs), Marqus Szymon Pelagio (dashboard, demo and submission), Engr. John Roy V. Galvez (mentor). NASA Space Apps 2026, Field Shift challenge.</p>`;
+    <p class="h">Source code</p>
+    <p class="note"><a href="https://github.com/venstqs/SakaSAR---NASA-Space-Apps-Challenge" target="_blank" rel="noopener noreferrer" style="color:var(--water-dark);text-decoration:underline;font-weight:600">github.com/venstqs/SakaSAR---NASA-Space-Apps-Challenge</a></p>`;
 }
 
 // ================= Story mode: the 30-second demo path =================

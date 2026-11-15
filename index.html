@@ -38,7 +38,10 @@
         "inLanguage": "en-US",
         "publisher": {
           "@id": "https://sakasar.earth/#organization"
-        }
+        },
+        "sameAs": [
+          "https://github.com/venstqs/SakaSAR---NASA-Space-Apps-Challenge"
+        ]
       },
       {
         "@type": "Organization",
@@ -51,7 +54,10 @@
           "width": 512,
           "height": 512
         },
-        "image": "https://sakasar.earth/assets/logo.png"
+        "image": "https://sakasar.earth/assets/logo.png",
+        "sameAs": [
+          "https://github.com/venstqs/SakaSAR---NASA-Space-Apps-Challenge"
+        ]
       },
       {
         "@type": "WebApplication",
@@ -63,6 +69,22 @@
         "description": "Satellite radar flood mapping and soil-waterlogging forecasting for Philippine farms. Built with Sentinel-1, NASADEM, GPM, and PyTorch for NASA Space Apps.",
         "image": "https://sakasar.earth/assets/logo.png",
         "isAccessibleForFree": true,
+        "author": {
+          "@id": "https://sakasar.earth/#organization"
+        },
+        "sameAs": [
+          "https://github.com/venstqs/SakaSAR---NASA-Space-Apps-Challenge"
+        ]
+      },
+      {
+        "@type": "SoftwareSourceCode",
+        "@id": "https://sakasar.earth/#code",
+        "name": "SakaSAR Source Code",
+        "codeRepository": "https://github.com/venstqs/SakaSAR---NASA-Space-Apps-Challenge",
+        "programmingLanguage": ["Python", "JavaScript", "HTML", "CSS"],
+        "targetProduct": {
+          "@id": "https://sakasar.earth/#app"
+        },
         "author": {
           "@id": "https://sakasar.earth/#organization"
         }
@@ -101,6 +123,7 @@
         <span class="tb-sep" aria-hidden="true"></span>
         <button type="button" class="tool icon-only" id="btn-shot" aria-label="Save map image" data-tip="Save map image"><i data-lucide="image-down"></i></button>
         <button type="button" class="tool icon-only" id="btn-link" aria-label="Copy link to this view" data-tip="Copy link to this view"><i data-lucide="link"></i></button>
+        <a class="tool icon-only" href="https://github.com/venstqs/SakaSAR---NASA-Space-Apps-Challenge" target="_blank" rel="noopener noreferrer" aria-label="GitHub repository" data-tip="GitHub repository"><i data-lucide="github"></i></a>
       </div>
     </header>
 
@@ -229,6 +252,7 @@
     <main style="max-width:720px;margin:48px auto;padding:0 20px;font-family:system-ui,sans-serif;color:#0f1f17;background:#fff">
       <h1>SakaSAR — Radar Flood &amp; Soil Intelligence</h1>
       <p>Satellite radar flood mapping and soil-waterlogging forecasting for Philippine farms. Built with Sentinel-1, NASADEM, GPM, and PyTorch for NASA Space Apps.</p>
+      <p>Open source code and documentation: <a href="https://github.com/venstqs/SakaSAR---NASA-Space-Apps-Challenge" target="_blank" rel="noopener noreferrer">github.com/venstqs/SakaSAR---NASA-Space-Apps-Challenge</a></p>
     </main>
   </noscript>
 </body>
