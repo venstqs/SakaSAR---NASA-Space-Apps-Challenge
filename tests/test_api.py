@@ -56,6 +56,8 @@ def test_dashboard_served_and_repo_not_exposed():
     assert client.get("/").status_code == 200
     assert "sitemap.xml" in client.get("/robots.txt").text
     assert "https://sakasar.earth/" in client.get("/sitemap.xml").text
+    assert client.get("/favicon.ico").status_code == 200
+    assert client.get("/site.webmanifest").status_code == 200
     assert client.get("/mock-data.json").json() == json.loads((ROOT / "mock-data.json").read_text(encoding="utf-8"))
     for f in ("pyproject.toml", "api.py", ".git/config", "requirements.txt"):
         assert client.get(f"/{f}").status_code == 404

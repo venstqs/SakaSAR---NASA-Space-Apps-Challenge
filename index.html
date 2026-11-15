@@ -7,10 +7,13 @@
   <meta name="description" content="3D GIS replay of Typhoon Kristine over the Bicol Region: NASA rain and soil heatmaps, the EONET storm track, Sentinel-1 flood hotspots across 114 towns, 30 m field drowning risk and an LSTM soil-saturation forecast." />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://sakasar.earth/" />
-  <link rel="icon" type="image/x-icon" href="favicon.ico" />
-  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png" />
-  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="48x48" href="https://sakasar.earth/assets/favicon-48x48.png" />
+  <link rel="icon" type="image/png" sizes="96x96" href="https://sakasar.earth/assets/favicon-96x96.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="https://sakasar.earth/assets/favicon-192x192.png" />
+  <link rel="icon" type="image/x-icon" href="https://sakasar.earth/favicon.ico" />
+  <link rel="shortcut icon" href="https://sakasar.earth/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="https://sakasar.earth/assets/apple-touch-icon.png" />
+  <link rel="manifest" href="https://sakasar.earth/site.webmanifest" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="SakaSAR" />
   <meta property="og:title" content="SakaSAR — Agro-Hydrological Decision Support" />
@@ -24,17 +27,40 @@
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@type": "WebApplication",
-    "name": "SakaSAR",
-    "url": "https://sakasar.earth/",
-    "applicationCategory": "EnvironmentalApplication",
-    "operatingSystem": "Web",
-    "description": "SAR-based field drowning risk, Sentinel-1 Bicol Region typhoon flood mapping, crop-rotation guidance and LSTM root-zone soil wetness forecasting using open NASA and Copernicus Earth observation data.",
-    "isAccessibleForFree": true,
-    "sourceOrganization": {
-      "@type": "Organization",
-      "name": "SakaSAR Team — NASA Space Apps Challenge 2026 (Field Shift)"
-    }
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://sakasar.earth/#website",
+        "url": "https://sakasar.earth/",
+        "name": "SakaSAR",
+        "description": "Bicol Typhoon Flood Monitor & Field Drowning Risk",
+        "publisher": {
+          "@id": "https://sakasar.earth/#organization"
+        }
+      },
+      {
+        "@type": "Organization",
+        "@id": "https://sakasar.earth/#organization",
+        "name": "SakaSAR",
+        "url": "https://sakasar.earth/",
+        "logo": "https://sakasar.earth/assets/logo.png",
+        "image": "https://sakasar.earth/assets/logo.png"
+      },
+      {
+        "@type": "WebApplication",
+        "@id": "https://sakasar.earth/#app",
+        "name": "SakaSAR",
+        "url": "https://sakasar.earth/",
+        "applicationCategory": "EnvironmentalApplication",
+        "operatingSystem": "Web",
+        "description": "SAR-based field drowning risk, Sentinel-1 Bicol Region typhoon flood mapping, crop-rotation guidance and LSTM root-zone soil wetness forecasting using open NASA and Copernicus Earth observation data.",
+        "image": "https://sakasar.earth/assets/logo.png",
+        "isAccessibleForFree": true,
+        "author": {
+          "@id": "https://sakasar.earth/#organization"
+        }
+      }
+    ]
   }
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />

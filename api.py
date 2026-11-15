@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse
 ROOT = Path(__file__).resolve().parent
 DATA_PATH = ROOT / "mock-data.json"
 OUTLOOK_PATH = ROOT / "data" / "soil_outlook.json"
-DASHBOARD_FILES = {"index.html", "app.js", "style.css", "mock-data.json", "favicon.ico", "robots.txt", "sitemap.xml"}
+DASHBOARD_FILES = {"index.html", "app.js", "style.css", "mock-data.json", "favicon.ico", "robots.txt", "sitemap.xml", "site.webmanifest"}
 
 app = FastAPI(title="SakaSAR API", version="1.1.0",
               description="SAR root-zone hydrology and drowning-risk data for the Camarines Sur pilot.")
