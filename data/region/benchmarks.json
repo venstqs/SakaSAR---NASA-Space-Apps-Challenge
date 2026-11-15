@@ -1,5 +1,5 @@
 {
- "built": "2026-11-15 09:15",
+ "built": "2026-11-15 11:04",
  "machine": "Windows 10, Python 3.11.9, Intel64 Family 6 Model 186 Stepping 2, GenuineIntel",
  "field_risk": {
   "independent_hit_rate": "31%",
@@ -25,6 +25,19 @@
   "streams": 813,
   "largest_catchment_km2": 2281.0,
   "bicol_river_basin_published_km2": 3770
+ },
+ "field_risk_bicol": {
+  "area_ha": {
+   "high": 7114,
+   "watch": 65211,
+   "low": 59428,
+   "missing": 0
+  },
+  "flooded_farmland_cells": 3156,
+  "terrain_rain_share_high": 0.918,
+  "farmland_share_high": 0.496,
+  "full_score_share_high_circular": 0.995,
+  "processing_time_sec": 77.3
  },
  "forecast": {
   "model": "LSTM (1 layer, 64 hidden), PyTorch",
@@ -179,12 +192,12 @@
  },
  "speed": {
   "hydrology_cells": 1815050,
-  "priority_flood_sec": 3.8,
-  "d8_sec": 0.22,
-  "flow_accumulation_sec": 0.99,
-  "risk_engine_rebuild": "1.6 sec",
+  "priority_flood_sec": 5.12,
+  "d8_sec": 0.29,
+  "flow_accumulation_sec": 1.14,
+  "risk_engine_rebuild": "1.5 sec",
   "bicol_flood_screening_sec": 650.0,
-  "forecast_inference_35_cells_ms": 0.65,
+  "forecast_inference_35_cells_ms": 0.64,
   "forecast_parameters": 19586
  }
 }

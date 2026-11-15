@@ -59,6 +59,13 @@ def main():
                    "lift_over_land": round(v["share_rated_high"] / v["land_share_high"], 2), "streams": ro["streams"],
                    "largest_catchment_km2": ro.get("largest_catchment_km2"), "bicol_river_basin_published_km2": ro.get("bicol_river_basin_published_km2")}
 
+    # 2b. Field Drowning Risk for all Bicol farmland (100 m)
+    bp_ = R / "bicol_risk.json"
+    if bp_.exists():
+        br = load(bp_); bv = br["validation"]
+        B["field_risk_bicol"] = {"area_ha": br["area_ha"], "flooded_farmland_cells": bv["flooded_farmland_cells"],
+                                 "terrain_rain_share_high": bv["share_rated_high_terrain_rain"], "farmland_share_high": bv["farmland_share_high_terrain_rain"],
+                                 "full_score_share_high_circular": bv["share_rated_high_full"], "processing_time_sec": br["processing_time_sec"]}
     # 3. Soil forecast (LSTM) at the pilot cell
     m = so["metrics"]
     B["forecast"] = {
@@ -148,6 +155,24 @@ def pct(x):
     return f"{x * 100:.0f}%" if isinstance(x, (int, float)) else str(x)
 
 
+def bicol_risk_md(B):
+    b = B.get("field_risk_bicol")
+    if not b:
+        return ""
+    return f"""## 2b. Field Drowning Risk, all of Bicol farmland (100 m)
+
+Same formula as the pilot on every ESA WorldCover cropland cell ({sum(b['area_ha'].values()):,} ha): high {b['area_ha']['high']:,} ha,
+watch {b['area_ha']['watch']:,} ha, low {b['area_ha']['low']:,} ha. Built in {b['processing_time_sec']} s.
+
+| Check | Result |
+|---|---|
+| Radar-flooded farmland cells checked | {b['flooded_farmland_cells']:,} |
+| Rated high by terrain + rain only (independent) | **{pct(b['terrain_rain_share_high'])}** |
+| Baseline: all farmland rated high by terrain + rain | {pct(b['farmland_share_high'])} (lift ×{round(b['terrain_rain_share_high'] / b['farmland_share_high'], 2)}) |
+| Rated high by the full score | {pct(b['full_score_share_high_circular'])} (circular: ΔVV is in the score and the flood map) |
+"""
+
+
 def write_md(B):
     f, fo, fr, ri, ru = B["field_risk"], B["forecast"], B["forecast_regional"], B["rain_interpolation"], B["runoff"]
     root, top = fo["root_zone"], fo["surface"]
@@ -187,6 +212,7 @@ nature; a ×{ru['lift_over_farmland']} lift is a real but modest signal. The dra
 {round(100 * ru['largest_catchment_km2'] / ru['bicol_river_basin_published_km2']) if ru.get('largest_catchment_km2') else 'n/a'}% of the Bicol River basin: at 200 m, flat floodplains and lake surfaces (Bato, Baao, Buhi)
 send part of the upper basin elsewhere, so watershed tracing is a screening tool, not a basin map.
 
+{bicol_risk_md(B)}
 ## 3. Soil forecast (root-zone wetness, 7 days ahead, pilot cell)
 
 Model: {fo['model']}. Split by issue date: train {fo['split']['train']}, validation {fo['split']['val']}, test {fo['split']['test']}

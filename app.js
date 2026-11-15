@@ -48,7 +48,7 @@ const S = {
   tl: null, munis: null, summary: null, overlay: null,
   t: 23, playing: false, speed: 1, last: 0, dayShown: -1,
   field: "soilnow", fieldOpacity: 0.8, basemap: "sat", gibs: "none", view3d: true,
-  layers: { hotspots: true, flood: true, towns: true, storm: true, terrain: true, hillshade: true, pilot: true, sarchange: false, runoff: true, streams: true },
+  layers: { hotspots: true, flood: true, towns: true, storm: true, terrain: true, hillshade: true, pilot: true, sarchange: false, runoff: true, streams: true, brisk: true },
   pilot: null, plot: "PL-02", priority: "water", story: 0, mode: "now", pgrid: null, pgLayer: "cls",
   aiMode: "hind", events: [], townCenters: [], charts: {}, ready: false, inspect: null,
 };
@@ -128,6 +128,7 @@ async function init() {
   fetchJSON("data/region/pilot_grids.json").then((g) => { S.pgrid = g; renderPilotGrid(); });
   fetchJSON("data/region/bicol_runoff.json").then((r) => { S.runoff = r; loadRunoff(); renderData(); });
   fetchJSON("data/region/bicol_flowdir.json").then((f) => f && loadFlow(f));
+  fetchJSON("data/region/bicol_risk.json").then((r) => { if (r) { S.brisk = r; loadBicolRisk(); } });
   fetchJSON("data/region/benchmarks.json").then((b) => { S.bench = b; renderData(); renderAI(); });
   S.t = Math.max(0, tl.days.indexOf("2024-11-02")) + 0.5;
   S.townCenters = munis.features.map((f) => {
@@ -358,7 +359,7 @@ function initMap() {
   // when our browser-made tiles arrive, the 3D terrain must re-drape them (it caches each tile's layers)
   let rttQueued = false;
   map.on("sourcedata", (e) => {
-    if ((e.sourceId === "field" || e.sourceId === "flood" || e.sourceId === "pgrid" || e.sourceId === "runoff" || e.sourceId === "base" || String(e.sourceId).startsWith("gibs-")) && e.tile && !rttQueued) {
+    if ((e.sourceId === "field" || e.sourceId === "flood" || e.sourceId === "pgrid" || e.sourceId === "runoff" || e.sourceId === "brisk" || e.sourceId === "base" || String(e.sourceId).startsWith("gibs-")) && e.tile && !rttQueued) {
       rttQueued = true;
       requestAnimationFrame(() => { rttQueued = false; map.terrain?.sourceCache?.freeRtt?.(); map.triggerRepaint(); });
     }
@@ -484,6 +485,7 @@ function applyLayers() {
   Object.keys(GIBS).forEach((k) => vis(`gibs-${k}`, S.gibs === k));
   map.setTerrain(L.terrain && S.view3d ? { source: "dem", exaggeration: Number($("exag")?.value || 1.8) } : null);
   applyPilotLayers();
+  vis("brisk", S.layers.brisk);
   vis("runoff", S.layers.runoff); ["streams", "streams-casing"].forEach((id) => vis(id, S.layers.streams));
   renderLegend();
 }
@@ -557,6 +559,7 @@ function inspect(lon, lat) {
       <dt>Forecast after 2 Nov</dt><dd>${h ? `${h.days_pred} of 7 days waterlogged` : "n/a"}</dd>
       <dt>What happened</dt><dd>${h ? `${h.days_actual} of 7 days` : "n/a"}</dd>
       <dt>If Kristine came again</dt><dd>${g ? `${g.days_waterlogged} of 7 days` : "n/a"}</dd>
+      ${(() => { const b = briskAt(lon, lat); return b && b.cls >= 0 ? `<div class="sec">Field Drowning Risk, 100 m (after Kristine)</div><dt>This farmland cell</dt><dd>${b.score}/100, ${["low", "watch", "high"][b.cls]}</dd>` : ""; })()}
       ${pgInspectHTML(lon, lat)}
     </dl>
     ${h ? `<div class="insp-chart"><canvas id="ch-insp"></canvas></div>` : ""}
@@ -921,6 +924,8 @@ function renderLayers() {
       <input type="range" id="wi-rain" min="0" max="400" step="10" value="0" aria-label="Storm rain for the what-if, mm" />
       <div class="whatif-out" id="wi-out">Drag to test a uniform storm rain over Bicol (event + the week before). 0 = Kristine's real rain.</div>
     </div>
+    <p class="h">Field Drowning Risk, all of Bicol farmland (100 m)</p>
+    ${toggle("brisk", "Field Drowning Risk, 100 m", "Radar + terrain + rain after Kristine, same formula as the 30 m pilot. Every farmland cell, from zoom 8")}
     <p class="h">Field Drowning Risk, 30 m (sample fields)</p>
     ${toggle("pilot", "Risk zones and fields", "High, watch and low cells; field outlines, flood edge and drainage channel. From zoom 11")}
     ${toggle("sarchange", "Radar wetness change", "Cells where Sentinel-1 VV dropped by 1 dB or more after the storm")}
@@ -990,7 +995,7 @@ function renderLegend() {
     const st = PG_STYLE[S.pgLayer], a = st.stops[0][0], b = st.stops[st.stops.length - 1][0];
     parts.unshift(`<div><b>${st.name}, 30 m</b><small>risk engine grid, ${S.pgrid.width}×${S.pgrid.height} cells</small><div class="ramp" style="background:linear-gradient(90deg,${st.stops.map((q) => `rgba(${q[1][0]},${q[1][1]},${q[1][2]},${Math.max(0.2, q[1][3] / 255)}) ${((q[0] - a) / (b - a)) * 100}%`).join(",")})"></div><div class="ticks-row"><span>${st.fmt(a)}</span><span>${st.fmt(b)}</span></div></div>`);
   }
-  if (S.pilot && S.layers.pilot && S.ready && map.getZoom() >= 10.5) parts.unshift(`<div><b>Field Drowning Risk, 30 m</b><div class="sw">${["high", "watch", "low"].map((k) => `<span><i style="background:${RISK_C[k]}"></i>${RISK_W[k]}</span>`).join("")}<span><i style="background:none;box-shadow:inset 0 0 0 2px #4ec4de"></i>Radar flood edge</span><span><i style="background:#7fe0ff"></i>Drainage channel</span></div></div>`);
+  if (S.pilot && (S.layers.pilot || S.layers.brisk) && S.ready && map.getZoom() >= (S.layers.brisk ? 8 : 10.5)) parts.unshift(`<div><b>Field Drowning Risk</b><small>${map.getZoom() >= 11.2 ? "30 m pilot grid" : "100 m, all Bicol farmland, after Kristine"}</small><div class="sw">${["high", "watch", "low"].map((k) => `<span><i style="background:${RISK_C[k]}"></i>${RISK_W[k]}</span>`).join("")}<span><i style="background:none;box-shadow:inset 0 0 0 2px #4ec4de"></i>Radar flood edge</span><span><i style="background:#7fe0ff"></i>Drainage channel</span></div></div>`);
   if (S.runoff && (S.layers.runoff || S.layers.streams) && z < 12) parts.push(`<div><b>Runoff & ponding risk, 200 m</b><small>terrain + rain, never saw the radar</small>${S.layers.runoff ? `<div class="ramp" style="background:linear-gradient(90deg,rgba(150,205,235,.5),#2f9fd3 40%,#1b5fa8 70%,#281e78)"></div><div class="ticks-row"><span>60</span><span>High 70</span><span>100</span></div>` : ""}${S.layers.streams ? `<div class="sw"><span><i style="background:#4ec4de;height:3px;border-radius:2px"></i>Drainage, ≥10 km² upstream</span></div>` : ""}</div>`);
   if (S.layers.storm && S.mode === "replay" && z < 10) parts.push(`<div><b>Kristine (EONET winds, PAGASA classes)</b><div class="sw">${CATS.map((c) => `<span><i style="background:${c.c}"></i>${c.short}</span>`).join("")}</div></div>`);
   $("legend").innerHTML = parts.length ? `<button type="button" class="legend-toggle" aria-expanded="${!S.legendFolded}">Legend<i data-lucide="${S.legendFolded ? "chevron-up" : "chevron-down"}"></i></button>${S.legendFolded ? "" : parts.join("")}` : "";
@@ -1553,7 +1558,7 @@ function renderPilotGrid() {
   const src = map.getSource("pgrid"), key = `${k}-${Date.now()}`;
   if (!src) {
     map.addSource("pgrid", { type: "raster", tiles: [`saka://pgrid/${key}/{z}/{x}/{y}`], tileSize: 256, minzoom: 10, maxzoom: 17, bounds: [w, s, e, n] });
-    map.addLayer({ id: "pgrid", type: "raster", source: "pgrid", minzoom: 10.5, paint: { "raster-opacity": 0.85, "raster-resampling": "nearest", "raster-fade-duration": 0 } }, map.getLayer("plots-fill") ? "plots-fill" : undefined);
+    map.addLayer({ id: "pgrid", type: "raster", source: "pgrid", minzoom: 11.2, paint: { "raster-opacity": 0.85, "raster-resampling": "nearest", "raster-fade-duration": 0 } }, map.getLayer("plots-fill") ? "plots-fill" : undefined);
   } else src.setTiles([`saka://pgrid/${key}/{z}/{x}/{y}`]);
   vis("pgrid", S.layers.pilot);
   vis("risk-zones", false); // overlapping vector zones doubled their colour; the grid raster replaces them
@@ -1843,6 +1848,8 @@ const FARM_SAY = { high: "Your field is likely to drown. Act in the next 48 hour
 function farmerAt(lon, lat, town) {
   const sc = pgValue("score", lon, lat);
   if (sc != null && pgValue("cls", lon, lat) !== -2) return { score: Math.round(sc), cls: runoffClass(sc), basis: "30 m Field Drowning Risk (radar + terrain + rain)", town, flooded: pgValue("flood", lon, lat) === 1 };
+  const br = briskAt(lon, lat);
+  if (br && br.cls >= 0) return { score: br.score, cls: ["low", "watch", "high"][br.cls], basis: "100 m Field Drowning Risk after Kristine (radar + terrain + rain)", town, flooded: floodAt(lon, lat) === "flooded" };
   const r = runoffAt(lon, lat), fl = floodAt(lon, lat);
   if (!r) return null;
   // evidence ladder: radar water (observed) > runoff model (modelled, capped at watch); never call non-farmland a field
@@ -1947,6 +1954,13 @@ function fieldStats(pts) {
     for (let x = 0; x < R.fw; x++) { const lo = R.fW + ((x + 0.5) / R.fw) * (R.fE - R.fW); if (lo < mnx || lo > mxx || !pointInRing(lo, la, ring)) continue;
       const a = R.flood[(y * R.fw + x) * 4 + 3]; if (a > 0) { fpx++; if (a >= 200) fflood++; } }
   }
+  const B = S.briskVals, bs = [];
+  if (B) for (let y = 0; y < B.H; y++) {
+    const la = latFromMercY(B.yN - ((y + 0.5) / B.H) * (B.yN - B.yS)); if (la < mny || la > mxy) continue;
+    for (let x = 0; x < B.W; x++) { const lo = B.w + ((x + 0.5) / B.W) * (B.e - B.w); const i = (y * B.W + x) * 4;
+      if (lo >= mnx && lo <= mxx && B.d[i + 3] && B.d[i + 1] >= 2 && pointInRing(lo, la, ring)) bs.push(B.d[i]); }
+  }
+  if (bs.length) { bs.sort((a, b) => a - b); out.risk100 = { cells: bs.length, score: bs[Math.floor(bs.length / 2)], high: bs.filter((v) => v >= 70).length / bs.length }; }
   if (!rs.length) { const r = runoffAt(out.lon, out.lat); if (r) rs.push(r.score); }
   rs.sort((a, b) => a - b);
   Object.assign(out, { basis: "coarse", cells: rs.length, score: rs.length ? rs[Math.floor(rs.length / 2)] : null, farmPx: fpx, flooded: fpx ? fflood / fpx : null });
@@ -1956,8 +1970,9 @@ function drawFinish() {
   if (S.draw.pts.length < 3) return;
   const pts = S.draw.pts.slice(); drawStop();
   const st = fieldStats(pts);
-  const cls = st.basis === "30m" ? runoffClass(st.score) : st.flooded > 0.2 ? "high" : Math.min(st.score ?? 0, 69) >= 40 ? "watch" : "low";
-  const f = { score: st.score, cls, town: st.town, basis: st.basis === "30m" ? `${st.cells} cells of the 30 m risk grid` : "radar flood map + 200 m runoff (coarser outside the 30 m pilot)" };
+  const r100 = st.basis !== "30m" ? st.risk100 : null;
+  const cls = st.basis === "30m" ? runoffClass(st.score) : r100 ? runoffClass(r100.score) : st.flooded > 0.2 ? "high" : Math.min(st.score ?? 0, 69) >= 40 ? "watch" : "low";
+  const f = { score: r100 ? r100.score : st.score, cls, town: st.town, basis: st.basis === "30m" ? `${st.cells} cells of the 30 m risk grid` : r100 ? `${r100.cells} farmland cells of the 100 m Field Drowning Risk` : "radar flood map + 200 m runoff (coarser outside the 30 m pilot)" };
   const box = $("inspector");
   $("insp-title").textContent = `Your field${st.town ? `, ${st.town.name}` : ""}`;
   $("insp-body").innerHTML = `${farmerCard(f, st.ha)}
@@ -1971,6 +1986,7 @@ function drawFinish() {
       <dt>Terrain wetness index (mean)</dt><dd>${st.twi.toFixed(1)}</dd>
       <dt>Land cover</dt><dd>${Object.entries(st.lc).map(([k, v]) => `${esc(k)} ${Math.round((100 * v) / st.cells)}%`).join(", ")}</dd>`
       : `<div class="sec">Inside your field (outside the 30 m pilot)</div>
+      ${r100 ? `<dt>Field Drowning Risk, 100 m (median of ${r100.cells} cells)</dt><dd>${r100.score}/100</dd><dt>Share rated high</dt><dd>${pct(r100.high)}</dd>` : ""}
       <dt>Runoff & ponding score (median of ${st.cells} cells)</dt><dd>${st.score ?? "n/a"}/100</dd>
       <dt>Farmland seen under water (radar)</dt><dd>${st.flooded != null ? pct(st.flooded) : "no farmland pixels"}</dd>
       <p class="note" style="grid-column:1/-1">Outside the pilot only coarser data exist (radar flood map ~150 m, runoff 200 m). Treat this as a screening; a 30 m run for your barangay needs the risk engine.</p>`}
@@ -2185,6 +2201,31 @@ function renderWsKpis(id) {
   }[id] || [];
   box.innerHTML = k.map(([l, v]) => `<div><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join("");
   box.hidden = !k.length;
+}
+
+// ================= Field Drowning Risk for all of Bicol farmland (100 m, pipeline/bicol_risk.py) =================
+async function loadBicolRisk() {
+  const r = S.brisk, [disp, vals] = await Promise.all([loadImageCanvas(r.image), loadImageCanvas(r.values)]);
+  if (!disp || !vals) return;
+  const [[w, n], [e], , [, s]] = r.coordinates;
+  registerRaster("brisk", disp, w, e, n, s, false);
+  S.briskVals = { d: vals.getContext("2d").getImageData(0, 0, vals.width, vals.height).data, W: vals.width, H: vals.height, w, e, yN: mercY(n), yS: mercY(s) };
+  const go = () => {
+    if (map.getSource("brisk")) return;
+    map.addSource("brisk", { type: "raster", tiles: ["saka://brisk/v1/{z}/{x}/{y}"], tileSize: 256, minzoom: 6, maxzoom: 14, bounds: [w, s, e, n] });
+    map.addLayer({ id: "brisk", type: "raster", source: "brisk", minzoom: 7.6,
+      paint: { "raster-opacity": ["interpolate", ["linear"], ["zoom"], 7.6, 0, 8.6, 0.85, 11, 0.85, 11.6, 0.25], "raster-resampling": "nearest", "raster-fade-duration": 0 } },
+      map.getLayer("pgrid") ? "pgrid" : map.getLayer("towns-fill") ? "towns-fill" : undefined);
+    applyLayers();
+  };
+  S.ready ? go() : map.once("style.load", go);
+}
+function briskAt(lon, lat) {
+  const B = S.briskVals; if (!B || lon < B.w || lon > B.e) return null;
+  const x = Math.floor(((lon - B.w) / (B.e - B.w)) * B.W), y = Math.floor(((B.yN - mercY(lat)) / (B.yN - B.yS)) * B.H);
+  if (y < 0 || y >= B.H) return null;
+  const i = (y * B.W + x) * 4; if (!B.d[i + 3]) return null;
+  return { score: B.d[i], cls: B.d[i + 1] - 2 };
 }
 
 init();

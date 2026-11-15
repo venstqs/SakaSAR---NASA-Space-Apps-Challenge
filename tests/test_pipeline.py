@@ -159,3 +159,14 @@ def test_benchmarks_file():
     assert b["forecast_regional"]["within_1_day"] <= b["forecast_regional"]["cells"]
     assert b["rain_interpolation"]["cell_days"] > 0
     assert (root / "docs" / "BENCHMARKS.md").read_text(encoding="utf-8").startswith("# SakaSAR benchmarks")
+
+
+def test_bicol_field_risk_outputs():
+    """Bicol-wide Field Drowning Risk (100 m): areas add up to the farmland and the honest check fields exist."""
+    import json
+    from pathlib import Path
+    doc = json.loads((Path(__file__).resolve().parent.parent / "data" / "region" / "bicol_risk.json").read_text(encoding="utf-8"))
+    assert sum(doc["area_ha"].values()) > 100_000
+    v = doc["validation"]
+    assert 0 <= v["share_rated_high_terrain_rain"] <= 1 and 0 <= v["farmland_share_high_terrain_rain"] <= 1
+    assert len(doc["towns"]) > 100
