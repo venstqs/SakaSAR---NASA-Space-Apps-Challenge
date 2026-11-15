@@ -49,7 +49,7 @@ const S = {
   t: 23, playing: false, speed: 1, last: 0, dayShown: -1,
   field: "soilnow", fieldOpacity: 0.8, basemap: "sat", gibs: "none", view3d: true,
   layers: { hotspots: true, flood: true, towns: true, storm: true, terrain: true, hillshade: true, pilot: true, sarchange: false, runoff: true, streams: true },
-  pilot: null, plot: "PL-02", priority: "water", story: 0, mode: "now", pgrid: null, pgLayer: "none",
+  pilot: null, plot: "PL-02", priority: "water", story: 0, mode: "now", pgrid: null, pgLayer: "cls",
   aiMode: "hind", events: [], townCenters: [], charts: {}, ready: false, inspect: null,
 };
 let map, stormMarker, pinMarker, hoverPopup;
@@ -926,8 +926,8 @@ function renderLayers() {
     ${toggle("sarchange", "Radar wetness change", "Cells where Sentinel-1 VV dropped by 1 dB or more after the storm")}
     <p class="note chip-note" style="margin:8px 6px 6px">30 m detail layer (exact cell values on hover)</p>
     <div class="chips" role="group" aria-label="30 m detail layer">
-      <button type="button" class="chip" data-pg="none" aria-pressed="${S.pgLayer === "none"}">Risk classes</button>
-      ${Object.entries(PG_STYLE).map(([k, v]) => `<button type="button" class="chip" data-pg="${k}" aria-pressed="${S.pgLayer === k}">${v.name}</button>`).join("")}
+      <button type="button" class="chip" data-pg="cls" aria-pressed="${S.pgLayer === "cls"}">Risk classes</button>
+      ${Object.entries(PG_STYLE).filter(([k]) => k !== "cls").map(([k, v]) => `<button type="button" class="chip" data-pg="${k}" aria-pressed="${S.pgLayer === k}">${v.name}</button>`).join("")}
     </div>
     <p class="h">Storm</p>
     ${toggle("storm", "Kristine's track", "NASA EONET every 6 hours, PAGASA colours")}
@@ -986,7 +986,7 @@ function renderLegend() {
   if (after && S.mode === "replay" && z < 12 && (S.layers.flood || S.layers.hotspots || S.layers.towns)) {
     parts.push(`<div><b>Flood, Sentinel-1 (28 Oct + 2 Nov)</b><div class="sw">${S.layers.hotspots ? `<span><i style="background:linear-gradient(90deg,#ffe882,#ffb000,#ff5a1f,#be0028)"></i>Hotspot density</span>` : ""}${S.layers.flood ? `<span><i style="background:#4ec4de"></i>Flooded farmland</span><span><i style="background:#e9e4c9"></i>Farmland</span>` : ""}${S.layers.towns ? `<span><i style="background:rgba(27,95,168,0.5)"></i>Town share flooded</span>` : ""}</div></div>`);
   }
-  if (S.pgLayer !== "none" && S.pgrid && S.layers.pilot && z >= 10.5) {
+  if (!["none", "cls"].includes(S.pgLayer) && S.pgrid && S.layers.pilot && z >= 10.5) {
     const st = PG_STYLE[S.pgLayer], a = st.stops[0][0], b = st.stops[st.stops.length - 1][0];
     parts.unshift(`<div><b>${st.name}, 30 m</b><small>risk engine grid, ${S.pgrid.width}×${S.pgrid.height} cells</small><div class="ramp" style="background:linear-gradient(90deg,${st.stops.map((q) => `rgba(${q[1][0]},${q[1][1]},${q[1][2]},${Math.max(0.2, q[1][3] / 255)}) ${((q[0] - a) / (b - a)) * 100}%`).join(",")})"></div><div class="ticks-row"><span>${st.fmt(a)}</span><span>${st.fmt(b)}</span></div></div>`);
   }
@@ -1131,7 +1131,7 @@ function addPilotLayers() {
 function applyPilotLayers() {
   if (!S.ready || !S.pilot) return;
   ["plots-fill", "plots-line", "obs-flood", "drain"].forEach((id) => vis(id, S.layers.pilot));
-  vis("risk-zones", S.layers.pilot && S.pgLayer === "none"); vis("pgrid", S.layers.pilot && S.pgLayer !== "none");
+  vis("risk-zones", false); vis("pgrid", S.layers.pilot && S.pgLayer !== "none");
   vis("sar-change", S.layers.pilot && S.layers.sarchange);
   (S.plotLabels || []).forEach((m) => (m.getElement().style.display = S.layers.pilot && map.getZoom() >= 11.2 ? "" : "none"));
 }
@@ -1516,6 +1516,8 @@ document.addEventListener("click", (e) => { if (e.target.closest("#splash")) fin
 
 // ================= 30 m detail layers from the pilot GeoTIFFs =================
 const PG_STYLE = {
+  // class per 30 m cell: 0 low, 1 watch, 2 high, -1 no radar data (built-up/water, -2, is left clear)
+  cls: { name: "Risk classes", stops: [[-1, [154, 165, 159, 110]], [-0.01, [154, 165, 159, 110]], [0, [124, 198, 154, 150]], [0.99, [124, 198, 154, 150]], [1, [238, 159, 39, 160]], [1.99, [238, 159, 39, 160]], [2, [226, 83, 60, 165]]], fmt: (v) => ["low", "watch", "high"][v] || "" },
   score: { name: "Risk score", stops: [[23, [124, 198, 154, 150]], [40, [238, 159, 39, 170]], [70, [226, 83, 60, 190]], [100, [150, 25, 20, 210]]], fmt: (v) => `${Math.round(v)}/100` },
   twi: { name: "Terrain wetness (TWI)", stops: [[5, [240, 248, 250, 40]], [8, [150, 210, 235, 150]], [11, [47, 159, 211, 190]], [15, [20, 60, 140, 215]]], fmt: (v) => v.toFixed(1) },
   dvv: { name: "Radar change ΔVV", stops: [[-8, [16, 60, 150, 220]], [-4, [47, 159, 211, 190]], [-1, [200, 230, 245, 90]], [0, [255, 255, 255, 30]], [3, [201, 166, 107, 170]], [6, [140, 100, 50, 210]]], fmt: (v) => `${v.toFixed(1)} dB` },
@@ -1554,7 +1556,7 @@ function renderPilotGrid() {
     map.addLayer({ id: "pgrid", type: "raster", source: "pgrid", minzoom: 10.5, paint: { "raster-opacity": 0.85, "raster-resampling": "nearest", "raster-fade-duration": 0 } }, map.getLayer("plots-fill") ? "plots-fill" : undefined);
   } else src.setTiles([`saka://pgrid/${key}/{z}/{x}/{y}`]);
   vis("pgrid", S.layers.pilot);
-  vis("risk-zones", S.layers.pilot && k === "none");
+  vis("risk-zones", false); // overlapping vector zones doubled their colour; the grid raster replaces them
   renderLegend();
 }
 function pgReadout(lon, lat) {
