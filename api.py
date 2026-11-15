@@ -24,7 +24,7 @@ DASHBOARD_FILES = {"index.html", "app.js", "style.css", "mock-data.json", "favic
 
 app = FastAPI(title="SakaSAR API", version="1.1.0",
               description="SAR root-zone hydrology and drowning-risk data for the Camarines Sur pilot.")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "HEAD"], allow_headers=["*"])
 
 _cache: dict = {"mtime": None, "data": None}
 
@@ -130,7 +130,7 @@ def get_dataset(name: str) -> FileResponse:
     return FileResponse(target, filename=name)
 
 
-@app.get("/", include_in_schema=False)
+@app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
 def dashboard():
     index_file = ROOT / "index.html"
     if index_file.exists():
@@ -141,7 +141,7 @@ def dashboard():
 ASSETS_DIR = ROOT / "assets"
 
 
-@app.get("/assets/{name}", include_in_schema=False)
+@app.api_route("/assets/{name}", methods=["GET", "HEAD"], include_in_schema=False)
 def dashboard_static_asset(name: str) -> FileResponse:
     """Images used by the dashboard (logo). Only plain filenames inside assets/ are served."""
     target = (ASSETS_DIR / name).resolve()
@@ -150,7 +150,7 @@ def dashboard_static_asset(name: str) -> FileResponse:
     return FileResponse(target)
 
 
-@app.get("/{filename}", include_in_schema=False)
+@app.api_route("/{filename}", methods=["GET", "HEAD"], include_in_schema=False)
 def dashboard_asset(filename: str) -> FileResponse:
     target = ROOT / filename
     if filename not in DASHBOARD_FILES or not target.exists():
