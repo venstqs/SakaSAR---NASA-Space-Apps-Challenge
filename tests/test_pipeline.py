@@ -121,7 +121,7 @@ def test_recommendations_timeline_per_plot():
         assert all(r["action"] and r["why"] and r["sources"] for r in recs)
     high = next(f["properties"] for f in m["plots"]["features"] if f["properties"]["risk_class"] == "high")
     assert "trench" in high["recommendations"][0]["action"]
-    assert "LSTM" in high["recommendations"][1]["sources"][0]
+    assert "Soil forecast" in high["recommendations"][1]["sources"][0]
 
 
 def test_best_rotation_skips_caution():
