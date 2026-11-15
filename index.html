@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SakaSAR — Bicol Typhoon Flood Monitor &amp; Field Drowning Risk</title>
-  <meta name="description" content="3D GIS replay of Typhoon Kristine over the Bicol Region: NASA rain and soil heatmaps, the EONET storm track, Sentinel-1 flood hotspots across 114 towns, 30 m field drowning risk and an LSTM soil-saturation forecast." />
-  <meta name="robots" content="index, follow" />
+  <title>SakaSAR — Radar Flood &amp; Soil Intelligence</title>
+  <meta name="description" content="Satellite radar flood mapping and soil-waterlogging forecasting for Philippine farms. Built with Sentinel-1, NASADEM, GPM, and PyTorch for NASA Space Apps." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
   <link rel="canonical" href="https://sakasar.earth/" />
   <link rel="icon" type="image/png" sizes="48x48" href="https://sakasar.earth/assets/favicon-48x48.png" />
   <link rel="icon" type="image/png" sizes="96x96" href="https://sakasar.earth/assets/favicon-96x96.png" />
@@ -16,13 +16,13 @@
   <link rel="manifest" href="https://sakasar.earth/site.webmanifest" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="SakaSAR" />
-  <meta property="og:title" content="SakaSAR — Agro-Hydrological Decision Support" />
-  <meta property="og:description" content="Radar-based field drowning risk and crop-rotation guidance for typhoon-hit farms. Built for NASA Space Apps Challenge 2026." />
+  <meta property="og:title" content="SakaSAR — Radar Flood &amp; Soil Intelligence" />
+  <meta property="og:description" content="Satellite radar flood mapping and soil-waterlogging forecasting for Philippine farms. Built with Sentinel-1, NASADEM, GPM, and PyTorch for NASA Space Apps." />
   <meta property="og:image" content="https://sakasar.earth/assets/logo.png" />
   <meta property="og:url" content="https://sakasar.earth/" />
   <meta name="twitter:card" content="summary" />
-  <meta name="twitter:title" content="SakaSAR — Agro-Hydrological Decision Support" />
-  <meta name="twitter:description" content="Radar-based field drowning risk and crop-rotation guidance for typhoon-hit farms." />
+  <meta name="twitter:title" content="SakaSAR — Radar Flood &amp; Soil Intelligence" />
+  <meta name="twitter:description" content="Satellite radar flood mapping and soil-waterlogging forecasting for Philippine farms. Built with Sentinel-1, NASADEM, GPM, and PyTorch for NASA Space Apps." />
   <meta name="twitter:image" content="https://sakasar.earth/assets/logo.png" />
   <script type="application/ld+json">
   {
@@ -33,7 +33,9 @@
         "@id": "https://sakasar.earth/#website",
         "url": "https://sakasar.earth/",
         "name": "SakaSAR",
-        "description": "Bicol Typhoon Flood Monitor & Field Drowning Risk",
+        "alternateName": ["SakaSAR Earth", "SakaSAR AI"],
+        "description": "Satellite radar flood mapping and soil-waterlogging forecasting for Philippine farms.",
+        "inLanguage": "en-US",
         "publisher": {
           "@id": "https://sakasar.earth/#organization"
         }
@@ -43,7 +45,12 @@
         "@id": "https://sakasar.earth/#organization",
         "name": "SakaSAR",
         "url": "https://sakasar.earth/",
-        "logo": "https://sakasar.earth/assets/logo.png",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://sakasar.earth/assets/favicon-512x512.png",
+          "width": 512,
+          "height": 512
+        },
         "image": "https://sakasar.earth/assets/logo.png"
       },
       {
@@ -52,8 +59,8 @@
         "name": "SakaSAR",
         "url": "https://sakasar.earth/",
         "applicationCategory": "EnvironmentalApplication",
-        "operatingSystem": "Web",
-        "description": "SAR-based field drowning risk, Sentinel-1 Bicol Region typhoon flood mapping, crop-rotation guidance and LSTM root-zone soil wetness forecasting using open NASA and Copernicus Earth observation data.",
+        "operatingSystem": "Web Browser",
+        "description": "Satellite radar flood mapping and soil-waterlogging forecasting for Philippine farms. Built with Sentinel-1, NASADEM, GPM, and PyTorch for NASA Space Apps.",
         "image": "https://sakasar.earth/assets/logo.png",
         "isAccessibleForFree": true,
         "author": {
@@ -220,8 +227,8 @@
   <script src="app.js"></script>
   <noscript>
     <main style="max-width:720px;margin:48px auto;padding:0 20px;font-family:system-ui,sans-serif;color:#0f1f17;background:#fff">
-      <h1>SakaSAR — Bicol Typhoon Flood Monitor &amp; Field Drowning Risk</h1>
-      <p>SakaSAR maps post-typhoon flooded farmland and field drowning risk across the Bicol Region, Philippines using Copernicus Sentinel-1 radar, NASADEM 30 m terrain, GPM IMERG rainfall, NASA POWER weather, SMAP root-zone moisture, SoilGrids and an LSTM soil-saturation forecast. JavaScript is required for the interactive 3D MapLibre dashboard.</p>
+      <h1>SakaSAR — Radar Flood &amp; Soil Intelligence</h1>
+      <p>Satellite radar flood mapping and soil-waterlogging forecasting for Philippine farms. Built with Sentinel-1, NASADEM, GPM, and PyTorch for NASA Space Apps.</p>
     </main>
   </noscript>
 </body>

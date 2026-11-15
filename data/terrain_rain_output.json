@@ -19,7 +19,7 @@
       9.2,
       14.1
     ],
-    "processing_time_sec": 0.16
+    "processing_time_sec": 0.17
   },
   "rainfall": {
     "data_mode": "cached_live",

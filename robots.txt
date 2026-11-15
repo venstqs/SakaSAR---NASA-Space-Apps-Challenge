@@ -1,4 +1,12 @@
 User-agent: *
 Allow: /
 
+User-agent: Googlebot
+Allow: /
+
+User-agent: Googlebot-Image
+Allow: /
+
 Sitemap: https://sakasar.earth/sitemap.xml
+Host: https://sakasar.earth
+
