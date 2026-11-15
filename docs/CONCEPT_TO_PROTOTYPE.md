@@ -16,6 +16,13 @@ mistakes it for a result). Numbers and methods are in [METHODS.md](METHODS.md) a
 | One shared grid for all layers | 30 m EPSG:32651 grid for the pilot; regional layers on 100 m / 200 m grids | Built |
 | Bare-field and vulnerability detection from NDVI | Checked MODIS 250 m: too coarse for paddies. Bare-field days stay labelled as sample values until Landsat/Sentinel-2 NDVI or the cropping calendar is added | Future |
 
+## How the prototype is framed
+
+SakaSAR opens in **This week** mode: soil wetness across Bicol from the latest NASA POWER day, and a storm-readiness map
+(how many days roots would stay waterlogged if a Kristine-size storm hit now, from the soil forecast). Terrain, runoff,
+drainage, Check my field and watershed tracing work for any day. **Kristine 2024** is a replay feature: a real typhoon
+we use to show the full chain and to test the models against what the radar saw. It is the evidence, not the limit.
+
 ## Farmer-facing features
 
 | Concept | Prototype | Status |
@@ -35,7 +42,7 @@ mistakes it for a result). Numbers and methods are in [METHODS.md](METHODS.md) a
 |---|---|---|
 | Which barangays and towns to reach first | Barangay ranking in the pilot; all 114 Bicol towns ranked by flooded farmland, with CSV export | Built |
 | Damage report within hours instead of weeks | Town flood report: one printable page per town (flooded hectares, radar pass, rain, runoff exposure, soil forecast, actions). Area only; no yield-loss estimate | Partly |
-| Early salvage trigger 48–72 h ahead | Soil forecast for the coming week, plus a rain what-if ("what if 150 mm fell?") on the runoff map. No live rain-forecast feed, so no automatic trigger | Partly |
+| Early salvage trigger 48–72 h ahead | This week mode (soil now + storm readiness), soil forecast for the coming week, plus a rain what-if ("what if 150 mm fell?") on the runoff map. No live rain-forecast feed, so no automatic trigger | Partly |
 | Land-use and zoning support | Bicol-wide runoff and ponding map with an honest check (95% of radar-flooded farmland rated high vs 66% of all farmland) | Partly |
 | Insurance and subsidy verification | Not built. "Check my field" already returns radar evidence for a traced parcel, which is the basis for it | Future |
 | Aquifer and drought forecaster (GRACE) | Not built | Future |

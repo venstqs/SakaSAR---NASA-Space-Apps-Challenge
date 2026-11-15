@@ -791,3 +791,38 @@ h2, h3, h4, .pilot-head h2, .plot-card h3, .story h2, .insp-head b { font-family
 .whatif-out { font-size: 12px; color: var(--ink-2); line-height: 1.4; margin-top: 4px; }
 
 .ref-dot { width: 9px; height: 9px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px rgba(8, 28, 22, 0.8); pointer-events: none; }
+
+/* ---------- modes ---------- */
+.mode-seg button { font-weight: 600; }
+.app.mode-now .timeline { display: none; }
+.app.mode-now .legend, .app.mode-now .readout { bottom: calc(var(--gap) + 32px); }
+.app.mode-now .readout { bottom: var(--gap); }
+.app.mode-now .story { bottom: calc(var(--gap) + 40px); }
+
+/* ---------- motion intro ---------- */
+.intro-inner { display: none; }
+.intro-stage { display: grid; grid-template-columns: minmax(260px, 380px) minmax(320px, 620px); gap: 40px; align-items: center; width: min(1080px, 92vw); }
+.intro-copy { display: grid; gap: 10px; justify-items: start; }
+.intro-copy .intro-logo { width: 96px; height: 96px; }
+.intro-copy .intro-word { font: 800 54px/1 var(--ui); letter-spacing: -0.05em; color: var(--brand); }
+.intro-copy .intro-line { font: 500 16px/1.4 var(--ui); color: var(--ink-2); max-width: 30ch; }
+.intro-stats { display: grid; gap: 10px; margin: 14px 0 0; }
+.intro-stats div { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: baseline; opacity: 0; transform: translateY(8px); animation: lineIn 0.5s ease var(--d) forwards; }
+.intro-stats dt { font: 700 26px/1 var(--display); color: var(--ink); min-width: 3.2ch; }
+.intro-stats dd { margin: 0; font-size: 13px; color: var(--muted); }
+.intro-canvas { width: 100%; aspect-ratio: 0.82; max-height: 78vh; }
+.intro-skip { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); font-size: 12px; color: var(--muted); opacity: 0; animation: lineIn 0.4s ease 1s forwards; }
+@media (max-width: 760px) {
+  .intro-stage { grid-template-columns: 1fr; gap: 6px; }
+  .intro-canvas { order: -1; max-height: 42vh; }
+  .intro-copy .intro-word { font-size: 40px; }
+  .intro-copy .intro-logo { width: 64px; height: 64px; }
+  .mode-seg { display: inline-flex !important; }
+  .mode-seg button { padding: 0 8px; font-size: 12px; }
+}
+
+.mode-seg .sm { display: none; }
+@media (max-width: 760px) {
+  .mode-seg .lg { display: none; } .mode-seg .sm { display: inline; }
+  #btn-fit-bicol, #btn-fit-storm, #btn-shot { display: none; }
+}

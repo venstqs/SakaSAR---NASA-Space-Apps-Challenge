@@ -36,6 +36,10 @@ const FIELDS = {
     stops: [[0, [170, 215, 235, 0]], [40, [150, 210, 235, 100]], [150, [100, 195, 215, 165]], [300, [47, 159, 211, 200]], [500, [27, 95, 168, 215]], [700, [88, 40, 150, 225]]], ticks: [0, 200, 400, "700+"] },
   soil: { name: "Root-zone soil wetness", sub: "NASA POWER GWETROOT. 1 = pores full of water; 0.97+ waterlogged", unit: "", min: 0.6, max: 1,
     stops: [[0.6, [201, 166, 107, 150]], [0.8, [233, 226, 184, 150]], [0.9, [143, 211, 176, 170]], [0.95, [47, 159, 211, 190]], [0.97, [27, 95, 168, 215]], [1, [16, 50, 120, 230]]], ticks: [0.6, 0.8, 0.9, 1] },
+  soilnow: { name: "Soil wetness now", sub: "NASA POWER root zone on the latest available day: dry, moist, wet, waterlogged (0.97+)", unit: "", min: 0.55, max: 1,
+    stops: [[0.55, [214, 130, 50, 185]], [0.68, [236, 190, 90, 175]], [0.78, [120, 190, 110, 175]], [0.9, [52, 160, 200, 195]], [0.97, [27, 95, 168, 220]], [1, [16, 50, 120, 230]]], ticks: ["dry", "moist", "wet", "full"] },
+  ready: { name: "Storm readiness", sub: "Days roots would stay waterlogged if a Kristine-size storm hit now (soil forecast from today's soil)", unit: "days", min: 0, max: 7,
+    stops: [[0, [124, 198, 154, 120]], [1, [255, 236, 170, 150]], [3, [238, 159, 39, 180]], [5, [226, 83, 60, 205]], [7, [140, 20, 20, 225]]], ticks: [0, 2, 4, 7] },
   lstm: { name: "Forecast waterlogged days", sub: "Days out of the next 7 with the root zone at 0.97+ (soil forecast)", unit: "days", min: 0, max: 7,
     stops: [[0, [255, 255, 255, 0]], [0.5, [255, 236, 170, 120]], [2, [238, 159, 39, 170]], [4, [226, 83, 60, 200]], [7, [140, 20, 20, 225]]], ticks: [0, 2, 4, 7] },
 };
@@ -43,9 +47,9 @@ const FIELDS = {
 const S = {
   tl: null, munis: null, summary: null, overlay: null,
   t: 23, playing: false, speed: 1, last: 0, dayShown: -1,
-  field: "none", fieldOpacity: 0.8, basemap: "sat", gibs: "none", view3d: true,
+  field: "soilnow", fieldOpacity: 0.8, basemap: "sat", gibs: "none", view3d: true,
   layers: { hotspots: true, flood: true, towns: true, storm: true, terrain: true, hillshade: true, pilot: true, sarchange: false, runoff: true, streams: true },
-  pilot: null, plot: "PL-02", priority: "water", story: 0, pgrid: null, pgLayer: "none",
+  pilot: null, plot: "PL-02", priority: "water", story: 0, mode: "now", pgrid: null, pgLayer: "none",
   aiMode: "hind", events: [], townCenters: [], charts: {}, ready: false, inspect: null,
 };
 let map, stormMarker, pinMarker, hoverPopup;
@@ -112,17 +116,19 @@ function nearestCell(lon, lat) {
 // ---------------- boot ----------------
 async function init() {
   if ($("splash")) $("brand-logo").style.opacity = 0;
-  const [tl, munis, summary, overlay, pilot] = await Promise.all([
+  const [tl, munis, summary, overlay, pilot, streams] = await Promise.all([
     fetchJSON("data/region/bicol_timeline.json"), fetchJSON("data/region/bicol_municipalities.geojson"),
     fetchJSON("data/region/bicol_summary.json"), fetchJSON("data/region/bicol_flood.json"), fetchJSON("mock-data.json"),
+    fetchJSON("data/region/bicol_streams.geojson"),
   ]);
+  if (!tl || !munis) { toast("Could not load the Bicol data files. Run the API from the project folder."); return; }
+  Object.assign(S, { tl, munis, summary, overlay, streamsGJ: streams });
+  S.pilot = pilot && pilot.plots ? pilot : null;
+  // secondary layers load in the background, after the core data exist
   fetchJSON("data/region/pilot_grids.json").then((g) => { S.pgrid = g; renderPilotGrid(); });
   fetchJSON("data/region/bicol_runoff.json").then((r) => { S.runoff = r; loadRunoff(); renderData(); });
   fetchJSON("data/region/bicol_flowdir.json").then((f) => f && loadFlow(f));
   fetchJSON("data/region/benchmarks.json").then((b) => { S.bench = b; renderData(); renderAI(); });
-  S.pilot = pilot && pilot.plots ? pilot : null;
-  if (!tl || !munis) { toast("Could not load the Bicol data files. Run the API from the project folder."); return; }
-  Object.assign(S, { tl, munis, summary, overlay });
   S.t = Math.max(0, tl.days.indexOf("2024-11-02")) + 0.5;
   S.townCenters = munis.features.map((f) => {
     let x = 0, y = 0, n = 0;
@@ -132,6 +138,7 @@ async function init() {
   });
   prepareGrid();
   S.closest = closestPass(tl.storm, NAGA);
+  requestAnimationFrame(introPlay);
   if (window.Chart) { Chart.defaults.font.family = "Geist, system-ui, sans-serif"; Chart.defaults.color = "#5f7468"; }
   buildEvents();
   bindChrome();
@@ -142,6 +149,7 @@ async function init() {
   renderData();
   bindStory();
   bindDraw();
+  bindModes();
   buildWindows();
   buildTimeline();
   initMap();
@@ -189,6 +197,8 @@ function cellValues(field, di) {
     if (field === "rainsum") return R.cum[i][di];
     if (field === "soil") return tl.rootzone[i][di] ?? NaN;
     if (field === "lstm") return lstmValue(i);
+    if (field === "soilnow") { const c = tl.lstm_kristine_again?.cells?.[i]; return c?.today ?? NaN; }
+    if (field === "ready") { const c = tl.lstm_kristine_again?.cells?.[i]; return c ? c.days_waterlogged : NaN; }
     return NaN;
   });
 }
@@ -275,6 +285,7 @@ function loadFloodPixels() {
       return { type: "Feature", properties: { w: v / max }, geometry: { type: "Point", coordinates: [lon, lat] } };
     });
     registerRaster("flood", c, w, e, n, s, false);
+    R.hot = feats;
     const go = () => { map.getSource("hotspots").setData({ type: "FeatureCollection", features: feats }); map.getSource("flood")?.setTiles(["saka://flood/ready/{z}/{x}/{y}"]); };
     S.ready ? go() : map.once("style.load", go);
   };
@@ -462,13 +473,13 @@ function addLabels() {
 function vis(id, on) { if (map?.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none"); }
 function applyLayers() {
   if (!S.ready) return;
-  const L = S.layers, after = dayISO(S.t) >= "2024-11-02";
+  const L = S.layers, replay = S.mode === "replay", after = replay && dayISO(S.t) >= "2024-11-02";
   vis("hotspots", L.hotspots && after);
   vis("flood", L.flood && after);
   vis("towns-fill", L.towns && after);
   ["towns-line", "towns-hover", "towns-active", "prov-labels", "town-labels"].forEach((id) => vis(id, L.towns));
-  ["track-casing", "track", "track-done", "track-pts", "closest"].forEach((id) => vis(id, L.storm));
-  [stormMarker, S.refLabel, S.nagaLabel, ...(S.trackLabels || [])].forEach((m) => m && (m.getElement().style.visibility = L.storm ? "" : "hidden"));
+  ["track-casing", "track", "track-done", "track-pts", "closest"].forEach((id) => vis(id, L.storm && replay));
+  [stormMarker, S.refLabel, S.nagaLabel, ...(S.trackLabels || [])].forEach((m) => m && (m.getElement().style.visibility = L.storm && replay ? "" : "hidden"));
   vis("hillshade", L.hillshade);
   Object.keys(GIBS).forEach((k) => vis(`gibs-${k}`, S.gibs === k));
   map.setTerrain(L.terrain && S.view3d ? { source: "dem", exaggeration: Number($("exag")?.value || 1.8) } : null);
@@ -533,6 +544,9 @@ function inspect(lon, lat) {
       ${(() => { const r = runoffAt(lon, lat), tr = t && S.runoff?.towns?.[`${t.name}|${t.province}`]; return r || tr ? `<div class="sec">Runoff & ponding risk (terrain + rain, 200 m)</div>
       ${r ? `<dt>This spot</dt><dd>${r.score}/100, ${runoffClass(r.score)}</dd><dt>Terrain wetness index</dt><dd>${r.twi.toFixed(1)}</dd>` : ""}
       ${tr ? `<dt>Town land rated high</dt><dd>${pct(tr.high_share)}</dd>` : ""}` : ""; })()}
+      ${S.mode === "now" && tl.lstm_kristine_again ? `<div class="sec">Now (NASA POWER, ${short(tl.lstm_kristine_again.soil_as_of)} ${tl.lstm_kristine_again.soil_as_of.slice(0, 4)})</div>
+      <dt>Root-zone wetness</dt><dd>${fmt(sample(cellValues("soilnow", 0), lon, lat), 2)}</dd>
+      <dt>If a Kristine-size storm hit now</dt><dd>${fmt(sample(cellValues("ready", 0), lon, lat), 0)} of 7 days waterlogged</dd>` : ""}
       <div class="sec">Weather here, ${short(iso)} (NASA POWER)</div>
       <dt>Rain that day</dt><dd>${fmt(rainDay)} mm</dd>
       <dt>Rain since 10 Oct</dt><dd>${fmt(rainSum)} mm</dd>
@@ -960,11 +974,11 @@ function renderLegend() {
   if (S.field !== "none" && z < 10.5) {
     const f = FIELDS[S.field], L = lut(S.field);
     const grad = Array.from({ length: 9 }, (_, k) => { const j = Math.round((k / 8) * 255) * 4; return `rgba(${L[j]},${L[j + 1]},${L[j + 2]},${Math.max(0.15, L[j + 3] / 255)}) ${(k / 8) * 100}%`; }).join(",");
-    const extra = S.field === "lstm" ? (S.aiMode === "hind" ? "Forecast issued 3 Nov 2024" : "Kristine's rain on today's soil") : `${short(dayISO(S.t))}`;
+    const extra = ["soilnow", "ready"].includes(S.field) ? `NASA POWER, latest day ${short(S.tl.lstm_kristine_again?.soil_as_of || "")} ${(S.tl.lstm_kristine_again?.soil_as_of || "").slice(0, 4)}` : S.field === "lstm" ? (S.aiMode === "hind" ? "Forecast issued 3 Nov 2024" : "Kristine's rain on today's soil") : `${short(dayISO(S.t))}`;
     parts.push(`<div><b>${f.name}${f.unit ? ` (${f.unit})` : ""}</b><small>${extra}</small><div class="ramp" style="background:linear-gradient(90deg,${grad})"></div><div class="ticks-row">${f.ticks.map((t) => `<span>${t}</span>`).join("")}</div></div>`);
   }
   const after = dayISO(S.t) >= "2024-11-02";
-  if (after && z < 12 && (S.layers.flood || S.layers.hotspots || S.layers.towns)) {
+  if (after && S.mode === "replay" && z < 12 && (S.layers.flood || S.layers.hotspots || S.layers.towns)) {
     parts.push(`<div><b>Flood, Sentinel-1 (28 Oct + 2 Nov)</b><div class="sw">${S.layers.hotspots ? `<span><i style="background:linear-gradient(90deg,#ffe882,#ffb000,#ff5a1f,#be0028)"></i>Hotspot density</span>` : ""}${S.layers.flood ? `<span><i style="background:#4ec4de"></i>Flooded farmland</span><span><i style="background:#e9e4c9"></i>Farmland</span>` : ""}${S.layers.towns ? `<span><i style="background:rgba(27,95,168,0.5)"></i>Town share flooded</span>` : ""}</div></div>`);
   }
   if (S.pgLayer !== "none" && S.pgrid && S.layers.pilot && z >= 10.5) {
@@ -973,7 +987,7 @@ function renderLegend() {
   }
   if (S.pilot && S.layers.pilot && S.ready && map.getZoom() >= 10.5) parts.unshift(`<div><b>Field Drowning Risk, 30 m</b><div class="sw">${["high", "watch", "low"].map((k) => `<span><i style="background:${RISK_C[k]}"></i>${RISK_W[k]}</span>`).join("")}<span><i style="background:none;box-shadow:inset 0 0 0 2px #4ec4de"></i>Radar flood edge</span><span><i style="background:#7fe0ff"></i>Drainage channel</span></div></div>`);
   if (S.runoff && (S.layers.runoff || S.layers.streams) && z < 12) parts.push(`<div><b>Runoff & ponding risk, 200 m</b><small>terrain + rain, never saw the radar</small>${S.layers.runoff ? `<div class="ramp" style="background:linear-gradient(90deg,rgba(150,205,235,.5),#2f9fd3 40%,#1b5fa8 70%,#281e78)"></div><div class="ticks-row"><span>60</span><span>High 70</span><span>100</span></div>` : ""}${S.layers.streams ? `<div class="sw"><span><i style="background:#4ec4de;height:3px;border-radius:2px"></i>Drainage, ≥10 km² upstream</span></div>` : ""}</div>`);
-  if (S.layers.storm && z < 10) parts.push(`<div><b>Kristine (EONET winds, PAGASA classes)</b><div class="sw">${CATS.map((c) => `<span><i style="background:${c.c}"></i>${c.short}</span>`).join("")}</div></div>`);
+  if (S.layers.storm && S.mode === "replay" && z < 10) parts.push(`<div><b>Kristine (EONET winds, PAGASA classes)</b><div class="sw">${CATS.map((c) => `<span><i style="background:${c.c}"></i>${c.short}</span>`).join("")}</div></div>`);
   $("legend").innerHTML = parts.length ? `<button type="button" class="legend-toggle" aria-expanded="${!S.legendFolded}">Legend<i data-lucide="${S.legendFolded ? "chevron-up" : "chevron-down"}"></i></button>${S.legendFolded ? "" : parts.join("")}` : "";
   $("legend").querySelector(".legend-toggle")?.addEventListener("click", () => { S.legendFolded = !S.legendFolded; renderLegend(); });
   icons();
@@ -1254,6 +1268,7 @@ const STORY = [
 ];
 function setGibs(k) { S.gibs = k; document.querySelectorAll("[data-gibs]").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.gibs === k))); if (k !== "none" && S.ready) { map.getSource(`gibs-${k}`)._date = null; updateGibs(dayISO(S.t)); } applyLayers(); }
 function storyGo(i) {
+  if (S.mode !== "replay") setMode("replay", true);
   if (!S.pilot && i === 3) i = 4;
   S.story = Math.max(0, Math.min(STORY.length - 1, i));
   const st = STORY[S.story];
@@ -1453,7 +1468,8 @@ function backToMap() {
 const intro = { t0: performance.now(), done: false, hadView: location.hash.includes("view=") };
 function finishIntro(now) {
   if (intro.done) return; intro.done = true;
-  const wait = now ? 0 : Math.max(0, 2350 - (performance.now() - intro.t0));
+  if (!now && !intro.played) { intro.done = false; setTimeout(() => finishIntro(), 120); return; }
+  const wait = now ? 0 : 700; // hold the finished frame a moment
   setTimeout(() => {
     const sp = $("splash"), scan = $("intro-scan"), brand = $("brand-logo");
     if (!sp) return;
@@ -1697,8 +1713,8 @@ async function loadRunoff() {
   const go = () => {
     if (!map.getSource("runoff")) {
       map.addSource("runoff", { type: "raster", tiles: ["saka://runoff/v1/{z}/{x}/{y}"], tileSize: 256, minzoom: 5, maxzoom: 13, bounds: [w, s, e, n] });
-      map.addLayer({ id: "runoff", type: "raster", source: "runoff", paint: { "raster-opacity": ["interpolate", ["linear"], ["zoom"], 7, 0.85, 11, 0.45, 13, 0.2], "raster-resampling": "linear", "raster-fade-duration": 0 } }, map.getLayer("towns-fill") ? "towns-fill" : undefined);
-      map.addSource("streams", { type: "geojson", data: "data/region/bicol_streams.geojson" });
+      map.addLayer({ id: "runoff", type: "raster", source: "runoff", paint: { "raster-opacity": ["interpolate", ["linear"], ["zoom"], 7, 0.85, 11, 0.45, 13, 0.2], "raster-resampling": "linear", "raster-fade-duration": 0 } }, map.getLayer("field") ? "field" : map.getLayer("towns-fill") ? "towns-fill" : undefined);
+      map.addSource("streams", { type: "geojson", data: S.streamsGJ || "data/region/bicol_streams.geojson" });
       map.addLayer({ id: "streams-casing", type: "line", source: "streams", layout: { "line-cap": "round", "line-join": "round" },
         paint: { "line-opacity": ["interpolate", ["linear"], ["zoom"], 7, ["case", [">=", ["get", "up_km2"], 120], 1, 0], 8.4, ["case", [">=", ["get", "up_km2"], 35], 1, 0], 9.4, 1, 10.5, 1, 11.8, 0], "line-color": "rgba(8,40,70,0.55)", "line-width": ["interpolate", ["linear"], ["get", "up_km2"], 10, 1.4, 100, 2.4, 1000, 3.8, 5000, 5.6] } }, map.getLayer("towns-line") ? "towns-line" : undefined);
       map.addLayer({ id: "streams", type: "line", source: "streams", layout: { "line-cap": "round", "line-join": "round" },
@@ -2070,6 +2086,73 @@ function whatIf(mm) {
   if (out) out.innerHTML = real ? `Kristine's real rain: <b>${pct(ro.validation.land_share_high)}</b> of Bicol land rated high.`
     : `<b>${mm} mm</b> everywhere: <b>${pct(res.high)}</b> of Bicol land rated high (Kristine: ${pct(ro.validation.land_share_high)}). ${mm >= 300 ? "Rain is capped at 300 mm in the score, as in the field risk formula." : ""}`;
   return res;
+}
+
+// ================= Modes: "This week" (default) and "Kristine 2024" (a replay of a real typhoon) =================
+function setMode(m, quiet) {
+  S.mode = m;
+  document.querySelectorAll("[data-mode]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === m)));
+  $("app").classList.toggle("mode-now", m === "now");
+  if (m === "now") { pause(); if (["rain", "rainsum", "soil", "lstm"].includes(S.field)) setField("soilnow"); }
+  else { if (["soilnow", "ready"].includes(S.field)) setField("none"); setTime(tAt("2024-11-02") + 0.5, true); }
+  applyLayers(); renderLegend();
+  if (!quiet) toast(m === "now" ? `This week: soil and storm readiness from NASA POWER, latest day ${short(S.tl.lstm_kristine_again?.soil_as_of || "")}.` : "Replay: Typhoon Kristine, October 2024. Press play.");
+}
+function bindModes() {
+  document.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
+  $("app").classList.add("mode-now");
+}
+
+// ================= Intro: Bicol traced, a radar swath finds the rivers and the flood, the numbers count in =================
+function introPlay() {
+  const cv = $("intro-canvas");
+  const end = () => { intro.played = true; };
+  if (!cv || !S.munis || reduceMotion) { end(); return; }
+  const rect = cv.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+  if (rect.width < 50) { end(); return; }
+  cv.width = rect.width * dpr; cv.height = rect.height * dpr;
+  const g = cv.getContext("2d"); g.scale(dpr, dpr);
+  const W = rect.width, H = rect.height, pad = 18, kx = Math.cos((13.1 * Math.PI) / 180);
+  const bw = (R.e - R.w) * kx, bh = R.n - R.s, sc = Math.min((W - 2 * pad) / bw, (H - 2 * pad) / bh);
+  const ox = (W - bw * sc) / 2, oy = (H - bh * sc) / 2, P = (lo, la) => [ox + (lo - R.w) * kx * sc, oy + (R.n - la) * sc];
+  const polys = [];
+  S.munis.features.forEach((f) => (f.geometry.type === "Polygon" ? [f.geometry.coordinates] : f.geometry.coordinates).forEach((p) => {
+    const path = new Path2D(); let x0 = 0; p[0].forEach(([lo, la], i) => { const [x, y] = P(lo, la); x0 += x; i ? path.lineTo(x, y) : path.moveTo(x, y); }); path.closePath();
+    polys.push({ path, x: x0 / p[0].length });
+  }));
+  polys.sort((a, b) => a.x - b.x);
+  const rivers = (S.streamsGJ?.features || []).map((f) => { const path = new Path2D(); f.geometry.coordinates.forEach(([lo, la], i) => { const [x, y] = P(lo, la); i ? path.lineTo(x, y) : path.moveTo(x, y); }); return { path, w: Math.min(2.4, 0.5 + Math.log10(f.properties.up_km2) * 0.55) }; });
+  const ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : 1 - (1 - x) ** 3), slope = 0.32, t0 = performance.now();
+  // stats beside the logo
+  const stats = [[S.munis.features.length, "towns screened"], [S.summary?.flooded_farmland_ha || 0, "ha of flooded farmland seen through cloud"], [S.streamsGJ?.features?.length || 0, "rivers traced from NASADEM"]];
+  $("intro-stats").innerHTML = stats.map((s, i) => `<div style="--d:${1.5 + i * 0.12}s"><dt data-v="0">0</dt><dd>${s[1]}</dd></div>`).join("");
+  setTimeout(() => $("intro-stats").querySelectorAll("dt").forEach((el, i) => countTo(el, stats[i][0])), 1500);
+  const frame = (now) => {
+    const t = (now - t0) / 1000;
+    g.clearRect(0, 0, W, H);
+    // 1. outlines draw in west → east
+    const nOut = Math.floor(polys.length * ease(t / 1.0));
+    g.lineWidth = 0.7; g.strokeStyle = "rgba(23, 100, 58, 0.5)";
+    for (let i = 0; i < nOut; i++) g.stroke(polys[i].path);
+    // 2. the radar swath sweeps; behind it, land fills, rivers and the flood light up
+    const sweep = ease((t - 0.55) / 1.45), bx = -H * slope - 80 + sweep * (W + H * slope + 160);
+    g.save(); g.beginPath(); g.moveTo(-10, -10); g.lineTo(bx + 10 * slope, -10); g.lineTo(bx - H * slope, H + 10); g.lineTo(-10, H + 10); g.closePath(); g.clip();
+    g.fillStyle = "rgba(143, 209, 107, 0.16)"; polys.forEach((p) => g.fill(p.path));
+    g.strokeStyle = "rgba(23, 100, 58, 0.75)"; g.lineWidth = 0.8; polys.forEach((p) => g.stroke(p.path));
+    g.strokeStyle = "rgba(47, 159, 211, 0.85)"; g.lineCap = "round"; rivers.forEach((r) => { g.lineWidth = r.w; g.stroke(r.path); });
+    (R.hot || []).forEach((h) => { const [x, y] = P(...h.geometry.coordinates), rr = 2 + h.properties.w * 9;
+      const gr = g.createRadialGradient(x, y, 0, x, y, rr); gr.addColorStop(0, "rgba(226, 83, 60, 0.9)"); gr.addColorStop(0.5, "rgba(255, 176, 0, 0.45)"); gr.addColorStop(1, "rgba(255, 176, 0, 0)");
+      g.fillStyle = gr; g.beginPath(); g.arc(x, y, rr, 0, 7); g.fill(); });
+    g.restore();
+    if (sweep > 0 && sweep < 1) {
+      const gr = g.createLinearGradient(bx - 90, 0, bx, 0); gr.addColorStop(0, "rgba(23, 100, 58, 0)"); gr.addColorStop(1, "rgba(23, 100, 58, 0.18)");
+      g.fillStyle = gr; g.beginPath(); g.moveTo(bx - 90, 0); g.lineTo(bx, 0); g.lineTo(bx - H * slope, H); g.lineTo(bx - 90 - H * slope, H); g.closePath(); g.fill();
+      g.strokeStyle = "#17643a"; g.lineWidth = 2; g.beginPath(); g.moveTo(bx, 0); g.lineTo(bx - H * slope, H); g.stroke();
+      g.fillStyle = "#17643a"; g.font = "600 11px Inter, sans-serif"; g.fillText("Sentinel-1 radar pass", Math.min(W - 130, Math.max(6, bx - H * slope * 0.12 + 8)), 18);
+    }
+    if (t < 2.3) requestAnimationFrame(frame); else end();
+  };
+  requestAnimationFrame(frame);
 }
 
 init();

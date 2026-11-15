@@ -52,6 +52,10 @@
         <span class="wordmark">SakaSAR</span>
       </a>
       <div class="toolbar" role="toolbar" aria-label="Map tools">
+        <div class="seg mode-seg" role="group" aria-label="What to show">
+          <button type="button" data-mode="now" aria-pressed="true"><span class="lg">This week</span><span class="sm">Now</span></button><button type="button" data-mode="replay"><span class="lg">Kristine 2024</span><span class="sm">2024</span></button>
+        </div>
+        <span class="tb-sep" aria-hidden="true"></span>
         <div class="seg" role="group" aria-label="View">
           <button type="button" data-view="2d">2D</button><button type="button" data-view="3d" aria-pressed="true">3D</button>
         </div>
@@ -172,11 +176,16 @@
 
   <!-- Intro: the SakaSAR logo, then a Sentinel-1 style swath wipes to the map -->
   <div class="intro" id="splash" aria-hidden="true">
-    <div class="intro-inner">
-      <img class="intro-logo" src="assets/sakasar-logo.png" alt="" width="150" height="150" />
-      <p class="intro-word">SakaSAR</p>
-      <p class="intro-line">Flood intelligence for Bicol farms, from radar and NASA data</p>
+    <div class="intro-stage">
+      <div class="intro-copy">
+        <img class="intro-logo" src="assets/sakasar-logo.png" alt="" width="96" height="96" />
+        <p class="intro-word" id="intro-word">SakaSAR</p>
+        <p class="intro-line">Radar sees the flood through the cloud. Farmers get a plan.</p>
+        <dl class="intro-stats" id="intro-stats"></dl>
+      </div>
+      <canvas class="intro-canvas" id="intro-canvas"></canvas>
     </div>
+    <p class="intro-skip">Click to skip</p>
   </div>
   <div class="intro-scan" id="intro-scan" aria-hidden="true"></div>
 
