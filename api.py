@@ -99,7 +99,7 @@ def get_recommendations(plot_id: str | None = None) -> dict:
 
 
 def get_groq_api_key() -> str | None:
-    key = os.environ.get("GROQ_API_KEY")
+    key = os.environ.get("GROQ_API_KEY") or os.environ.get("groq_api_key")
     if key:
         return key.strip()
     env_file = ROOT / ".env"
@@ -107,7 +107,7 @@ def get_groq_api_key() -> str | None:
         try:
             for line in env_file.read_text(encoding="utf-8").splitlines():
                 line = line.strip()
-                if line.startswith("GROQ_API_KEY="):
+                if line.upper().startswith("GROQ_API_KEY="):
                     return line.split("=", 1)[1].strip().strip('"').strip("'")
         except Exception:
             pass
