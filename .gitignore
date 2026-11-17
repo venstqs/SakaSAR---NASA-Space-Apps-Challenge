@@ -11,7 +11,7 @@ data/cache_region/
 
 .vercel
 
-# Internal handoff docs and local demo (kept on disk for Claude/Gemini, never published)
+# Internal handoff docs and local demo (kept on disk, never published)
 CLAUDE.md
 docs/ANTIGRAVITY.md
 docs/SUBMISSION.md
